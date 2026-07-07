@@ -1,0 +1,61 @@
+{
+  "name": "@nova/request",
+  "version": "0.1.0",
+  "description": "A modern, TypeScript-first HTTP client powered by the Fetch API.",
+  "keywords": [
+    "nova",
+    "request",
+    "fetch",
+    "http",
+    "client",
+    "typescript"
+  ],
+  "homepage": "https://github.com/nova-js/request",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nova-js/request.git"
+  },
+  "bugs": {
+    "url": "https://github.com/nova-js/request/issues"
+  },
+  "license": "MIT",
+  "author": "Nova Team",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "sideEffects": false,
+  "engines": {
+    "node": ">=20"
+  },
+  "packageManager": "pnpm@11.10.0",
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "dev": "tsup --watch",
+    "build": "tsup",
+    "clean": "rm -rf dist",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest",
+    "test:watch": "vitest --watch",
+    "example": "tsx examples/basic.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.0",
+    "tsup": "^8.5.1",
+    "tsx": "^4.23.0",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.9"
+  }
+}
