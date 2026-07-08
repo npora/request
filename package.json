@@ -45,14 +45,15 @@
   "scripts": {
     "dev": "tsup --watch",
     "build": "tsup",
-    "clean": "rm -rf dist",
-    "typecheck": "tsc --noEmit",
     "test": "vitest",
-    "test:watch": "vitest --watch",
-    "example": "tsx examples/basic.ts",
-    "example:retry": "tsx examples/retry.ts"
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "changeset": "changeset",
+    "version-packages": "changeset version",
+    "release": "changeset publish"
   },
   "devDependencies": {
+    "@changesets/cli": "^2.31.0",
     "@types/node": "^26.1.0",
     "tsup": "^8.5.1",
     "tsx": "^4.23.0",

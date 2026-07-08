@@ -69,13 +69,13 @@ describe('timeout', () => {
       signal: controller.signal
     })
 
-    await Promise.resolve()
-
-    controller.abort(
-      new RequestError('User aborted', {
-        code: 'ABORT_ERROR'
-      })
-    )
+    setTimeout(() => {
+      controller.abort(
+        new RequestError('User aborted', {
+          code: 'ABORT_ERROR'
+        })
+      )
+    }, 0)
 
     await expect(promise).rejects.toMatchObject({
       code: 'ABORT_ERROR'
