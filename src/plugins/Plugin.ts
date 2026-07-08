@@ -1,16 +1,26 @@
-import type { Client } from '../client'
+import type { Lifecycle } from '../core'
+
+/**
+ * 插件安装上下文。
+ */
+export interface PluginSetupContext {
+  /**
+   * 注册生命周期。
+   */
+  addLifecycle: (lifecycle: Lifecycle) => void
+}
 
 /**
  * Npora Request 插件。
  */
-export interface Plugin {
+export interface Plugin extends Lifecycle {
   /**
    * 插件名称。
    */
   name: string
 
   /**
-   * 插件安装函数。
+   * 插件初始化函数。
    */
-  install: (client: Client) => void
+  setup?: (context: PluginSetupContext) => void
 }
