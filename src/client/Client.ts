@@ -2,6 +2,7 @@ import { FetchAdapter } from '../adapters'
 import { LifecycleStack, Pipeline, RequestContext } from '../core'
 import { InterceptorStack } from '../interceptors'
 import type { Plugin } from '../plugins'
+import { retryPlugin } from '../plugins'
 import type { NovaResponse, RequestConfig } from '../types'
 import { mergeConfig } from '../utils'
 
@@ -26,6 +27,8 @@ export class Client {
 
   constructor(defaults: Partial<RequestConfig> = {}) {
     this.defaults = defaults
+
+    this.use(retryPlugin())
   }
 
   use(plugin: Plugin): this {

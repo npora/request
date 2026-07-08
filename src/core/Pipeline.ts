@@ -4,7 +4,6 @@ import type { NovaResponse, RequestConfig } from '../types'
 import { sleep } from '../utils'
 import type { LifecycleStack } from './LifecycleStack'
 import { RequestContext } from './RequestContext'
-import { normalizeRetryOptions } from './retry'
 
 export interface PipelineInterceptors {
   request: InterceptorStack<RequestConfig>
@@ -24,9 +23,9 @@ export class Pipeline {
 
     await this.lifecycles.runBeforeRequest(context)
 
-    const retryOptions = normalizeRetryOptions(context.config.retry)
+    let attempt = 0
 
-    for (let attempt = 0; attempt <= retryOptions.retries; attempt++) {
+    while (true) {
       await this.adapter.request(context)
 
       if (!context.error) {
@@ -41,11 +40,9 @@ export class Pipeline {
         return context
       }
 
-      const canRetry =
-        attempt < retryOptions.retries &&
-        (await retryOptions.shouldRetry(context.error, attempt))
+      const retryDecision = await this.lifecycles.resolveRetry(context, attempt)
 
-      if (!canRetry) {
+      if (!retryDecision.retry) {
         context.error = await this.interceptors.error.run(context.error)
 
         await this.lifecycles.runError(context)
@@ -53,16 +50,14 @@ export class Pipeline {
         return context
       }
 
-      const delay = await retryOptions.delay(attempt, context.error)
-
       context.error = undefined
       context.response = undefined
 
-      if (delay > 0) {
-        await sleep(delay)
+      if (retryDecision.delay && retryDecision.delay > 0) {
+        await sleep(retryDecision.delay)
       }
-    }
 
-    return context
+      attempt++
+    }
   }
 }
