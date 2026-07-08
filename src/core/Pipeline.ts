@@ -1,53 +1,59 @@
 import type { Adapter } from '../adapters'
+import type { InterceptorStack } from '../interceptors'
+import type { NovaResponse, RequestConfig } from '../types'
+import { sleep } from '../utils'
 import { RequestContext } from './RequestContext'
+import { normalizeRetryOptions } from './retry'
 
-/**
- * Request Pipeline
- *
- * 请求生命周期执行器。
- *
- * Pipeline 负责组织整个请求生命周期，
- * 不负责具体请求实现。
- */
+export interface PipelineInterceptors {
+  request: InterceptorStack<RequestConfig>
+  response: InterceptorStack<NovaResponse>
+  error: InterceptorStack<unknown>
+}
+
 export class Pipeline {
   constructor(
-    private readonly adapter: Adapter
+    private readonly adapter: Adapter,
+    private readonly interceptors: PipelineInterceptors
   ) {}
 
-  /**
-   * 执行请求流水线。
-   */
-  async execute<T>(
-    context: RequestContext<T>
-  ): Promise<RequestContext<T>> {
+  async execute<T>(context: RequestContext<T>): Promise<RequestContext<T>> {
+    context.config = await this.interceptors.request.run(context.config)
 
-    // Request Lifecycle
-    await this.beforeRequest(context)
+    const retryOptions = normalizeRetryOptions(context.config.retry)
 
-    // Adapter
-    await this.adapter.request(context)
+    for (let attempt = 0; attempt <= retryOptions.retries; attempt++) {
+      await this.adapter.request(context)
 
-    // Response Lifecycle
-    await this.afterResponse(context)
+      if (!context.error) {
+        if (context.response) {
+          context.response = (await this.interceptors.response.run(
+            context.response as NovaResponse
+          )) as NovaResponse<T>
+        }
+
+        return context
+      }
+
+      const canRetry =
+        attempt < retryOptions.retries &&
+        (await retryOptions.shouldRetry(context.error, attempt))
+
+      if (!canRetry) {
+        context.error = await this.interceptors.error.run(context.error)
+        return context
+      }
+
+      const delay = await retryOptions.delay(attempt, context.error)
+
+      context.error = undefined
+      context.response = undefined
+
+      if (delay > 0) {
+        await sleep(delay)
+      }
+    }
 
     return context
-  }
-
-  /**
-   * 请求前生命周期。
-   */
-  protected async beforeRequest<T>(
-    context: RequestContext<T>
-  ): Promise<void> {
-    void context
-  }
-
-  /**
-   * 请求后生命周期。
-   */
-  protected async afterResponse<T>(
-    context: RequestContext<T>
-  ): Promise<void> {
-    void context
   }
 }

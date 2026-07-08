@@ -1,13 +1,14 @@
 import { FetchAdapter } from '../adapters'
 import { Pipeline, RequestContext } from '../core'
-import type { RequestConfig } from '../types'
+import { InterceptorStack } from '../interceptors'
+import type { Plugin } from '../plugins'
+import type { NovaResponse, RequestConfig } from '../types'
 import { mergeConfig } from '../utils'
 
 /**
  * HTTP Client
  *
- * Client 是 Nova Request 对外提供的统一请求入口。
- * 它只负责组织请求流程，不负责具体请求实现。
+ * Client 是 Npora Request 对外提供的统一请求入口。
  */
 export class Client {
   /**
@@ -16,18 +17,47 @@ export class Client {
   private readonly defaults: Partial<RequestConfig>
 
   /**
+   * 已安装插件名称集合。
+   */
+  private readonly installedPlugins = new Set<string>()
+
+  /**
+   * 拦截器。
+   */
+  public readonly interceptors = {
+    request: new InterceptorStack<RequestConfig>(),
+    response: new InterceptorStack<NovaResponse>(),
+    error: new InterceptorStack<unknown>()
+  }
+
+  /**
    * 请求执行流水线。
    */
-  private readonly pipeline = new Pipeline(new FetchAdapter())
+  private readonly pipeline = new Pipeline(
+    new FetchAdapter(),
+    this.interceptors
+  )
 
   constructor(defaults: Partial<RequestConfig> = {}) {
     this.defaults = defaults
   }
 
   /**
+   * 安装插件。
+   */
+  use(plugin: Plugin): this {
+    if (this.installedPlugins.has(plugin.name)) {
+      return this
+    }
+
+    plugin.install(this)
+    this.installedPlugins.add(plugin.name)
+
+    return this
+  }
+
+  /**
    * 执行请求。
-   *
-   * @param config 请求配置
    */
   async request<T = unknown>(config: RequestConfig): Promise<T> {
     const mergedConfig = mergeConfig(this.defaults, config)
