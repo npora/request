@@ -1,20 +1,15 @@
 import type { RequestConfig, NovaResponse } from '../types'
-import type { RequestError } from '../errors'
 
 /**
  * Request Context
  *
  * 请求上下文对象。
- *
- * RequestContext 贯穿整个请求生命周期，
- * 所有插件、拦截器、Adapter 都共享同一个上下文。
  */
 export class RequestContext<T = unknown> {
-
   /**
    * 当前请求配置。
    */
-  public readonly config: RequestConfig
+  public config: RequestConfig
 
   /**
    * 请求响应。
@@ -24,7 +19,7 @@ export class RequestContext<T = unknown> {
   /**
    * 请求异常。
    */
-  public error?: RequestError
+  public error?: unknown
 
   /**
    * 请求开始时间。
@@ -42,10 +37,9 @@ export class RequestContext<T = unknown> {
   }
 
   /**
-   * 请求耗时（毫秒）。
+   * 请求耗时，单位毫秒。
    */
   get duration(): number {
-
     if (!this.endTime) {
       return Date.now() - this.startTime
     }

@@ -1,25 +1,25 @@
 {
-  "name": "@nova/request",
+  "name": "@npora/request",
   "version": "0.1.0",
   "description": "A modern, TypeScript-first HTTP client powered by the Fetch API.",
   "keywords": [
-    "nova",
+    "npora",
     "request",
     "fetch",
     "http",
-    "client",
+    "http-client",
     "typescript"
   ],
-  "homepage": "https://github.com/nova-js/request",
+  "homepage": "https://github.com/npora/request",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/nova-js/request.git"
+    "url": "git+https://github.com/npora/request.git"
   },
   "bugs": {
-    "url": "https://github.com/nova-js/request/issues"
+    "url": "https://github.com/npora/request/issues"
   },
   "license": "MIT",
-  "author": "Nova Team",
+  "author": "Npora Team",
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
@@ -49,7 +49,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest",
     "test:watch": "vitest --watch",
-    "example": "tsx examples/basic.ts"
+    "example": "tsx examples/basic.ts",
+    "example:retry": "tsx examples/retry.ts"
   },
   "devDependencies": {
     "@types/node": "^26.1.0",
