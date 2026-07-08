@@ -1,13 +1,52 @@
 import { RequestError } from '../errors'
+import type { Plugin } from './Plugin'
 import type { RetryOptions } from '../types'
 
-export interface NormalizedRetryOptions {
+interface NormalizedRetryOptions {
   retries: number
   delay: (attempt: number, error: unknown) => number | Promise<number>
   shouldRetry: (error: unknown, attempt: number) => boolean | Promise<boolean>
 }
 
-export function normalizeRetryOptions(
+/**
+ * Retry Plugin
+ *
+ * 内置重试插件。
+ */
+export function retryPlugin(): Plugin {
+  return {
+    name: 'builtin:retry',
+
+    async resolveRetry(context, attempt) {
+      if (!context.error) {
+        return {
+          retry: false,
+          delay: 0
+        }
+      }
+
+      const retryOptions = normalizeRetryOptions(context.config.retry)
+
+      const canRetry =
+        attempt < retryOptions.retries &&
+        (await retryOptions.shouldRetry(context.error, attempt))
+
+      if (!canRetry) {
+        return {
+          retry: false,
+          delay: 0
+        }
+      }
+
+      return {
+        retry: true,
+        delay: await retryOptions.delay(attempt, context.error)
+      }
+    }
+  }
+}
+
+function normalizeRetryOptions(
   retry?: number | RetryOptions
 ): NormalizedRetryOptions {
   if (typeof retry === 'number') {

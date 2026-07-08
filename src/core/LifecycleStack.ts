@@ -1,4 +1,4 @@
-import type { Lifecycle } from './Lifecycle'
+import type { Lifecycle, RetryDecision } from './Lifecycle'
 import type { RequestContext } from './RequestContext'
 
 export class LifecycleStack {
@@ -23,6 +23,24 @@ export class LifecycleStack {
   async runError<T>(context: RequestContext<T>): Promise<void> {
     for (const lifecycle of this.lifecycles) {
       await lifecycle.onError?.(context)
+    }
+  }
+
+  async resolveRetry<T>(
+    context: RequestContext<T>,
+    attempt: number
+  ): Promise<RetryDecision> {
+    for (const lifecycle of this.lifecycles) {
+      const decision = await lifecycle.resolveRetry?.(context, attempt)
+
+      if (decision) {
+        return decision
+      }
+    }
+
+    return {
+      retry: false,
+      delay: 0
     }
   }
 }
