@@ -21,11 +21,11 @@ describe('plugin', () => {
 
     const request = createClient()
 
-    const authPlugin: Plugin = {
+    const plugin: Plugin = {
       name: 'auth',
 
-      install(client) {
-        client.interceptors.request.use(config => {
+      install(context) {
+        context.interceptors.request.use(config => {
           return {
             ...config,
             headers: {
@@ -37,7 +37,7 @@ describe('plugin', () => {
       }
     }
 
-    request.use(authPlugin)
+    request.use(plugin)
 
     await request.get('/user')
 

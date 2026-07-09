@@ -1,4 +1,3 @@
-import type { Client } from '../client'
 import type { LoggerOptions } from '../types'
 import type { Plugin } from './Plugin'
 
@@ -6,8 +5,8 @@ export function loggerPlugin(defaultOptions: LoggerOptions = {}): Plugin {
   return {
     name: 'logger',
 
-    install(client: Client) {
-      client.interceptors.request.use(config => {
+    install(context) {
+      context.interceptors.request.use(config => {
         const logger = config.logger ?? defaultOptions
 
         if (logger.enabled === false) {
@@ -23,7 +22,7 @@ export function loggerPlugin(defaultOptions: LoggerOptions = {}): Plugin {
         return config
       })
 
-      client.interceptors.response.use(response => {
+      context.interceptors.response.use(response => {
         const logger = response.config.logger ?? defaultOptions
 
         if (logger.enabled === false) {
@@ -40,7 +39,7 @@ export function loggerPlugin(defaultOptions: LoggerOptions = {}): Plugin {
         return response
       })
 
-      client.interceptors.error.use(error => {
+      context.interceptors.error.use(error => {
         console.error('[Npora Request]', {
           type: 'error',
           error

@@ -1,4 +1,3 @@
-import type { Client } from '../client'
 import type { RequestConfig } from '../types'
 import type { Plugin } from './Plugin'
 
@@ -13,37 +12,51 @@ export function cachePlugin(): Plugin {
   return {
     name: 'cache',
 
-    install(client: Client) {
-      const originalRequest = client.request.bind(client)
+    install(context) {
+      context.hooks.onRequest(requestContext => {
+        const cache = requestContext.config.cache
 
-      client.request = async function requestWithCache<T = unknown>(
-        config: RequestConfig
-      ): Promise<T> {
-        if (!config.cache?.enabled) {
-          return originalRequest<T>(config)
+        if (!cache?.enabled) {
+          return
         }
 
-        const key = createCacheKey(config)
+        const key = createCacheKey(requestContext.config)
         const record = cacheStore.get(key)
 
-        if (record) {
-          if (Date.now() <= record.expiresAt) {
-            return record.data as T
-          }
-
-          cacheStore.delete(key)
+        if (!record) {
+          return
         }
 
-        const data = await originalRequest<T>(config)
-        const ttl = config.cache.ttl ?? 30000
+        if (Date.now() > record.expiresAt) {
+          cacheStore.delete(key)
+          return
+        }
+
+        requestContext.response = {
+          data: record.data,
+          status: 200,
+          statusText: 'OK',
+          headers: new Headers(),
+          config: requestContext.config,
+          raw: new Response()
+        }
+      })
+
+      context.hooks.onResponse(requestContext => {
+        const cache = requestContext.config.cache
+
+        if (!cache?.enabled || !requestContext.response) {
+          return
+        }
+
+        const key = createCacheKey(requestContext.config)
+        const ttl = cache.ttl ?? 30000
 
         cacheStore.set(key, {
-          data,
+          data: requestContext.response.data,
           expiresAt: Date.now() + ttl
         })
-
-        return data
-      }
+      })
     }
   }
 }

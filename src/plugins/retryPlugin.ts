@@ -1,7 +1,6 @@
 import { RequestError } from '../errors'
-import type { Client } from '../client'
+import type { RetryOptions } from '../types'
 import type { Plugin } from './Plugin'
-import type { RequestConfig, RetryOptions } from '../types'
 
 interface NormalizedRetryOptions {
   retries: number
@@ -13,38 +12,36 @@ export function retryPlugin(defaultOptions: RetryOptions = {}): Plugin {
   return {
     name: 'retry',
 
-    install(client: Client) {
-      const originalRequest = client.request.bind(client)
-
-      client.request = async function requestWithRetry<T = unknown>(
-        config: RequestConfig
-      ): Promise<T> {
-        const retryOptions = normalizeRetryOptions(config.retry, defaultOptions)
-
-        let attempt = 0
-
-        while (true) {
-          try {
-            return await originalRequest<T>(config)
-          } catch (error) {
-            const canRetry =
-              attempt < retryOptions.retries &&
-              (await retryOptions.shouldRetry(error, attempt))
-
-            if (!canRetry) {
-              throw error
-            }
-
-            const delay = await retryOptions.delay(attempt, error)
-
-            if (delay > 0) {
-              await sleep(delay)
-            }
-
-            attempt++
+    install(context) {
+      context.hooks.onRetry(async (requestContext, attempt) => {
+        if (!requestContext.error) {
+          return {
+            retry: false,
+            delay: 0
           }
         }
-      }
+
+        const retryOptions = normalizeRetryOptions(
+          requestContext.config.retry,
+          defaultOptions
+        )
+
+        const canRetry =
+          attempt < retryOptions.retries &&
+          (await retryOptions.shouldRetry(requestContext.error, attempt))
+
+        if (!canRetry) {
+          return {
+            retry: false,
+            delay: 0
+          }
+        }
+
+        return {
+          retry: true,
+          delay: await retryOptions.delay(attempt, requestContext.error)
+        }
+      })
     }
   }
 }
@@ -96,10 +93,4 @@ function defaultShouldRetry(error: unknown): boolean {
   }
 
   return error.status === 408 || error.status === 429 || error.status >= 500
-}
-
-function sleep(ms: number): Promise<void> {
-  return new Promise(resolve => {
-    setTimeout(resolve, ms)
-  })
 }
