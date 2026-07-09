@@ -16,17 +16,17 @@ Core features should remain stable.
 
 ### Instance
 
-- [ ] createClient()
+- [x] createClient()
 - [ ] createClient().extend()
 
 ### Request API
 
-- [ ] request()
-- [ ] get()
-- [ ] post()
-- [ ] put()
-- [ ] patch()
-- [ ] delete()
+- [x] request()
+- [x] get()
+- [x] post()
+- [x] put()
+- [x] patch()
+- [x] delete()
 
 ---
 
@@ -34,36 +34,34 @@ Core features should remain stable.
 
 ### Base
 
-- [ ] baseURL
-- [ ] headers
-- [ ] query
-- [ ] body
+- [x] baseURL
+- [x] headers
+- [x] query
+- [x] body
 
 ### Request
 
-- [ ] json
-- [ ] form
-- [ ] formData
+- [x] json
+- [x] form
+- [x] formData
 
 ### Control
 
-- [ ] timeout
-- [ ] signal
+- [x] timeout
+- [x] signal
 
 ### Response
 
-- [ ] responseType
-- [ ] validateStatus
+- [x] responseType
+- [x] validateStatus
 
 ---
 
 ## Pipeline
 
-- [ ] Config Merge
-
-- [ ] Request Pipeline
-
-- [ ] Request Context
+- [x] Config Merge
+- [x] Request Pipeline
+- [x] Request Context
 
 ---
 
@@ -71,41 +69,32 @@ Core features should remain stable.
 
 ### Built-in
 
-- [ ] Fetch Adapter
+- [x] Fetch Adapter
 
 ### Future
 
 - [ ] Node Adapter
-
-- [ ] Mock Adapter
+- [x] Mock Adapter
 
 ---
 
 ## Parser
 
-- [ ] JSON
-
-- [ ] Text
-
-- [ ] Blob
-
-- [ ] ArrayBuffer
-
-- [ ] Stream
+- [x] JSON
+- [x] Text
+- [x] Blob
+- [x] ArrayBuffer
+- [x] Stream
 
 ---
 
 ## Error
 
-- [ ] RequestError
-
-- [ ] HTTP Error
-
-- [ ] Network Error
-
-- [ ] Timeout Error
-
-- [ ] Abort Error
+- [x] RequestError
+- [x] HTTP Error
+- [x] Network Error
+- [x] Timeout Error
+- [x] Abort Error
 
 ---
 
@@ -117,85 +106,70 @@ Everything below should be implemented as extensions.
 
 ## Retry
 
-- [ ] Retry
-
-- [ ] Retry Delay
-
-- [ ] Retry Condition
+- [x] Retry
+- [x] Retry Delay
+- [x] Retry Condition
 
 ---
 
 ## Cache
 
-- [ ] Memory Cache
-
-- [ ] TTL
-
-- [ ] Custom Cache Key
+- [x] Memory Cache
+- [x] TTL
+- [x] Custom Cache Key
 
 ---
 
 ## Authentication
 
-- [ ] Authorization Header
-
+- [x] Authorization Header
 - [ ] Refresh Token
-
 - [ ] Token Storage
 
 ---
 
 ## Upload
 
-- [ ] Upload
-
+- [x] Upload
 - [ ] Upload Progress
 
 ---
 
 ## Download
 
-- [ ] Download
-
+- [x] Download
 - [ ] Download Progress
 
 ---
 
 ## Logger
 
-- [ ] Request Logger
-
-- [ ] Response Logger
-
-- [ ] Error Logger
+- [x] Request Logger
+- [x] Response Logger
+- [x] Error Logger
 
 ---
 
 ## Mock
 
-- [ ] Mock Adapter
+- [x] Mock Adapter
 
 ---
 
 # Interceptors
 
-- [ ] Request Interceptor
-
-- [ ] Response Interceptor
-
-- [ ] Error Interceptor
+- [x] Request Interceptor
+- [x] Response Interceptor
+- [x] Error Interceptor
 
 ---
 
 # Utilities
 
-- [ ] Query Builder
-
-- [ ] URL Builder
-
-- [ ] Header Merge
-
-- [ ] Body Serializer
+- [x] Query Builder
+- [x] URL Builder
+- [x] Header Merge
+- [x] Body Serializer
 
 ---
 
@@ -204,11 +178,8 @@ Everything below should be implemented as extensions.
 Supported:
 
 - [ ] Chrome
-
 - [ ] Edge
-
 - [ ] Firefox
-
 - [ ] Safari
 
 ---
@@ -218,31 +189,24 @@ Supported:
 Supported:
 
 - [ ] Browser
-
-- [ ] Node.js
-
+- [x] Node.js
 - [ ] Web Worker
 
 ---
 
 # TypeScript
 
-- [ ] Complete Type Definitions
-
-- [ ] Generic Request
-
-- [ ] Generic Response
-
+- [x] Complete Type Definitions
+- [x] Generic Request
+- [x] Generic Response
 - [ ] Generic Error
 
 ---
 
 # Testing
 
-- [ ] Unit Tests
-
+- [x] Unit Tests
 - [ ] Integration Tests
-
 - [ ] Browser Tests
 
 ---
@@ -250,11 +214,8 @@ Supported:
 # Documentation
 
 - [ ] README
-
-- [ ] Blueprint
-
-- [ ] Structure
-
+- [x] Blueprint
+- [x] Structure
 - [ ] Examples
 
 ---
@@ -272,11 +233,8 @@ Core
 Request
 
 - Timeout
-
 - Abort
-
 - Retry
-
 - Cache
 
 ---
@@ -286,11 +244,8 @@ Request
 Business
 
 - Auth
-
 - Logger
-
 - Upload
-
 - Download
 
 ---
