@@ -1,5 +1,5 @@
 import { FetchAdapter } from '../adapters'
-import { mergeConfig, Pipeline } from '../core'
+import { mergeConfig, Pipeline, PluginHooks } from '../core'
 import { InterceptorManager } from '../interceptors'
 import type { Plugin } from '../plugins'
 import type { NporaResponse, RequestConfig } from '../types'
@@ -9,6 +9,8 @@ export class Client {
 
   private readonly installedPlugins = new Set<string>()
 
+  private readonly hooks = new PluginHooks()
+
   public readonly interceptors = {
     request: new InterceptorManager<RequestConfig>(),
     response: new InterceptorManager<NporaResponse>(),
@@ -17,7 +19,8 @@ export class Client {
 
   private readonly pipeline = new Pipeline(
     new FetchAdapter(),
-    this.interceptors
+    this.interceptors,
+    this.hooks
   )
 
   constructor(defaults: Partial<RequestConfig> = {}) {
@@ -29,7 +32,11 @@ export class Client {
       return this
     }
 
-    plugin.install(this)
+    plugin.install({
+      interceptors: this.interceptors,
+      hooks: this.hooks
+    })
+
     this.installedPlugins.add(plugin.name)
 
     return this

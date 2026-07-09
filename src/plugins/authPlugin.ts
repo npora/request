@@ -1,4 +1,3 @@
-import type { Client } from '../client'
 import type { AuthOptions, RequestConfig } from '../types'
 import type { Plugin } from './Plugin'
 
@@ -6,8 +5,8 @@ export function authPlugin(defaultOptions: AuthOptions = {}): Plugin {
   return {
     name: 'auth',
 
-    install(client: Client) {
-      client.interceptors.request.use(async config => {
+    install(context) {
+      context.interceptors.request.use(async config => {
         const auth = config.auth ?? defaultOptions
 
         if (!auth.token) {

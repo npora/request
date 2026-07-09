@@ -1,12 +1,11 @@
-import type { Client } from '../client'
 import type { Plugin } from './Plugin'
 
 export function uploadPlugin(): Plugin {
   return {
     name: 'upload',
 
-    install(client: Client) {
-      client.interceptors.request.use(config => {
+    install(context) {
+      context.interceptors.request.use(config => {
         if (!config.upload) {
           return config
         }
