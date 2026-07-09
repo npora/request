@@ -50,14 +50,19 @@
     "typecheck": "tsc --noEmit",
     "changeset": "changeset",
     "version-packages": "changeset version",
-    "release": "changeset publish"
+    "release": "changeset publish",
+    "example": "tsx examples/basic.ts",
+    "example:plugins": "tsx examples/plugins.ts",
+    "test:coverage": "vitest run --coverage",
+    "test:run": "vitest run"
   },
   "devDependencies": {
     "@changesets/cli": "^2.31.0",
     "@types/node": "^26.1.0",
+    "@vitest/coverage-v8": "^4.1.10",
     "tsup": "^8.5.1",
     "tsx": "^4.23.0",
     "typescript": "^6.0.3",
-    "vitest": "^4.1.9"
+    "vitest": "^4.1.10"
   }
 }
