@@ -41,6 +41,10 @@ export interface UploadOptions {
   data: UploadData
 }
 
+export interface DownloadOptions {
+  filename?: string
+}
+
 export interface RequestConfig {
   url: string
   method?: HttpMethod
@@ -60,4 +64,5 @@ export interface RequestConfig {
   auth?: AuthOptions
   logger?: LoggerOptions
   upload?: UploadOptions
+  download?: DownloadOptions
 }
