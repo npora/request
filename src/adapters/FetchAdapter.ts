@@ -1,13 +1,14 @@
+import { buildRequest } from '../core'
 import { RequestError } from '../errors'
 import type { Adapter, NporaResponse, RequestConfig } from '../types'
-import { createFetchRequest, parseResponse } from '../utils'
+import { parseResponse } from '../utils'
 
 export class FetchAdapter implements Adapter {
   async request<T = unknown>(config: RequestConfig): Promise<NporaResponse<T>> {
-    const fetchRequest = createFetchRequest(config)
+    const request = buildRequest(config)
 
     try {
-      const response = await fetch(fetchRequest.url, fetchRequest.init)
+      const response = await fetch(request.url, request.init)
       const data = await parseResponse<T>(response, config)
 
       const validateStatus = config.validateStatus ?? defaultValidateStatus
@@ -32,7 +33,7 @@ export class FetchAdapter implements Adapter {
         throw error
       }
 
-      if (fetchRequest.init.signal?.aborted) {
+      if (request.init.signal?.aborted) {
         throw new RequestError('Request aborted', {
           code: 'ABORT_ERROR',
           cause: error
@@ -44,7 +45,7 @@ export class FetchAdapter implements Adapter {
         cause: error
       })
     } finally {
-      fetchRequest.clear()
+      request.clear()
     }
   }
 }

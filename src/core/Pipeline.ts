@@ -1,5 +1,5 @@
-import type { Adapter, NporaResponse, RequestConfig } from '../types'
 import type { InterceptorManager } from '../interceptors'
+import type { Adapter, NporaResponse, RequestConfig } from '../types'
 import type { PluginHooks } from './PluginHooks'
 import { RequestContext } from './RequestContext'
 
@@ -50,7 +50,6 @@ export class Pipeline {
 
           if (!retryDecision.retry) {
             context.error = await this.interceptors.error.run(context.error)
-
             throw context.error
           }
 
