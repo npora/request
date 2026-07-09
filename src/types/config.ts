@@ -31,6 +31,10 @@ export interface AuthOptions {
   scheme?: string
 }
 
+export interface LoggerOptions {
+  enabled?: boolean
+}
+
 export interface RequestConfig {
   url: string
   method?: HttpMethod
@@ -48,4 +52,5 @@ export interface RequestConfig {
   retry?: number | RetryOptions
   cache?: CacheOptions
   auth?: AuthOptions
+  logger?: LoggerOptions
 }
