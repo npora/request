@@ -13,48 +13,39 @@ export type ResponseType =
 
 export interface RetryOptions {
   retries?: number
-
   delay?: number | ((attempt: number, error: unknown) => number | Promise<number>)
-
-  shouldRetry?: (error: unknown, attempt: number) => boolean | Promise<boolean>
+  shouldRetry?: (
+    error: unknown,
+    attempt: number
+  ) => boolean | Promise<boolean>
 }
 
 export interface CacheOptions {
   enabled?: boolean
-
   ttl?: number
-
   key?: string
+}
+
+export interface AuthOptions {
+  token?: string | (() => string | Promise<string>)
+  scheme?: string
 }
 
 export interface RequestConfig {
   url: string
-
   method?: HttpMethod
-
   baseURL?: string
-
   headers?: HeadersInit
-
   query?: QueryParams
-
   body?: BodyInit | Record<string, unknown> | null
-
   json?: Record<string, unknown> | unknown[]
-
   form?: URLSearchParams | Record<string, QueryValue | QueryValue[]>
-
   formData?: FormData | Record<string, unknown>
-
   timeout?: number
-
   signal?: AbortSignal
-
   responseType?: ResponseType
-
   validateStatus?: (status: number) => boolean
-
   retry?: number | RetryOptions
-
   cache?: CacheOptions
+  auth?: AuthOptions
 }
