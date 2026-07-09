@@ -27,6 +27,27 @@ describe('loggerPlugin', () => {
     await request.get('/user')
 
     expect(logSpy).toHaveBeenCalledTimes(2)
+
+    expect(logSpy).toHaveBeenNthCalledWith(
+      1,
+      '[Npora Request]',
+      expect.objectContaining({
+        type: 'request',
+        method: 'GET',
+        url: '/user'
+      })
+    )
+
+    expect(logSpy).toHaveBeenNthCalledWith(
+      2,
+      '[Npora Request]',
+      expect.objectContaining({
+        type: 'response',
+        method: 'GET',
+        url: '/user',
+        status: 200
+      })
+    )
   })
 
   it('should not log when logger is disabled', async () => {
@@ -56,9 +77,13 @@ describe('loggerPlugin', () => {
   })
 
   it('should log error', async () => {
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
 
-    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('network down')))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockRejectedValue(new Error('network down'))
+    )
 
     const request = createClient().use(loggerPlugin())
 
@@ -66,6 +91,24 @@ describe('loggerPlugin', () => {
       code: 'NETWORK_ERROR'
     })
 
+    expect(logSpy).toHaveBeenCalledTimes(1)
+
     expect(errorSpy).toHaveBeenCalledTimes(1)
+
+    expect(logSpy).toHaveBeenCalledWith(
+      '[Npora Request]',
+      expect.objectContaining({
+        type: 'request',
+        method: 'GET',
+        url: '/error'
+      })
+    )
+
+    expect(errorSpy).toHaveBeenCalledWith(
+      '[Npora Request]',
+      expect.objectContaining({
+        type: 'error'
+      })
+    )
   })
 })
