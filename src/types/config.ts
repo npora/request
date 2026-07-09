@@ -35,6 +35,12 @@ export interface LoggerOptions {
   enabled?: boolean
 }
 
+export type UploadData = FormData | Record<string, unknown>
+
+export interface UploadOptions {
+  data: UploadData
+}
+
 export interface RequestConfig {
   url: string
   method?: HttpMethod
@@ -53,4 +59,5 @@ export interface RequestConfig {
   cache?: CacheOptions
   auth?: AuthOptions
   logger?: LoggerOptions
+  upload?: UploadOptions
 }
