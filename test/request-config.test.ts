@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { createFetchRequest } from '../src'
+import { buildRequest } from '../src'
 
 describe('request config', () => {
   it('should build url with baseURL and query', () => {
-    const { url } = createFetchRequest({
+    const { url } = buildRequest({
       baseURL: 'https://api.example.com',
       url: '/users',
       query: {
@@ -21,7 +21,7 @@ describe('request config', () => {
   })
 
   it('should serialize json body', () => {
-    const { init } = createFetchRequest({
+    const { init } = buildRequest({
       url: '/users',
       method: 'POST',
       json: {
@@ -36,7 +36,7 @@ describe('request config', () => {
   })
 
   it('should serialize form body', () => {
-    const { init } = createFetchRequest({
+    const { init } = buildRequest({
       url: '/login',
       method: 'POST',
       form: {
