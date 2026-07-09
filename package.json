@@ -50,7 +50,9 @@
     "typecheck": "tsc --noEmit",
     "changeset": "changeset",
     "version-packages": "changeset version",
-    "release": "changeset publish"
+    "release": "changeset publish",
+    "example": "tsx examples/basic.ts",
+    "example:plugins": "tsx examples/plugins.ts"
   },
   "devDependencies": {
     "@changesets/cli": "^2.31.0",
