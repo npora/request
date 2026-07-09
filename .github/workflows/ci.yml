@@ -36,7 +36,10 @@ jobs:
         run: pnpm typecheck
 
       - name: Test
-        run: pnpm test -- --run
+        run: pnpm test:run
+
+      - name: Coverage
+        run: pnpm test:coverage
 
       - name: Build
         run: pnpm build
