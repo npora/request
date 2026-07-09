@@ -19,6 +19,14 @@ export interface RetryOptions {
   shouldRetry?: (error: unknown, attempt: number) => boolean | Promise<boolean>
 }
 
+export interface CacheOptions {
+  enabled?: boolean
+
+  ttl?: number
+
+  key?: string
+}
+
 export interface RequestConfig {
   url: string
 
@@ -47,4 +55,6 @@ export interface RequestConfig {
   validateStatus?: (status: number) => boolean
 
   retry?: number | RetryOptions
+
+  cache?: CacheOptions
 }
