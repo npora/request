@@ -1,4 +1,5 @@
 export * from './Plugin'
 export * from './authPlugin'
 export * from './cachePlugin'
+export * from './loggerPlugin'
 export * from './retryPlugin'
