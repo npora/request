@@ -138,7 +138,7 @@ Everything below should be implemented as extensions.
 ## Download
 
 - [x] Download
-- [ ] Download Progress
+- [x] Download Progress
 
 ---
 
