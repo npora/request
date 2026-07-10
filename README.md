@@ -2,241 +2,173 @@
 
 > A modern, TypeScript-first HTTP client built on top of the Fetch API.
 
-Npora Request is a lightweight and extensible request library for modern JavaScript applications.
+Npora Request provides a consistent, extensible and production-ready request layer for modern JavaScript applications.
 
-It does not replace Fetch.
+It does **not** replace Fetch.
 
-It enhances Fetch with a stable client API, config handling, interceptors, adapters, plugins and unified errors.
+It builds on top of the Fetch API while keeping the native request model.
 
-## Features
+---
+
+# Features
 
 - Fetch First
 - TypeScript First
+- Lightweight
+- Extensible
 - Zero Runtime Dependency
-- Client Instance
-- Config Merge
-- Request / Response / Error Interceptors
-- Fetch Adapter
-- Mock Adapter
-- Timeout
-- Abort
-- Retry Plugin
-- Cache Plugin
-- Auth Plugin
-- Logger Plugin
-- Upload Plugin
-- Download Plugin
+- Plugin Architecture
+- Custom Adapter
+- Unified Error Handling
 
-## Installation
+---
+
+# Installation
 
 ```bash
 pnpm add @npora/request
 ```
 
+or
+
 ```bash
 npm install @npora/request
 ```
 
-> This package is still under active development.
+---
 
-## Quick Start
+# Quick Start
 
 ```ts
 import { createClient } from '@npora/request'
 
+interface User {
+  id: number
+  name: string
+}
+
 const request = createClient({
-  baseURL: 'https://jsonplaceholder.typicode.com'
+  baseURL: 'https://api.example.com'
 })
 
-const todo = await request.get('/todos/1')
+const user = await request.get<User>('/users/1')
 
-console.log(todo)
+console.log(user)
 ```
 
-## JSON Request
+---
+
+# Public API
 
 ```ts
-await request.post('/users', {
-  json: {
-    name: 'Npora'
-  }
-})
+const request = createClient(options)
+
+request.request(config)
+
+request.get(url)
+
+request.post(url)
+
+request.put(url)
+
+request.patch(url)
+
+request.delete(url)
+
+request.use(plugin)
+
+request.interceptors.request.use()
+
+request.interceptors.response.use()
+
+request.interceptors.error.use()
 ```
 
-## Query
+---
 
-```ts
-await request.get('/users', {
-  query: {
-    page: 1,
-    keyword: 'npora'
-  }
-})
+# Examples
+
+See the `examples` directory.
+
+```
+examples
+├── basic.ts
+└── plugins.ts
 ```
 
-## Timeout
+---
 
-```ts
-const request = createClient({
-  timeout: 5000
-})
+# Documentation
+
+Project documentation is located in the `docs` directory.
+
+```
+docs
+├── blueprint.md
+├── structure.md
+├── features.md
+└── api.md
 ```
 
-## Abort
+- **Blueprint** — Project vision and architecture
+- **Structure** — Directory responsibilities
+- **Features** — Product roadmap
+- **API** — Public API contract
 
-```ts
-const controller = new AbortController()
+---
 
-request.get('/users', {
-  signal: controller.signal
-})
+# Browser Support
 
-controller.abort()
-```
-
-## Interceptors
-
-```ts
-request.interceptors.request.use(config => {
-  return {
-    ...config,
-    headers: {
-      ...config.headers,
-      authorization: 'Bearer token'
-    }
-  }
-})
-
-request.interceptors.response.use(response => {
-  return response
-})
-
-request.interceptors.error.use(error => {
-  return error
-})
-```
-
-## Plugins
-
-### Retry
-
-```ts
-import { createClient, retryPlugin } from '@npora/request'
-
-const request = createClient().use(
-  retryPlugin({
-    retries: 2,
-    delay: 300
-  })
-)
-```
-
-### Cache
-
-```ts
-import { cachePlugin, createClient } from '@npora/request'
-
-const request = createClient().use(cachePlugin())
-
-await request.get('/users', {
-  cache: {
-    enabled: true,
-    ttl: 30000
-  }
-})
-```
-
-### Auth
-
-```ts
-import { authPlugin, createClient } from '@npora/request'
-
-const request = createClient().use(
-  authPlugin({
-    token: () => localStorage.getItem('token') ?? ''
-  })
-)
-```
-
-### Logger
-
-```ts
-import { createClient, loggerPlugin } from '@npora/request'
-
-const request = createClient().use(loggerPlugin())
-```
-
-### Upload
-
-```ts
-import { createClient, uploadPlugin } from '@npora/request'
-
-const request = createClient().use(uploadPlugin())
-
-await request.request({
-  url: '/upload',
-  upload: {
-    data: {
-      name: 'Npora'
-    }
-  }
-})
-```
-
-### Download
-
-```ts
-import { createClient, downloadPlugin } from '@npora/request'
-
-const request = createClient().use(downloadPlugin())
-
-const file = await request.get<Blob>('/download', {
-  download: {
-    filename: 'file.txt'
-  }
-})
-```
-
-## Mock Adapter
-
-```ts
-import { MockAdapter } from '@npora/request'
-
-const adapter = new MockAdapter()
-
-adapter.on('/user', () => ({
-  name: 'Npora'
-}))
-```
-
-## Design
-
-Npora Request follows three rules:
-
-- Keep the Core stable.
-- Build everything else as extensions.
-- Do not add runtime dependencies unless necessary.
-
-See:
-
-- `docs/blueprint.md`
-- `docs/features.md`
-- `docs/structure.md`
-
-## Browser Support
-
-Supported:
+Supported runtimes:
 
 - Chrome
 - Edge
 - Firefox
 - Safari
-- Node.js 20+
+- Node.js
 
-Internet Explorer is not supported.
+Internet Explorer is **not supported**.
 
-Polyfills are not included.
+---
 
-## License
+# Roadmap
+
+## v0.1
+
+Core
+
+- Client
+- Config
+- Pipeline
+- Adapter
+- Error
+
+## v0.2
+
+Request
+
+- Timeout
+- Abort
+- Retry
+- Cache
+
+## v0.3
+
+Business
+
+- Auth
+- Logger
+- Upload
+- Download
+
+## v1.0
+
+Stable API
+
+Production Ready
+
+---
+
+# License
 
 MIT © Npora Team
