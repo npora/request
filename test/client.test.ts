@@ -1,5 +1,9 @@
 import { describe, expect, it, vi } from 'vitest'
-import type { Adapter, NporaResponse, RequestConfig } from '../src'
+import type {
+  Adapter,
+  NporaResponse,
+  RequestConfig
+} from '../src'
 import { createClient } from '../src'
 
 describe('client', () => {
@@ -16,10 +20,10 @@ describe('client', () => {
   })
 
   it('should use custom adapter', async () => {
-    const request = vi.fn(
-      async <T = unknown>(
+    const adapter: Adapter = {
+      async request<T = unknown>(
         config: RequestConfig
-      ): Promise<NporaResponse<T>> => {
+      ): Promise<NporaResponse<T>> {
         return {
           data: {
             source: 'custom-adapter'
@@ -31,11 +35,9 @@ describe('client', () => {
           raw: new Response()
         }
       }
-    )
-
-    const adapter: Adapter = {
-      request
     }
+
+    const requestSpy = vi.spyOn(adapter, 'request')
 
     const client = createClient({
       adapter,
@@ -48,9 +50,9 @@ describe('client', () => {
       source: 'custom-adapter'
     })
 
-    expect(request).toHaveBeenCalledTimes(1)
+    expect(requestSpy).toHaveBeenCalledTimes(1)
 
-    expect(request).toHaveBeenCalledWith(
+    expect(requestSpy).toHaveBeenCalledWith(
       expect.objectContaining({
         baseURL: 'https://api.example.com',
         url: '/user',

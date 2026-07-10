@@ -1,14 +1,21 @@
 /**
- * Request error options.
+ * Public request error codes.
  */
+export type RequestErrorCode =
+  | 'HTTP_ERROR'
+  | 'NETWORK_ERROR'
+  | 'TIMEOUT_ERROR'
+  | 'ABORT_ERROR'
+  | 'PARSER_ERROR'
+
 export interface RequestErrorOptions {
   /**
-   * Error code.
+   * Stable machine-readable error code.
    */
-  code: string
+  code: RequestErrorCode
 
   /**
-   * HTTP status.
+   * HTTP response status when available.
    */
   status?: number
 
@@ -19,23 +26,14 @@ export interface RequestErrorOptions {
 }
 
 /**
- * Unified request error.
+ * Unified public error for all request failures.
  */
 export class RequestError extends Error {
-  /**
-   * Error code.
-   */
-  public readonly code: string
+  readonly code: RequestErrorCode
 
-  /**
-   * HTTP status.
-   */
-  public readonly status?: number
+  readonly status?: number
 
-  /**
-   * Original error.
-   */
-  public readonly cause?: unknown
+  readonly cause?: unknown
 
   constructor(message: string, options: RequestErrorOptions) {
     super(message)
@@ -44,5 +42,7 @@ export class RequestError extends Error {
     this.code = options.code
     this.status = options.status
     this.cause = options.cause
+
+    Object.setPrototypeOf(this, new.target.prototype)
   }
 }
