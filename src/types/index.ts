@@ -1,4 +1,5 @@
 export * from './adapter'
+export * from './client'
 export * from './config'
 export * from './method'
 export * from './response'

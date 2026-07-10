@@ -3,7 +3,12 @@ import { ConfigMerger, Pipeline } from '../core'
 import { InterceptorManager } from '../interceptors'
 import { PluginHooks } from '../interceptors/PluginHooks'
 import type { Plugin } from '../plugins'
-import type { NporaResponse, RequestConfig } from '../types'
+import type {
+  Adapter,
+  ClientOptions,
+  NporaResponse,
+  RequestConfig
+} from '../types'
 
 export class Client {
   private readonly defaults: Partial<RequestConfig>
@@ -18,14 +23,13 @@ export class Client {
     error: new InterceptorManager<unknown>()
   }
 
-  private readonly pipeline = new Pipeline(
-    new FetchAdapter(),
-    this.interceptors,
-    this.hooks
-  )
+  private readonly pipeline: Pipeline
 
-  constructor(defaults: Partial<RequestConfig> = {}) {
+  constructor(options: ClientOptions = {}) {
+    const { adapter = new FetchAdapter(), ...defaults } = options
+
     this.defaults = defaults
+    this.pipeline = this.createPipeline(adapter)
   }
 
   use(plugin: Plugin): this {
@@ -103,5 +107,9 @@ export class Client {
       url,
       method: 'DELETE'
     })
+  }
+
+  private createPipeline(adapter: Adapter): Pipeline {
+    return new Pipeline(adapter, this.interceptors, this.hooks)
   }
 }
