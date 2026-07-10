@@ -8,7 +8,6 @@ export class FetchAdapter implements Adapter {
 
     try {
       const response = await fetch(request.url, request.init)
-      const data = await parseResponse<T>(response, config)
       const validateStatus = config.validateStatus ?? defaultValidateStatus
 
       if (!validateStatus(response.status)) {
@@ -17,6 +16,8 @@ export class FetchAdapter implements Adapter {
           status: response.status
         })
       }
+
+      const data = await parseResponse<T>(response, config)
 
       return {
         data,
@@ -31,9 +32,10 @@ export class FetchAdapter implements Adapter {
         throw error
       }
 
-      const reason = request.init.signal?.reason
+      const signal = request.init.signal
+      const reason = signal?.reason
 
-      if (request.init.signal?.aborted) {
+      if (signal?.aborted) {
         if (reason instanceof RequestError) {
           throw reason
         }

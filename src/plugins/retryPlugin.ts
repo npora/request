@@ -4,21 +4,28 @@ import type { Plugin } from './Plugin'
 
 interface NormalizedRetryOptions {
   retries: number
-  delay: (attempt: number, error: unknown) => number | Promise<number>
-  shouldRetry: (error: unknown, attempt: number) => boolean | Promise<boolean>
+
+  delay: (
+    attempt: number,
+    error: unknown
+  ) => number | Promise<number>
+
+  shouldRetry: (
+    error: unknown,
+    attempt: number
+  ) => boolean | Promise<boolean>
 }
 
-export function retryPlugin(defaultOptions: RetryOptions = {}): Plugin {
+export function retryPlugin(
+  defaultOptions: RetryOptions = {}
+): Plugin {
   return {
     name: 'retry',
 
     install(context) {
       context.hooks.onRetry(async (requestContext, attempt) => {
         if (!requestContext.error) {
-          return {
-            retry: false,
-            delay: 0
-          }
+          return undefined
         }
 
         const retryOptions = normalizeRetryOptions(
@@ -26,20 +33,25 @@ export function retryPlugin(defaultOptions: RetryOptions = {}): Plugin {
           defaultOptions
         )
 
-        const canRetry =
-          attempt < retryOptions.retries &&
-          (await retryOptions.shouldRetry(requestContext.error, attempt))
+        if (attempt >= retryOptions.retries) {
+          return undefined
+        }
 
-        if (!canRetry) {
-          return {
-            retry: false,
-            delay: 0
-          }
+        const shouldRetry = await retryOptions.shouldRetry(
+          requestContext.error,
+          attempt
+        )
+
+        if (!shouldRetry) {
+          return undefined
         }
 
         return {
           retry: true,
-          delay: await retryOptions.delay(attempt, requestContext.error)
+          delay: await retryOptions.delay(
+            attempt,
+            requestContext.error
+          )
         }
       })
     }
@@ -52,24 +64,42 @@ function normalizeRetryOptions(
 ): NormalizedRetryOptions {
   if (typeof retry === 'number') {
     return {
-      retries: retry,
+      retries: normalizeRetries(retry),
       delay: normalizeDelay(defaults.delay),
-      shouldRetry: defaults.shouldRetry ?? defaultShouldRetry
+      shouldRetry:
+        defaults.shouldRetry ?? defaultShouldRetry
     }
   }
 
   return {
-    retries: retry?.retries ?? defaults.retries ?? 0,
-    delay: normalizeDelay(retry?.delay ?? defaults.delay),
-    shouldRetry: retry?.shouldRetry ?? defaults.shouldRetry ?? defaultShouldRetry
+    retries: normalizeRetries(
+      retry?.retries ?? defaults.retries ?? 0
+    ),
+    delay: normalizeDelay(
+      retry?.delay ?? defaults.delay
+    ),
+    shouldRetry:
+      retry?.shouldRetry ??
+      defaults.shouldRetry ??
+      defaultShouldRetry
   }
+}
+
+function normalizeRetries(retries: number): number {
+  if (!Number.isFinite(retries)) {
+    return 0
+  }
+
+  return Math.max(0, Math.floor(retries))
 }
 
 function normalizeDelay(
   delay?: RetryOptions['delay']
 ): NormalizedRetryOptions['delay'] {
   if (typeof delay === 'number') {
-    return () => delay
+    const normalizedDelay = Math.max(0, delay)
+
+    return () => normalizedDelay
   }
 
   return delay ?? defaultRetryDelay
@@ -88,9 +118,13 @@ function defaultShouldRetry(error: unknown): boolean {
     return true
   }
 
-  if (!error.status) {
+  if (error.status === undefined) {
     return false
   }
 
-  return error.status === 408 || error.status === 429 || error.status >= 500
+  return (
+    error.status === 408 ||
+    error.status === 429 ||
+    error.status >= 500
+  )
 }
