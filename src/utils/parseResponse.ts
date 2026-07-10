@@ -1,5 +1,9 @@
-import type { RequestConfig } from '../types'
+import { RequestError } from '../errors'
+import type { RequestConfig, ResponseType } from '../types'
 
+/**
+ * Parse a Fetch response according to the request configuration.
+ */
 export async function parseResponse<T = unknown>(
   response: Response,
   config: RequestConfig
@@ -8,33 +12,45 @@ export async function parseResponse<T = unknown>(
     return undefined as T
   }
 
-  const responseType = config.responseType ?? detectResponseType(response)
+  const responseType =
+    config.responseType ?? detectResponseType(response)
 
-  switch (responseType) {
-    case 'json':
-      return response.json() as Promise<T>
+  try {
+    switch (responseType) {
+      case 'json':
+        return (await response.json()) as T
 
-    case 'text':
-      return response.text() as Promise<T>
+      case 'text':
+        return (await response.text()) as T
 
-    case 'blob':
-      return response.blob() as Promise<T>
+      case 'blob':
+        return (await response.blob()) as T
 
-    case 'arrayBuffer':
-      return response.arrayBuffer() as Promise<T>
+      case 'arrayBuffer':
+        return (await response.arrayBuffer()) as T
 
-    case 'stream':
-      return response.body as T
+      case 'stream':
+        return response.body as T
 
-    default:
-      return response.text() as Promise<T>
+      default:
+        return (await response.text()) as T
+    }
+  } catch (error) {
+    throw new RequestError('Failed to parse response', {
+      code: 'PARSER_ERROR',
+      status: response.status,
+      cause: error
+    })
   }
 }
 
-function detectResponseType(response: Response): RequestConfig['responseType'] {
+function detectResponseType(response: Response): ResponseType {
   const contentType = response.headers.get('content-type') ?? ''
 
-  if (contentType.includes('application/json')) {
+  if (
+    contentType.includes('application/json') ||
+    contentType.includes('+json')
+  ) {
     return 'json'
   }
 
