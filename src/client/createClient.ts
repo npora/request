@@ -1,9 +1,9 @@
-import type { RequestConfig } from '../types'
+import type { ClientOptions } from '../types'
 import { Client } from './Client'
 
 /**
- * Create HTTP client.
+ * Create an HTTP client instance.
  */
-export function createClient(defaults: Partial<RequestConfig> = {}): Client {
-  return new Client(defaults)
+export function createClient(options: ClientOptions = {}): Client {
+  return new Client(options)
 }
