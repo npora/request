@@ -1,5 +1,3 @@
 export * from './ConfigMerger'
 export * from './Pipeline'
-export * from './PluginHooks'
-export * from './RequestBuilder'
 export * from './RequestContext'

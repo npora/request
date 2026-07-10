@@ -1,6 +1,7 @@
 import { FetchAdapter } from '../adapters'
-import { ConfigMerger, Pipeline, PluginHooks } from '../core'
+import { ConfigMerger, Pipeline } from '../core'
 import { InterceptorManager } from '../interceptors'
+import { PluginHooks } from '../interceptors/PluginHooks'
 import type { Plugin } from '../plugins'
 import type { NporaResponse, RequestConfig } from '../types'
 
@@ -44,7 +45,6 @@ export class Client {
 
   async request<T = unknown>(config: RequestConfig): Promise<T> {
     const mergedConfig = ConfigMerger.merge(this.defaults, config)
-
     const response = await this.pipeline.execute<T>(mergedConfig)
 
     return response.data

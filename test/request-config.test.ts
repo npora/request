@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildRequest } from '../src'
+import { buildRequest } from '../src/utils/buildRequest'
 
 describe('request config', () => {
   it('should build url with baseURL and query', () => {
