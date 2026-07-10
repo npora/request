@@ -1,6 +1,8 @@
-import type { InterceptorManager } from '../interceptors'
+import type {
+  InterceptorManager
+} from '../interceptors/InterceptorManager'
+import type { PluginHooks } from '../interceptors/PluginHooks'
 import type { Adapter, NporaResponse, RequestConfig } from '../types'
-import type { PluginHooks } from './PluginHooks'
 import { RequestContext } from './RequestContext'
 
 export interface PipelineInterceptors {
@@ -9,6 +11,11 @@ export interface PipelineInterceptors {
   error: InterceptorManager<unknown>
 }
 
+/**
+ * Coordinates the request lifecycle.
+ *
+ * Pipeline does not implement business features.
+ */
 export class Pipeline {
   constructor(
     private readonly adapter: Adapter,
@@ -46,21 +53,20 @@ export class Pipeline {
 
           await this.hooks.runError(context)
 
-          const retryDecision = await this.hooks.resolveRetry(context, attempt)
+          const decision = await this.hooks.resolveRetry(context, attempt)
 
-          if (!retryDecision.retry) {
+          if (!decision.retry) {
             context.error = await this.interceptors.error.run(context.error)
             throw context.error
           }
 
           context.error = undefined
           context.response = undefined
+          attempt += 1
 
-          if (retryDecision.delay && retryDecision.delay > 0) {
-            await sleep(retryDecision.delay)
+          if (decision.delay && decision.delay > 0) {
+            await sleep(decision.delay)
           }
-
-          attempt++
         }
       }
     } finally {
@@ -69,8 +75,8 @@ export class Pipeline {
   }
 }
 
-function sleep(ms: number): Promise<void> {
+function sleep(milliseconds: number): Promise<void> {
   return new Promise(resolve => {
-    setTimeout(resolve, ms)
+    setTimeout(resolve, milliseconds)
   })
 }

@@ -1,4 +1,4 @@
-import type { PluginHooks, RetryHook, RequestHook } from '../core'
+import type { PluginHooks } from '../interceptors/PluginHooks'
 import type { InterceptorManager } from '../interceptors'
 import type { NporaResponse, RequestConfig } from '../types'
 
@@ -9,7 +9,10 @@ export interface PluginContext {
     error: InterceptorManager<unknown>
   }
 
-  hooks: Pick<PluginHooks, 'onRequest' | 'onResponse' | 'onError' | 'onRetry'>
+  hooks: Pick<
+    PluginHooks,
+    'onRequest' | 'onResponse' | 'onError' | 'onRetry'
+  >
 }
 
 export interface Plugin {
@@ -17,5 +20,3 @@ export interface Plugin {
 
   install: (context: PluginContext) => void
 }
-
-export type { RequestHook, RetryHook }

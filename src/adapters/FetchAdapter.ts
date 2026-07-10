@@ -1,7 +1,6 @@
-import { buildRequest } from '../core'
 import { RequestError } from '../errors'
 import type { Adapter, NporaResponse, RequestConfig } from '../types'
-import { parseResponse } from '../utils'
+import { buildRequest, parseResponse } from '../utils'
 
 export class FetchAdapter implements Adapter {
   async request<T = unknown>(config: RequestConfig): Promise<NporaResponse<T>> {
@@ -10,7 +9,6 @@ export class FetchAdapter implements Adapter {
     try {
       const response = await fetch(request.url, request.init)
       const data = await parseResponse<T>(response, config)
-
       const validateStatus = config.validateStatus ?? defaultValidateStatus
 
       if (!validateStatus(response.status)) {
@@ -33,7 +31,13 @@ export class FetchAdapter implements Adapter {
         throw error
       }
 
+      const reason = request.init.signal?.reason
+
       if (request.init.signal?.aborted) {
+        if (reason instanceof RequestError) {
+          throw reason
+        }
+
         throw new RequestError('Request aborted', {
           code: 'ABORT_ERROR',
           cause: error

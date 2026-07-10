@@ -1,5 +1,5 @@
 import type { QueryParams, RequestConfig } from '../types'
-import { createTimeoutSignal } from '../utils'
+import { createTimeoutSignal } from './createTimeoutSignal'
 
 export interface BuiltRequest {
   url: string
@@ -7,6 +7,9 @@ export interface BuiltRequest {
   clear: () => void
 }
 
+/**
+ * Build a Fetch-compatible request from RequestConfig.
+ */
 export function buildRequest(config: RequestConfig): BuiltRequest {
   const headers = new Headers(config.headers)
   const body = buildBody(config, headers)
@@ -44,9 +47,9 @@ function buildURL(config: RequestConfig): string {
 function stringifyQuery(query: QueryParams): string {
   const params = new URLSearchParams()
 
-  Object.entries(query).forEach(([key, value]) => {
+  for (const [key, value] of Object.entries(query)) {
     appendQuery(params, key, value)
-  })
+  }
 
   return params.toString()
 }
@@ -61,7 +64,10 @@ function appendQuery(
   }
 
   if (Array.isArray(value)) {
-    value.forEach(item => appendQuery(params, key, item))
+    for (const item of value) {
+      appendQuery(params, key, item)
+    }
+
     return
   }
 
@@ -78,24 +84,16 @@ function buildBody(
   }
 
   if (config.form !== undefined) {
-    setContentType(headers, 'application/x-www-form-urlencoded;charset=UTF-8')
+    setContentType(
+      headers,
+      'application/x-www-form-urlencoded;charset=UTF-8'
+    )
+
     return buildURLSearchParams(config.form)
   }
 
   if (config.formData !== undefined) {
-    if (config.formData instanceof FormData) {
-      return config.formData
-    }
-
-    const formData = new FormData()
-
-    Object.entries(config.formData).forEach(([key, value]) => {
-      if (value !== null && value !== undefined) {
-        formData.append(key, String(value))
-      }
-    })
-
-    return formData
+    return buildFormData(config.formData)
   }
 
   if (config.body === null || config.body === undefined) {
@@ -119,11 +117,52 @@ function buildURLSearchParams(
 
   const params = new URLSearchParams()
 
-  Object.entries(form).forEach(([key, value]) => {
+  for (const [key, value] of Object.entries(form)) {
     appendQuery(params, key, value)
-  })
+  }
 
   return params
+}
+
+function buildFormData(
+  input: FormData | Record<string, unknown>
+): FormData {
+  if (input instanceof FormData) {
+    return input
+  }
+
+  const formData = new FormData()
+
+  for (const [key, value] of Object.entries(input)) {
+    appendFormDataValue(formData, key, value)
+  }
+
+  return formData
+}
+
+function appendFormDataValue(
+  formData: FormData,
+  key: string,
+  value: unknown
+): void {
+  if (value === null || value === undefined) {
+    return
+  }
+
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      appendFormDataValue(formData, key, item)
+    }
+
+    return
+  }
+
+  if (value instanceof Blob) {
+    formData.append(key, value)
+    return
+  }
+
+  formData.append(key, String(value))
 }
 
 function setContentType(headers: Headers, value: string): void {

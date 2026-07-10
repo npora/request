@@ -1,21 +1,31 @@
-import type { RequestContext } from './RequestContext'
+import type { RequestContext } from '../core/RequestContext'
 
 export interface RetryDecision {
   retry: boolean
   delay?: number
 }
 
-export type RequestHook = (context: RequestContext<any>) => void | Promise<void>
+export type RequestHook = (
+  context: RequestContext<unknown>
+) => void | Promise<void>
 
 export type RetryHook = (
-  context: RequestContext<any>,
+  context: RequestContext<unknown>,
   attempt: number
 ) => RetryDecision | undefined | Promise<RetryDecision | undefined>
 
+/**
+ * Internal plugin lifecycle manager.
+ *
+ * It coordinates plugin hooks without exposing Client internals.
+ */
 export class PluginHooks {
   private readonly requestHooks: RequestHook[] = []
+
   private readonly responseHooks: RequestHook[] = []
+
   private readonly errorHooks: RequestHook[] = []
+
   private readonly retryHooks: RetryHook[] = []
 
   onRequest(hook: RequestHook): void {
@@ -34,26 +44,26 @@ export class PluginHooks {
     this.retryHooks.push(hook)
   }
 
-  async runRequest(context: RequestContext<any>): Promise<void> {
+  async runRequest(context: RequestContext<unknown>): Promise<void> {
     for (const hook of this.requestHooks) {
       await hook(context)
     }
   }
 
-  async runResponse(context: RequestContext<any>): Promise<void> {
+  async runResponse(context: RequestContext<unknown>): Promise<void> {
     for (const hook of this.responseHooks) {
       await hook(context)
     }
   }
 
-  async runError(context: RequestContext<any>): Promise<void> {
+  async runError(context: RequestContext<unknown>): Promise<void> {
     for (const hook of this.errorHooks) {
       await hook(context)
     }
   }
 
   async resolveRetry(
-    context: RequestContext<any>,
+    context: RequestContext<unknown>,
     attempt: number
   ): Promise<RetryDecision> {
     for (const hook of this.retryHooks) {
