@@ -123,8 +123,8 @@ Everything below should be implemented as extensions.
 ## Authentication
 
 - [x] Authorization Header
-- [ ] Refresh Token
-- [ ] Token Storage
+- [x] Refresh Token
+- [x] Token Storage
 
 ---
 
