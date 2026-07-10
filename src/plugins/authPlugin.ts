@@ -4,9 +4,27 @@ import type { Plugin } from './Plugin'
 
 type MaybePromise<T> = T | Promise<T>
 
+/**
+ * Token storage used by the authentication extension.
+ *
+ * Storage implementation is supplied by the application.
+ * The request library does not access localStorage or sessionStorage directly.
+ */
+export interface AuthTokenStorage {
+  get(): MaybePromise<string | null | undefined>
+
+  set(token: string): MaybePromise<void>
+
+  remove(): MaybePromise<void>
+}
+
 export interface AuthPluginOptions {
   /**
    * Access token or access-token provider.
+   *
+   * When both token and storage are provided,
+   * the request-level token has the highest priority,
+   * followed by this token option, then storage.
    */
   token?: string | (() => MaybePromise<string>)
 
@@ -18,10 +36,15 @@ export interface AuthPluginOptions {
   scheme?: string
 
   /**
+   * Optional access-token storage.
+   */
+  storage?: AuthTokenStorage
+
+  /**
    * Refresh the access token.
    *
-   * The callback may return the refreshed token directly,
-   * or update external token storage and return void.
+   * Returning a token stores it through storage when configured.
+   * Returning void allows the callback to update external state itself.
    */
   refreshToken?: () => MaybePromise<string | void>
 
@@ -35,9 +58,6 @@ export interface AuthPluginOptions {
 
 /**
  * Authentication plugin.
- *
- * Adds the Authorization header and optionally refreshes
- * an expired access token after an unauthorized response.
  */
 export function authPlugin(options: AuthPluginOptions = {}): Plugin {
   let refreshPromise: Promise<string | void> | undefined
@@ -75,23 +95,28 @@ export function authPlugin(options: AuthPluginOptions = {}): Plugin {
             options.refreshToken
           )
 
-          const token =
-            refreshedToken || (await resolveToken(options.token))
-
-          if (token) {
-            requestContext.config = setAuthorizationHeader(
-              requestContext.config,
-              token,
-              options.scheme
-            )
+          if (refreshedToken) {
+            await options.storage?.set(refreshedToken)
           }
+
+          const token =
+            refreshedToken || (await resolvePluginToken(options))
+
+          if (!token) {
+            return undefined
+          }
+
+          requestContext.config = setAuthorizationHeader(
+            requestContext.config,
+            token,
+            options.scheme
+          )
 
           return {
             retry: true,
             delay: 0
           }
         } catch {
-          // Preserve the original HTTP error when refresh fails.
           return undefined
         }
       })
@@ -116,7 +141,10 @@ async function applyAuthorization(
   options: AuthPluginOptions
 ): Promise<RequestConfig> {
   const requestAuth = config.auth
-  const token = await resolveToken(requestAuth?.token ?? options.token)
+
+  const token = requestAuth?.token
+    ? await resolveToken(requestAuth.token)
+    : await resolvePluginToken(options)
 
   if (!token) {
     return config
@@ -127,6 +155,20 @@ async function applyAuthorization(
     token,
     requestAuth?.scheme ?? options.scheme
   )
+}
+
+async function resolvePluginToken(
+  options: AuthPluginOptions
+): Promise<string> {
+  const configuredToken = await resolveToken(options.token)
+
+  if (configuredToken) {
+    return configuredToken
+  }
+
+  const storedToken = await options.storage?.get()
+
+  return storedToken ?? ''
 }
 
 async function resolveToken(
