@@ -12,10 +12,11 @@ concurrency:
 permissions:
   contents: write
   pull-requests: write
+  id-token: write
 
 jobs:
-  version:
-    name: Version Packages
+  release:
+    name: Release
     runs-on: ubuntu-latest
 
     steps:
@@ -33,12 +34,25 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 24
+          registry-url: https://registry.npmjs.org
           cache: pnpm
+
+      - name: Update npm
+        run: npm install --global npm@latest
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Create release pull request
+      - name: Verify
+        run: |
+          pnpm typecheck
+          pnpm test:run
+          pnpm build
+
+      - name: Create release pull request or publish
         uses: changesets/action@v1
         with:
           version: pnpm version-packages
+          publish: pnpm release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
