@@ -50,7 +50,7 @@
     "typecheck": "tsc --noEmit",
     "changeset": "changeset",
     "version-packages": "changeset version",
-    "release": "pnpm build && changeset publish",
+    "release": "pnpm build && npm publish --access public",
     "example": "tsx examples/basic.ts",
     "example:plugins": "tsx examples/plugins.ts",
     "test:coverage": "vitest run --coverage",
