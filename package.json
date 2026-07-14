@@ -1,6 +1,6 @@
 {
   "name": "@npora/request",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "A modern, TypeScript-first HTTP client powered by the Fetch API.",
   "keywords": [
     "npora",
