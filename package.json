@@ -54,10 +54,14 @@
     "example": "tsx examples/basic.ts",
     "example:plugins": "tsx examples/plugins.ts",
     "test:coverage": "vitest run --coverage",
-    "test:run": "vitest run"
+    "test:run": "vitest run",
+    "test:browser": "playwright test --config=browser/playwright.config.ts",
+    "test:browser:ui": "playwright test --config=browser/playwright.config.ts --ui",
+    "test:browser:report": "playwright show-report playwright-report"
   },
   "devDependencies": {
     "@changesets/cli": "^2.31.0",
+    "@playwright/test": "^1.61.1",
     "@types/node": "^26.1.0",
     "@vitest/coverage-v8": "^4.1.10",
     "tsup": "^8.5.1",
