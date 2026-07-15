@@ -7,6 +7,12 @@ dist
 # Coverage
 coverage
 
+# Playwright
+playwright-report
+test-results
+browser/playwright-report
+browser/test-results
+
 # Logs
 *.log
 

@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+  />
+  <title>Npora Request Browser Tests</title>
+</head>
+
+<body>
+<main>
+  <h1>Npora Request Browser Tests</h1>
+</main>
+
+<script type="module">
+  import {
+    createClient
+  } from '/dist/index.js'
+
+  window.nporaRequest = createClient({
+    baseURL: '/api'
+  })
+
+  window.nporaReady = true
+</script>
+</body>
+</html>
