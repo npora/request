@@ -16,6 +16,24 @@ Generate a machine-readable report:
 pnpm benchmark -- --output benchmark-results/request.json
 ```
 
+Compare equivalent JSON requests through native Fetch, Npora Request, and
+Axios using its Fetch adapter:
+
+```sh
+pnpm benchmark:compare
+```
+
+Generate the comparison report and tune its sampling:
+
+```sh
+pnpm benchmark:compare -- \
+  --operations 5000 \
+  --concurrency 100 \
+  --warmup 500 \
+  --samples 5 \
+  --output benchmark-results/comparison.json
+```
+
 Tune the workload:
 
 ```sh
@@ -53,6 +71,24 @@ repeated trends rather than treating a single run as a release gate.
 CI stores the JSON report as a build artifact. Correctness and resource
 cleanup remain enforced separately by unit, integration and browser stress
 tests.
+
+## Competitor Comparison
+
+The comparison benchmark uses an in-memory Fetch response to remove DNS,
+socket and server variance. Every client builds the same query and headers
+and parses the same JSON payload. Axios is explicitly configured with its
+Fetch adapter so transport behavior is comparable.
+
+Each sequential and concurrent scenario runs multiple times. Execution order
+rotates between native Fetch, Npora Request, and Axios; the report retains the
+median-throughput sample. The exact Axios version is recorded in the JSON
+report and locked as a development dependency. It is never shipped with the
+library.
+
+This benchmark measures client-side request construction and response parsing
+overhead. It does not measure real network throughput, connection pooling,
+proxies, HTTP/2, or server performance. Results are observations rather than
+release thresholds.
 
 ## Hot-path Design
 

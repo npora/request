@@ -33,7 +33,9 @@ Rules:
 
 - Must not become part of the published package.
 - Must not add runtime dependencies.
+- Competitor libraries must remain development-only dependencies.
 - Reports are observational and environment-specific.
+- Cross-library scenarios must perform equivalent work and rotate order.
 - Correctness belongs in the test suite, not benchmark thresholds.
 
 ---

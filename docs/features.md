@@ -255,6 +255,8 @@ Supported:
 - [x] Coverage Regression Gate
 - [x] Request Pipeline Performance Benchmarks
 - [x] Machine-readable Benchmark Reports
+- [x] Native Fetch and Axios Comparison Benchmark
+- [x] Rotating Multi-sample Benchmark Runs
 - [x] Cached Interceptor and Hook Ordering
 - [x] Empty Pipeline Fast Path
 - [x] Allocation-aware Config Merge

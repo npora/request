@@ -253,6 +253,16 @@ pnpm test:size
 See [`docs/package-size.md`](docs/package-size.md) for the checked metrics and
 budget policy.
 
+Run the controlled native Fetch, Npora Request, and Axios comparison:
+
+```sh
+pnpm benchmark:compare
+```
+
+The comparison rotates execution order across multiple samples and reports
+the median run. Axios is a development-only dependency and is excluded from
+the published package.
+
 ---
 
 # Documentation
