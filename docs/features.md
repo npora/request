@@ -173,6 +173,9 @@ Everything below should be implemented as extensions.
 
 - [x] Download
 - [x] Download Progress
+- [x] Fetch Stream Progress
+- [x] Native XHR Progress Fallback
+- [x] Concurrent Download Stress Tests
 
 ---
 

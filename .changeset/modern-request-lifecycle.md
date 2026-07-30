@@ -10,5 +10,7 @@ Add a production-ready request lifecycle and extension API.
   conflict, rollback, cleanup, and uninstall lifecycles.
 - Harden retry, cache, authentication, timeout, configuration validation,
   pipeline error handling, short-circuit responses, and logger redaction.
+- Add automatic native XHR fallback for download progress, explicit transport
+  selection, stream cancellation, and concurrent download stress coverage.
 - Add Node integration, Chromium/WebKit, Web Worker, package entrypoint,
   tarball manifest, public type, and example validation.

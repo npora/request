@@ -1,9 +1,11 @@
 import type {
   Client,
+  DownloadPluginOptions,
   Plugin,
   RequestConfig,
   RetryOptions
 } from '@npora/request'
+import { downloadPlugin } from '@npora/request'
 
 interface MetricsOptions {
   enabled?: boolean
@@ -72,3 +74,9 @@ void installed
 void extended
 void headData
 void optionsData
+
+const downloadOptions: DownloadPluginOptions = {
+  transport: 'xhr'
+}
+
+client.use(downloadPlugin(downloadOptions))

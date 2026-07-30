@@ -135,4 +135,39 @@ describe('downloadPlugin progress', () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(1)
   })
+
+  it('should cancel the Fetch stream when progress handling fails', async () => {
+    const callbackError = new Error('progress failed')
+    const cancel = vi.fn()
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(
+          new TextEncoder().encode('download')
+        )
+      },
+      cancel
+    })
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(stream, {
+          status: 200
+        })
+      )
+    )
+
+    const request = createClient().use(downloadPlugin())
+
+    await expect(
+      request.get('/download', {
+        download: {
+          onProgress() {
+            throw callbackError
+          }
+        }
+      })
+    ).rejects.toBe(callbackError)
+    expect(cancel).toHaveBeenCalledWith(callbackError)
+  })
 })

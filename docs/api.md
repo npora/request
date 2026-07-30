@@ -259,6 +259,44 @@ const request = createClient()
   .use(authPlugin())
 ```
 
+### Download Progress Transport
+
+`downloadPlugin()` prefers Fetch response streams for progress reporting. When
+the runtime does not expose response streams, the default `auto` mode uses
+native `XMLHttpRequest` before sending the request, so the file is never
+downloaded twice.
+
+```ts
+const request = createClient().use(downloadPlugin())
+
+const file = await request.get<Blob>('/report.pdf', {
+  extensions: {
+    download: {
+      onProgress({ loaded, total, progress }) {
+        console.log({ loaded, total, progress })
+      }
+    }
+  }
+})
+```
+
+The transport can be selected explicitly when runtime capability detection is
+not reliable:
+
+```ts
+downloadPlugin({ transport: 'xhr' })
+downloadPlugin({ transport: 'fetch' })
+```
+
+- `auto` (default): use Fetch streams when available, otherwise native XHR.
+- `fetch`: always use Fetch stream progress.
+- `xhr`: use native XHR whenever download progress is enabled.
+
+Requests without `onProgress` continue through the normal Fetch adapter,
+regardless of this option. XHR downloads preserve URL, query, headers,
+credentials, timeout, cancellation, status validation, response hooks and
+response interceptors.
+
 Plugins must not replace client methods.
 
 Plugins should extend the request lifecycle through supported extension points.

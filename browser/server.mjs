@@ -35,6 +35,10 @@ const contentTypes = {
 }
 
 const requestCounts = new Map()
+const downloadFixture = Buffer.alloc(
+  64 * 1024,
+  0x6e
+)
 
 const server = createServer(
   async (request, response) => {
@@ -86,6 +90,16 @@ const server = createServer(
         sendJson(response, 200, {
           ok: true
         })
+
+        return
+      }
+
+      if (url.pathname === '/api/download') {
+        sendBinary(
+          response,
+          200,
+          downloadFixture
+        )
 
         return
       }
@@ -261,6 +275,21 @@ function sendJson(
 
     'cache-control': 'no-store',
 
+    'access-control-allow-origin': '*'
+  })
+
+  response.end(content)
+}
+
+function sendBinary(
+  response,
+  statusCode,
+  content
+) {
+  response.writeHead(statusCode, {
+    'content-type': 'application/octet-stream',
+    'content-length': String(content.byteLength),
+    'cache-control': 'no-store',
     'access-control-allow-origin': '*'
   })
 

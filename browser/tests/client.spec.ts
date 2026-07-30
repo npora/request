@@ -391,6 +391,97 @@ test(
   }
 )
 
+test(
+  'should handle concurrent XHR download progress without Fetch',
+  async ({ page }) => {
+    await openFixture(page)
+
+    const result = await page.evaluate(async () => {
+      const moduleURL = `${location.origin}/dist/index.js`
+      const {
+        createClient,
+        downloadPlugin
+      } = await import(moduleURL)
+      const request = createClient({
+        baseURL: '/api'
+      }).use(
+        downloadPlugin({
+          transport: 'xhr'
+        })
+      )
+      let fetchCalls = 0
+      const originalFetch = window.fetch
+
+      window.fetch = (...args) => {
+        fetchCalls += 1
+
+        return originalFetch(...args)
+      }
+
+      try {
+        const downloads = await Promise.all(
+          Array.from({ length: 32 }, async (_, id) => {
+            const events: Array<{
+              loaded: number
+              total?: number
+              progress?: number
+            }> = []
+            const blob = await request.get(
+              '/download',
+              {
+                query: {
+                  id
+                },
+                extensions: {
+                  download: {
+                    onProgress(progress: {
+                      loaded: number
+                      total?: number
+                      progress?: number
+                    }) {
+                      events.push(progress)
+                    }
+                  }
+                }
+              }
+            )
+            const last = events.at(-1)
+
+            return {
+              size: (blob as Blob).size,
+              eventCount: events.length,
+              loaded: last?.loaded,
+              total: last?.total,
+              progress: last?.progress
+            }
+          })
+        )
+
+        return {
+          downloads,
+          fetchCalls
+        }
+      } finally {
+        window.fetch = originalFetch
+      }
+    })
+
+    expect(result.fetchCalls).toBe(0)
+    expect(result.downloads).toHaveLength(32)
+
+    for (const download of result.downloads) {
+      expect(download).toEqual({
+        size: 64 * 1024,
+        eventCount: expect.any(Number),
+        loaded: 64 * 1024,
+        total: 64 * 1024,
+        progress: 1
+      })
+      expect(download.eventCount).toBeGreaterThan(0)
+    }
+  }
+)
+
 async function openFixture(
   page: import('@playwright/test').Page
 ): Promise<void> {
