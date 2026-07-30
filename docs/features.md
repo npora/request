@@ -212,9 +212,9 @@ Supported:
 
 Supported:
 
-- [ ] Browser
+- [x] Browser
 - [x] Node.js
-- [ ] Web Worker
+- [x] Web Worker
 
 ---
 
@@ -230,8 +230,8 @@ Supported:
 # Testing
 
 - [x] Unit Tests
-- [ ] Integration Tests
-- [ ] Browser Tests
+- [x] Integration Tests
+- [x] Browser Tests
 
 ---
 

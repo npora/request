@@ -34,6 +34,8 @@ const contentTypes = {
   '.map': 'application/json; charset=utf-8'
 }
 
+const requestCounts = new Map()
+
 const server = createServer(
   async (request, response) => {
     try {
@@ -52,6 +54,49 @@ const server = createServer(
         sendJson(response, 200, {
           id: 1,
           name: 'Npora'
+        })
+
+        return
+      }
+
+      if (url.pathname === '/api/echo') {
+        const body = await readRequestBody(request)
+
+        sendJson(response, 200, {
+          method: request.method,
+          query: Object.fromEntries(url.searchParams),
+          headers: request.headers,
+          body: body ? JSON.parse(body) : undefined
+        })
+
+        return
+      }
+
+      if (url.pathname === '/api/error') {
+        sendJson(response, 422, {
+          message: 'Invalid browser request'
+        })
+
+        return
+      }
+
+      if (url.pathname === '/api/slow') {
+        await delay(100)
+
+        sendJson(response, 200, {
+          ok: true
+        })
+
+        return
+      }
+
+      if (url.pathname === '/api/count') {
+        const key = url.searchParams.get('key') ?? 'default'
+        const count = (requestCounts.get(key) ?? 0) + 1
+
+        requestCounts.set(key, count)
+        sendJson(response, 200, {
+          count
         })
 
         return
@@ -236,6 +281,26 @@ function sendPreflight(response) {
   })
 
   response.end()
+}
+
+async function readRequestBody(request) {
+  const chunks = []
+
+  for await (const chunk of request) {
+    chunks.push(
+      Buffer.isBuffer(chunk)
+        ? chunk
+        : Buffer.from(chunk)
+    )
+  }
+
+  return Buffer.concat(chunks).toString('utf8')
+}
+
+function delay(milliseconds) {
+  return new Promise(resolve => {
+    setTimeout(resolve, milliseconds)
+  })
 }
 
 function isInsideDirectory(
