@@ -13,5 +13,15 @@ const request = createClient({
 })
 
 const todo = await request.get<Todo>('/todos/1')
+const response = await request.getResponse<Todo>('/todos/1')
+
+const adminRequest = request.extend({
+  baseURL: 'https://jsonplaceholder.typicode.com/admin',
+  headers: {
+    'x-client': 'admin'
+  }
+})
 
 console.log(todo)
+console.log(response.status, response.headers)
+void adminRequest

@@ -56,6 +56,7 @@
     "test:coverage": "vitest run --coverage",
     "test:run": "vitest run",
     "test:types": "pnpm build && tsc -p test/types/tsconfig.json",
+    "test:examples": "tsc -p examples/tsconfig.json",
     "test:browser": "playwright test --config=browser/playwright.config.ts",
     "test:browser:ui": "playwright test --config=browser/playwright.config.ts --ui",
     "test:browser:report": "playwright show-report playwright-report"

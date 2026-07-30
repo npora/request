@@ -43,6 +43,9 @@ jobs:
       - name: Typecheck
         run: pnpm typecheck
 
+      - name: Typecheck examples
+        run: pnpm test:examples
+
       - name: Unit and integration tests
         run: pnpm test:run
 

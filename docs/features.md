@@ -249,10 +249,11 @@ Supported:
 
 # Documentation
 
-- [ ] README
+- [x] README
 - [x] Blueprint
 - [x] Structure
-- [ ] Examples
+- [x] Examples
+- [x] Example Typecheck
 
 ---
 

@@ -19,8 +19,11 @@ It builds on top of the Fetch API while keeping the native request model.
 - Zero Runtime Dependency
 - Plugin Architecture
 - Typed Extension Configuration
+- Client Default Inheritance
+- Retry, Cache and Authentication
 - Custom Adapter
 - Unified Error Handling
+- Browser and Web Worker Support
 
 ---
 
@@ -105,6 +108,112 @@ needed.
 
 ---
 
+# Configuration
+
+```ts
+const api = createClient({
+  baseURL: 'https://api.example.com',
+  timeout: 5000,
+  headers: {
+    'x-app': 'dashboard'
+  },
+  query: {
+    locale: 'en'
+  },
+  fetchOptions: {
+    credentials: 'include'
+  }
+})
+
+const adminApi = api.extend({
+  baseURL: 'https://api.example.com/admin',
+  headers: {
+    'x-role': 'admin'
+  }
+})
+```
+
+`extend()` creates an isolated child client. It inherits configuration and the
+adapter, while plugins and interceptors remain instance-scoped.
+
+Request configuration overrides client defaults. Headers are merged
+case-insensitively, while query parameters, native Fetch options and extension
+configuration are merged by their documented rules.
+
+---
+
+# Complete Responses
+
+```ts
+const response = await api.getResponse<User>('/users/1')
+
+console.log(response.data)
+console.log(response.status)
+console.log(response.headers)
+console.log(response.raw)
+```
+
+---
+
+# Plugins
+
+```ts
+import {
+  authPlugin,
+  cachePlugin,
+  retryPlugin
+} from '@npora/request'
+
+const request = createClient({
+  baseURL: 'https://api.example.com'
+})
+  .use(retryPlugin({
+    retries: 2,
+    delay: 200
+  }))
+  .use(cachePlugin())
+  .use(authPlugin({
+    token: () => accessToken,
+    refreshToken
+  }))
+
+const user = await request.get<User>('/users/1', {
+  extensions: {
+    cache: {
+      enabled: true,
+      ttl: 30000
+    }
+  }
+})
+```
+
+Plugin configuration belongs under `extensions`. Legacy top-level plugin
+fields remain available during v0.x but are deprecated.
+
+---
+
+# Error Handling
+
+```ts
+import { RequestError } from '@npora/request'
+
+try {
+  await request.get('/users/missing')
+} catch (error) {
+  if (error instanceof RequestError) {
+    console.error(error.code)
+    console.error(error.status)
+    console.error(error.data)
+    console.error(error.response)
+  }
+}
+```
+
+Errors use stable codes including `CONFIG_ERROR`, `HTTP_ERROR`,
+`NETWORK_ERROR`, `TIMEOUT_ERROR`, `ABORT_ERROR` and `PARSER_ERROR`.
+
+---
+
 # Examples
 
 See the `examples` directory.
@@ -112,8 +221,12 @@ See the `examples` directory.
 ```
 examples
 ├── basic.ts
+├── custom-plugin.ts
+├── error-handling.ts
 └── plugins.ts
 ```
+
+Examples are typechecked in CI with `pnpm test:examples`.
 
 ---
 
