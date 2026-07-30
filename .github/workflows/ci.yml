@@ -46,8 +46,8 @@ jobs:
       - name: Typecheck examples
         run: pnpm test:examples
 
-      - name: Unit and integration tests
-        run: pnpm test:run
+      - name: Unit, integration and coverage tests
+        run: pnpm test:coverage
 
       - name: Build
         run: pnpm build

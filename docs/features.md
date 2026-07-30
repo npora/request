@@ -244,6 +244,7 @@ Supported:
 - [x] Unit Tests
 - [x] Integration Tests
 - [x] Browser Tests
+- [x] Coverage Regression Gate
 
 ---
 

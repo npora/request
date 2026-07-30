@@ -46,7 +46,7 @@ jobs:
       - name: Verify
         run: |
           pnpm typecheck
-          pnpm test:run
+          pnpm test:coverage
           pnpm build
           pnpm test:package
 
