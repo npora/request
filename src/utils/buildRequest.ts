@@ -69,18 +69,51 @@ function joinURL(baseURL: string | undefined, url: string): string {
     return baseURL
   }
 
-  return `${baseURL.replace(/\/+$/, '')}/${url.replace(/^\/+/, '')}`
+  let baseEnd = baseURL.length
+  let urlStart = 0
+
+  while (
+    baseEnd > 0 &&
+    baseURL.charCodeAt(baseEnd - 1) === 47
+  ) {
+    baseEnd -= 1
+  }
+
+  while (
+    urlStart < url.length &&
+    url.charCodeAt(urlStart) === 47
+  ) {
+    urlStart += 1
+  }
+
+  return `${baseURL.slice(0, baseEnd)}/${url.slice(urlStart)}`
 }
 
 function isAbsoluteURL(url: string): boolean {
-  return /^[a-z][a-z\d+\-.]*:/i.test(url) || url.startsWith('//')
+  if (url.startsWith('//')) {
+    return true
+  }
+
+  const colon = url.indexOf(':')
+
+  if (colon <= 0) {
+    return false
+  }
+
+  return /^[a-z][a-z\d+\-.]*$/i.test(
+    url.slice(0, colon)
+  )
 }
 
 function stringifyQuery(query: QueryParams): string {
   const params = new URLSearchParams()
 
-  for (const [key, value] of Object.entries(query)) {
-    appendQuery(params, key, value)
+  for (const key in query) {
+    if (
+      Object.prototype.hasOwnProperty.call(query, key)
+    ) {
+      appendQuery(params, key, query[key])
+    }
   }
 
   return params.toString()
@@ -97,7 +130,9 @@ function appendQuery(
 
   if (Array.isArray(value)) {
     for (const item of value) {
-      appendQuery(params, key, item)
+      if (item !== null && item !== undefined) {
+        params.append(key, String(item))
+      }
     }
 
     return
@@ -149,8 +184,12 @@ function buildURLSearchParams(
 
   const params = new URLSearchParams()
 
-  for (const [key, value] of Object.entries(form)) {
-    appendQuery(params, key, value)
+  for (const key in form) {
+    if (
+      Object.prototype.hasOwnProperty.call(form, key)
+    ) {
+      appendQuery(params, key, form[key])
+    }
   }
 
   return params
@@ -165,8 +204,12 @@ function buildFormData(
 
   const formData = new FormData()
 
-  for (const [key, value] of Object.entries(input)) {
-    appendFormDataValue(formData, key, value)
+  for (const key in input) {
+    if (
+      Object.prototype.hasOwnProperty.call(input, key)
+    ) {
+      appendFormDataValue(formData, key, input[key])
+    }
   }
 
   return formData

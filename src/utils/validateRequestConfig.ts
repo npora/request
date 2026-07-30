@@ -48,32 +48,42 @@ function validateHeaders(config: RequestConfig): Headers {
 }
 
 function validateBody(config: RequestConfig): void {
-  const activeFields = BODY_FIELDS.filter(key => {
+  let activeField: typeof BODY_FIELDS[number] | undefined
+
+  for (const key of BODY_FIELDS) {
     const value = config[key]
 
-    return value !== undefined && value !== null
-  })
+    if (value === undefined || value === null) {
+      continue
+    }
 
-  if (activeFields.length <= 1) {
-    const method = config.method ?? 'GET'
+    if (activeField) {
+      const activeFields = BODY_FIELDS.filter(field => {
+        const fieldValue = config[field]
 
-    if (
-      activeFields.length === 1 &&
-      (method === 'GET' || method === 'HEAD')
-    ) {
+        return fieldValue !== undefined && fieldValue !== null
+      })
+
       throw configError(
-        `${method} requests cannot include a body`,
+        `Request body options are mutually exclusive: ${activeFields.join(', ')}`,
         config
       )
     }
 
-    return
+    activeField = key
   }
 
-  throw configError(
-    `Request body options are mutually exclusive: ${activeFields.join(', ')}`,
-    config
-  )
+  const method = config.method ?? 'GET'
+
+  if (
+    activeField &&
+    (method === 'GET' || method === 'HEAD')
+  ) {
+    throw configError(
+      `${method} requests cannot include a body`,
+      config
+    )
+  }
 }
 
 function configError(

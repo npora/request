@@ -46,6 +46,30 @@ describe('request config', () => {
     )
   })
 
+  it('should preserve URLSearchParams encoding and array order', () => {
+    const inheritedQuery = Object.create({
+      inherited: 'ignored'
+    }) as Record<string, unknown>
+
+    inheritedQuery.search = 'hello world~'
+    inheritedQuery.tags = [
+      'first',
+      null,
+      'second',
+      undefined
+    ]
+
+    const { url } = buildRequest({
+      baseURL: 'https://api.example.com///',
+      url: '/search#results',
+      query: inheritedQuery as never
+    })
+
+    expect(url).toBe(
+      'https://api.example.com/search?search=hello+world%7E&tags=first&tags=second#results'
+    )
+  })
+
   it('should not prepend baseURL to an absolute request URL', () => {
     const { url } = buildRequest({
       baseURL: 'https://api.example.com',
@@ -54,6 +78,21 @@ describe('request config', () => {
 
     expect(url).toBe('https://uploads.example.com/file')
   })
+
+  it.each([
+    'mailto:team@example.com',
+    '//cdn.example.com/file'
+  ])(
+    'should preserve absolute URL form %s',
+    absoluteURL => {
+      const { url } = buildRequest({
+        baseURL: 'https://api.example.com',
+        url: absoluteURL
+      })
+
+      expect(url).toBe(absoluteURL)
+    }
+  )
 
   it('should pass native Fetch options to RequestInit', () => {
     const { init } = buildRequest({
@@ -106,6 +145,40 @@ describe('request config', () => {
     expect(body.toString()).toBe('username=npora&remember=true')
   })
 
+  it('should ignore inherited form and FormData fields', () => {
+    const form = Object.create({
+      inherited: 'ignored'
+    }) as Record<string, unknown>
+    const formData = Object.create({
+      inherited: 'ignored'
+    }) as Record<string, unknown>
+
+    form.username = 'npora'
+    formData.name = 'Npora'
+
+    const formRequest = buildRequest({
+      url: '/form',
+      method: 'POST',
+      form: form as never
+    })
+    const formDataRequest = buildRequest({
+      url: '/form-data',
+      method: 'POST',
+      formData
+    })
+
+    expect(
+      (formRequest.init.body as URLSearchParams).toString()
+    ).toBe('username=npora')
+    expect(
+      Array.from(
+        (formDataRequest.init.body as FormData).entries()
+      )
+    ).toEqual([
+      ['name', 'Npora']
+    ])
+  })
+
   it('should reject mutually exclusive body options', async () => {
     const fetchMock = vi.fn()
 
@@ -131,6 +204,26 @@ describe('request config', () => {
     })
 
     expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('should report every conflicting body option', async () => {
+    const request = createClient()
+
+    await expect(
+      request.post('/users', {
+        body: 'raw',
+        json: {
+          name: 'Npora'
+        },
+        form: {
+          name: 'Npora'
+        }
+      })
+    ).rejects.toMatchObject({
+      code: 'CONFIG_ERROR',
+      message:
+        'Request body options are mutually exclusive: body, json, form'
+    })
   })
 
   it.each([

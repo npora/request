@@ -120,6 +120,18 @@ const fetchAdapterCompleteResponse = await runSequential(
     responseType: 'text'
   })
 )
+const fetchAdapterQueryClient = await runSequential(
+  options.operations,
+  () => fetchClient.get('/benchmark#result', {
+    query: {
+      page: 2,
+      search: 'hello world',
+      tag: ['request', 'benchmark'],
+      ignored: null
+    },
+    responseType: 'text'
+  })
+)
 
 globalThis.fetch = originalFetch
 
@@ -142,7 +154,8 @@ const report = {
     concurrentClient: concurrent,
     concurrentPluginPipeline: pluginPipeline,
     fetchAdapterClient,
-    fetchAdapterCompleteResponse
+    fetchAdapterCompleteResponse,
+    fetchAdapterQueryClient
   },
   comparison: {
     sequentialClientOverhead:

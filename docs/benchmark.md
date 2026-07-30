@@ -36,6 +36,8 @@ pnpm benchmark -- \
   Fetch response, without network latency.
 - `fetchAdapterCompleteResponse`: the same Fetch lifecycle while preserving
   a separately readable raw `Response`.
+- `fetchAdapterQueryClient`: data-only Fetch lifecycle with scalar, array,
+  nullable and hash-aware query serialization.
 
 Each result includes duration, operations per second, heap delta, mean latency
 and p50/p95/p99/max latency. The report also includes client overhead relative
@@ -73,3 +75,8 @@ Successful data-only Fetch requests parse the original response without
 cloning when no response hooks or interceptors need `raw`. Complete responses,
 response lifecycle extensions and HTTP errors retain a separately readable
 raw body.
+
+Request construction avoids success-path body-field arrays and iterates query,
+form and FormData records without intermediate entry arrays. URL joining uses
+relative-path fast paths while query encoding remains delegated to
+`URLSearchParams`.

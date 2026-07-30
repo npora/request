@@ -27,3 +27,5 @@ Add a production-ready request lifecycle and extension API.
   attempt while retaining standalone and retry validation.
 - Skip Fetch Response cloning for successful data-only requests while
   preserving raw bodies for complete responses, extensions, and HTTP errors.
+- Reduce request-construction allocations for body validation, URL joining,
+  query parameters, forms, and FormData records.
