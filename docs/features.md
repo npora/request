@@ -112,6 +112,12 @@ Everything below should be implemented as extensions.
 - [x] Typed Extension Registry
 - [x] Third-party Config Augmentation
 - [x] Legacy Config Compatibility
+- [x] Plugin Priority
+- [x] Plugin Dependencies
+- [x] Plugin Conflicts
+- [x] Plugin Uninstall
+- [x] Scoped Registration Cleanup
+- [x] Install Rollback
 
 ---
 
@@ -178,6 +184,7 @@ Everything below should be implemented as extensions.
 - [x] Request Interceptor
 - [x] Response Interceptor
 - [x] Error Interceptor
+- [x] Interceptor Priority
 
 ---
 

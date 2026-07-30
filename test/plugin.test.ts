@@ -1,6 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { Plugin } from '../src'
-import { createClient } from '../src'
+import {
+  createClient,
+  PluginError
+} from '../src'
 
 afterEach(() => {
   vi.unstubAllGlobals()
@@ -71,5 +74,254 @@ describe('plugin', () => {
     }
 
     expect(request.use(plugin)).toBe(request)
+  })
+
+  it('should expose installed plugin state', () => {
+    const request = createClient()
+    const plugin: Plugin = {
+      name: 'state',
+      install() {}
+    }
+
+    expect(request.hasPlugin('state')).toBe(false)
+
+    request.use(plugin)
+
+    expect(request.hasPlugin('state')).toBe(true)
+
+    request.unuse('state')
+
+    expect(request.hasPlugin('state')).toBe(false)
+  })
+
+  it('should run higher priority plugin registrations first', async () => {
+    const order: string[] = []
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ ok: true }), {
+          status: 200,
+          headers: {
+            'content-type': 'application/json'
+          }
+        })
+      )
+    )
+
+    const low: Plugin = {
+      name: 'low',
+      priority: 0,
+      install({ hooks }) {
+        hooks.onRequest(() => {
+          order.push('low')
+        })
+      }
+    }
+
+    const high: Plugin = {
+      name: 'high',
+      priority: 10,
+      install({ hooks }) {
+        hooks.onRequest(() => {
+          order.push('high')
+        })
+      }
+    }
+
+    const request = createClient()
+      .use(low)
+      .use(high)
+
+    await request.get('/priority')
+
+    expect(order).toEqual([
+      'high',
+      'low'
+    ])
+  })
+
+  it('should require dependencies to be installed first', () => {
+    const request = createClient()
+    const plugin: Plugin = {
+      name: 'metrics',
+      requires: ['logger'],
+      install() {}
+    }
+
+    expect(() => {
+      request.use(plugin)
+    }).toThrowError(
+      expect.objectContaining({
+        name: 'PluginError',
+        code: 'MISSING_DEPENDENCY',
+        plugin: 'metrics',
+        relatedPlugin: 'logger'
+      })
+    )
+
+    expect(request.hasPlugin('metrics')).toBe(false)
+  })
+
+  it('should detect plugin conflicts in either direction', () => {
+    const request = createClient()
+    const first: Plugin = {
+      name: 'first',
+      conflicts: ['second'],
+      install() {}
+    }
+    const second: Plugin = {
+      name: 'second',
+      install() {}
+    }
+
+    request.use(first)
+
+    expect(() => {
+      request.use(second)
+    }).toThrowError(
+      expect.objectContaining({
+        name: 'PluginError',
+        code: 'PLUGIN_CONFLICT',
+        plugin: 'second',
+        relatedPlugin: 'first'
+      })
+    )
+  })
+
+  it('should prevent removal while another plugin depends on it', () => {
+    const request = createClient()
+    const base: Plugin = {
+      name: 'base',
+      install() {}
+    }
+    const dependent: Plugin = {
+      name: 'dependent',
+      requires: ['base'],
+      install() {}
+    }
+
+    request.use(base).use(dependent)
+
+    expect(() => {
+      request.unuse('base')
+    }).toThrowError(
+      expect.objectContaining({
+        name: 'PluginError',
+        code: 'DEPENDENCY_IN_USE',
+        plugin: 'base',
+        relatedPlugin: 'dependent'
+      })
+    )
+
+    expect(request.hasPlugin('base')).toBe(true)
+  })
+
+  it('should automatically clean plugin interceptors, hooks and resources', async () => {
+    const cleanup = vi.fn()
+    const hook = vi.fn()
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: {
+          'content-type': 'application/json'
+        }
+      })
+    )
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const plugin: Plugin = {
+      name: 'scoped',
+      install({ interceptors, hooks }) {
+        interceptors.request.use(config => {
+          return {
+            ...config,
+            headers: {
+              ...config.headers,
+              'x-plugin': 'installed'
+            }
+          }
+        })
+
+        hooks.onRequest(hook)
+
+        return cleanup
+      }
+    }
+
+    const request = createClient().use(plugin)
+
+    await request.get('/before')
+    request.unuse('scoped')
+    await request.get('/after')
+
+    const beforeHeaders = new Headers(
+      fetchMock.mock.calls[0]?.[1]?.headers
+    )
+    const afterHeaders = new Headers(
+      fetchMock.mock.calls[1]?.[1]?.headers
+    )
+
+    expect(beforeHeaders.get('x-plugin')).toBe('installed')
+    expect(afterHeaders.get('x-plugin')).toBe(null)
+    expect(hook).toHaveBeenCalledTimes(1)
+    expect(cleanup).toHaveBeenCalledTimes(1)
+  })
+
+  it('should rollback scoped registrations when installation fails', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: {
+          'content-type': 'application/json'
+        }
+      })
+    )
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const plugin: Plugin = {
+      name: 'broken',
+      install({ interceptors }) {
+        interceptors.request.use(config => {
+          return {
+            ...config,
+            headers: {
+              ...config.headers,
+              'x-broken': 'true'
+            }
+          }
+        })
+
+        throw new Error('install failed')
+      }
+    }
+
+    const request = createClient()
+
+    expect(() => {
+      request.use(plugin)
+    }).toThrow('install failed')
+
+    await request.get('/after-failure')
+
+    const headers = new Headers(
+      fetchMock.mock.calls[0]?.[1]?.headers
+    )
+
+    expect(headers.get('x-broken')).toBe(null)
+    expect(request.hasPlugin('broken')).toBe(false)
+  })
+
+  it('should expose PluginError instances', () => {
+    const error = new PluginError('Missing dependency', {
+      code: 'MISSING_DEPENDENCY',
+      plugin: 'metrics',
+      relatedPlugin: 'logger'
+    })
+
+    expect(error).toBeInstanceOf(Error)
+    expect(error).toBeInstanceOf(PluginError)
   })
 })

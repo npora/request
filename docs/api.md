@@ -168,12 +168,26 @@ request.interceptors.error.use(error => error)
 
 Interceptors are user-level extension points.
 
+An optional priority controls execution order. Higher values run first and
+equal priorities preserve registration order.
+
+```ts
+request.interceptors.request.use(
+  config => config,
+  {
+    priority: 10
+  }
+)
+```
+
 ---
 
 # Plugins
 
 ```ts
 request.use(plugin)
+request.unuse(pluginName)
+request.hasPlugin(pluginName)
 ```
 
 Official plugins:
@@ -198,6 +212,58 @@ const request = createClient()
 Plugins must not replace client methods.
 
 Plugins should extend the request lifecycle through supported extension points.
+
+## Plugin Lifecycle
+
+```ts
+const metricsPlugin: Plugin = {
+  name: 'metrics',
+  priority: 10,
+  requires: ['logger'],
+  conflicts: ['legacy-metrics'],
+
+  install({ interceptors, hooks }) {
+    interceptors.request.use(config => {
+      return config
+    })
+
+    const disposeHook = hooks.onResponse(context => {
+      // Record response metrics.
+    })
+
+    return () => {
+      disposeHook()
+      // Release any other plugin-owned resources.
+    }
+  }
+}
+```
+
+- `priority` is the default priority for registrations made by the plugin.
+- `requires` lists plugins that must already be installed.
+- `conflicts` prevents incompatible plugins from being installed together.
+- `install()` may return a synchronous cleanup function.
+- `unuse()` automatically removes all interceptors and hooks registered
+  through the plugin context, then runs the plugin cleanup.
+- A plugin cannot be removed while another installed plugin requires it.
+- Failed plugin installation automatically rolls back scoped registrations.
+
+Plugin lifecycle failures throw `PluginError` with one of these codes:
+
+```ts
+MISSING_DEPENDENCY
+PLUGIN_CONFLICT
+DEPENDENCY_IN_USE
+```
+
+When priorities are equal, registrations run in their original registration
+order. A registration-specific priority overrides the plugin default:
+
+```ts
+hooks.onRequest(handler, {
+  priority: 20
+})
+```
 
 ## Extension Configuration
 

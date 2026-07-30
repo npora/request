@@ -1,4 +1,6 @@
 import type {
+  Client,
+  Plugin,
   RequestConfig,
   RetryOptions
 } from '@npora/request'
@@ -35,3 +37,25 @@ const config: RequestConfig = {
 }
 
 void config
+
+const plugin: Plugin = {
+  name: 'metrics',
+  priority: 10,
+  requires: ['logger'],
+  conflicts: ['legacy-metrics'],
+
+  install({ hooks }) {
+    hooks.onRequest(() => {})
+
+    return () => {}
+  }
+}
+
+declare const client: Client
+
+client.use(plugin)
+client.unuse(plugin.name)
+
+const installed: boolean = client.hasPlugin(plugin.name)
+
+void installed

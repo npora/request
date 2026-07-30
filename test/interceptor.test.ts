@@ -141,4 +141,60 @@ describe('interceptors', () => {
 
     expect(headers.get('authorization')).toBe(null)
   })
+
+  it('should run higher priority interceptors first and preserve ties', async () => {
+    const order: string[] = []
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ ok: true }), {
+          status: 200,
+          headers: {
+            'content-type': 'application/json'
+          }
+        })
+      )
+    )
+
+    const request = createClient()
+
+    request.interceptors.request.use(
+      config => {
+        order.push('normal-first')
+        return config
+      },
+      {
+        priority: 0
+      }
+    )
+
+    request.interceptors.request.use(
+      config => {
+        order.push('high-first')
+        return config
+      },
+      {
+        priority: 10
+      }
+    )
+
+    request.interceptors.request.use(
+      config => {
+        order.push('high-second')
+        return config
+      },
+      {
+        priority: 10
+      }
+    )
+
+    await request.get('/priority')
+
+    expect(order).toEqual([
+      'high-first',
+      'high-second',
+      'normal-first'
+    ])
+  })
 })

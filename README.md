@@ -82,6 +82,10 @@ request.delete(url)
 
 request.use(plugin)
 
+request.unuse(pluginName)
+
+request.hasPlugin(pluginName)
+
 request.interceptors.request.use()
 
 request.interceptors.response.use()

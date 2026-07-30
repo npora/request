@@ -2,7 +2,12 @@ import { FetchAdapter } from '../adapters'
 import { ConfigMerger, Pipeline } from '../core'
 import { InterceptorManager } from '../interceptors'
 import { PluginHooks } from '../interceptors/PluginHooks'
-import type { Plugin } from '../plugins'
+import type {
+  Plugin,
+  PluginCleanup
+} from '../plugins/Plugin'
+import { PluginError } from '../plugins/PluginError'
+import { createPluginScope } from '../plugins/PluginScope'
 import type {
   Adapter,
   ClientOptions,
@@ -13,7 +18,10 @@ import type {
 export class Client {
   private readonly defaults: Partial<RequestConfig>
 
-  private readonly installedPlugins = new Set<string>()
+  private readonly installedPlugins = new Map<
+    string,
+    InstalledPlugin
+  >()
 
   private readonly hooks = new PluginHooks()
 
@@ -37,14 +45,69 @@ export class Client {
       return this
     }
 
-    plugin.install({
-      interceptors: this.interceptors,
-      hooks: this.hooks
-    })
+    this.validatePlugin(plugin)
 
-    this.installedPlugins.add(plugin.name)
+    const scope = createPluginScope(
+      this.interceptors,
+      this.hooks,
+      plugin.priority
+    )
+
+    try {
+      const cleanup = plugin.install(scope.context)
+
+      if (cleanup) {
+        scope.addCleanup(cleanup)
+      }
+
+      this.installedPlugins.set(plugin.name, {
+        plugin,
+        cleanup: scope.cleanup
+      })
+    } catch (error) {
+      try {
+        scope.cleanup()
+      } catch {
+        // Preserve the original installation error.
+      }
+
+      throw error
+    }
 
     return this
+  }
+
+  unuse(pluginName: string): this {
+    const installed = this.installedPlugins.get(pluginName)
+
+    if (!installed) {
+      return this
+    }
+
+    const dependent = this.findDependent(pluginName)
+
+    if (dependent) {
+      throw new PluginError(
+        `Cannot remove plugin "${pluginName}" while "${dependent}" depends on it`,
+        {
+          code: 'DEPENDENCY_IN_USE',
+          plugin: pluginName,
+          relatedPlugin: dependent
+        }
+      )
+    }
+
+    try {
+      installed.cleanup()
+    } finally {
+      this.installedPlugins.delete(pluginName)
+    }
+
+    return this
+  }
+
+  hasPlugin(pluginName: string): boolean {
+    return this.installedPlugins.has(pluginName)
   }
 
   async request<T = unknown>(config: RequestConfig): Promise<T> {
@@ -173,4 +236,64 @@ export class Client {
   private createPipeline(adapter: Adapter): Pipeline {
     return new Pipeline(adapter, this.interceptors, this.hooks)
   }
+
+  private validatePlugin(plugin: Plugin): void {
+    const missingDependency = plugin.requires?.find(name => {
+      return !this.installedPlugins.has(name)
+    })
+
+    if (missingDependency) {
+      throw new PluginError(
+        `Plugin "${plugin.name}" requires "${missingDependency}"`,
+        {
+          code: 'MISSING_DEPENDENCY',
+          plugin: plugin.name,
+          relatedPlugin: missingDependency
+        }
+      )
+    }
+
+    const directConflict = plugin.conflicts?.find(name => {
+      return this.installedPlugins.has(name)
+    })
+
+    if (directConflict) {
+      throw new PluginError(
+        `Plugin "${plugin.name}" conflicts with "${directConflict}"`,
+        {
+          code: 'PLUGIN_CONFLICT',
+          plugin: plugin.name,
+          relatedPlugin: directConflict
+        }
+      )
+    }
+
+    for (const installed of this.installedPlugins.values()) {
+      if (installed.plugin.conflicts?.includes(plugin.name)) {
+        throw new PluginError(
+          `Plugin "${plugin.name}" conflicts with "${installed.plugin.name}"`,
+          {
+            code: 'PLUGIN_CONFLICT',
+            plugin: plugin.name,
+            relatedPlugin: installed.plugin.name
+          }
+        )
+      }
+    }
+  }
+
+  private findDependent(pluginName: string): string | undefined {
+    for (const installed of this.installedPlugins.values()) {
+      if (installed.plugin.requires?.includes(pluginName)) {
+        return installed.plugin.name
+      }
+    }
+
+    return undefined
+  }
+}
+
+interface InstalledPlugin {
+  plugin: Plugin
+  cleanup: PluginCleanup
 }
