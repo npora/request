@@ -18,6 +18,7 @@ export function buildRequest(config: RequestConfig): BuiltRequest {
   return {
     url: buildURL(config),
     init: {
+      ...config.fetchOptions,
       method: config.method ?? 'GET',
       headers,
       body,
@@ -28,8 +29,7 @@ export function buildRequest(config: RequestConfig): BuiltRequest {
 }
 
 function buildURL(config: RequestConfig): string {
-  const baseURL = config.baseURL ?? ''
-  const url = `${baseURL}${config.url}`
+  const url = joinURL(config.baseURL, config.url)
 
   if (!config.query) {
     return url
@@ -41,7 +41,28 @@ function buildURL(config: RequestConfig): string {
     return url
   }
 
-  return url.includes('?') ? `${url}&${query}` : `${url}?${query}`
+  const hashIndex = url.indexOf('#')
+  const target = hashIndex === -1 ? url : url.slice(0, hashIndex)
+  const hash = hashIndex === -1 ? '' : url.slice(hashIndex)
+  const separator = target.includes('?') ? '&' : '?'
+
+  return `${target}${separator}${query}${hash}`
+}
+
+function joinURL(baseURL: string | undefined, url: string): string {
+  if (!baseURL || isAbsoluteURL(url)) {
+    return url
+  }
+
+  if (!url) {
+    return baseURL
+  }
+
+  return `${baseURL.replace(/\/+$/, '')}/${url.replace(/^\/+/, '')}`
+}
+
+function isAbsoluteURL(url: string): boolean {
+  return /^[a-z][a-z\d+\-.]*:/i.test(url) || url.startsWith('//')
 }
 
 function stringifyQuery(query: QueryParams): string {

@@ -48,10 +48,16 @@ export class Client {
   }
 
   async request<T = unknown>(config: RequestConfig): Promise<T> {
-    const mergedConfig = ConfigMerger.merge(this.defaults, config)
-    const response = await this.pipeline.execute<T>(mergedConfig)
+    const response = await this.requestResponse<T>(config)
 
     return response.data
+  }
+
+  async requestResponse<T = unknown>(
+    config: RequestConfig
+  ): Promise<NporaResponse<T>> {
+    const mergedConfig = ConfigMerger.merge(this.defaults, config)
+    return this.pipeline.execute<T>(mergedConfig)
   }
 
   get<T = unknown>(
@@ -59,6 +65,17 @@ export class Client {
     config: Omit<RequestConfig, 'url' | 'method'> = {}
   ): Promise<T> {
     return this.request<T>({
+      ...config,
+      url,
+      method: 'GET'
+    })
+  }
+
+  getResponse<T = unknown>(
+    url: string,
+    config: Omit<RequestConfig, 'url' | 'method'> = {}
+  ): Promise<NporaResponse<T>> {
+    return this.requestResponse<T>({
       ...config,
       url,
       method: 'GET'
@@ -76,11 +93,33 @@ export class Client {
     })
   }
 
+  postResponse<T = unknown>(
+    url: string,
+    config: Omit<RequestConfig, 'url' | 'method'> = {}
+  ): Promise<NporaResponse<T>> {
+    return this.requestResponse<T>({
+      ...config,
+      url,
+      method: 'POST'
+    })
+  }
+
   put<T = unknown>(
     url: string,
     config: Omit<RequestConfig, 'url' | 'method'> = {}
   ): Promise<T> {
     return this.request<T>({
+      ...config,
+      url,
+      method: 'PUT'
+    })
+  }
+
+  putResponse<T = unknown>(
+    url: string,
+    config: Omit<RequestConfig, 'url' | 'method'> = {}
+  ): Promise<NporaResponse<T>> {
+    return this.requestResponse<T>({
       ...config,
       url,
       method: 'PUT'
@@ -98,11 +137,33 @@ export class Client {
     })
   }
 
+  patchResponse<T = unknown>(
+    url: string,
+    config: Omit<RequestConfig, 'url' | 'method'> = {}
+  ): Promise<NporaResponse<T>> {
+    return this.requestResponse<T>({
+      ...config,
+      url,
+      method: 'PATCH'
+    })
+  }
+
   delete<T = unknown>(
     url: string,
     config: Omit<RequestConfig, 'url' | 'method'> = {}
   ): Promise<T> {
     return this.request<T>({
+      ...config,
+      url,
+      method: 'DELETE'
+    })
+  }
+
+  deleteResponse<T = unknown>(
+    url: string,
+    config: Omit<RequestConfig, 'url' | 'method'> = {}
+  ): Promise<NporaResponse<T>> {
+    return this.requestResponse<T>({
       ...config,
       url,
       method: 'DELETE'

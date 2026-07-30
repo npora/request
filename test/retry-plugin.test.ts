@@ -1,7 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { createClient, retryPlugin } from '../src'
+import {
+  createClient,
+  RequestError,
+  retryPlugin
+} from '../src'
 
 afterEach(() => {
+  vi.useRealTimers()
   vi.unstubAllGlobals()
 })
 
@@ -103,5 +108,168 @@ describe('retryPlugin', () => {
 
     expect(data).toEqual({ ok: true })
     expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('should not retry non-idempotent methods by default', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ message: 'Server Error' }), {
+        status: 500,
+        headers: {
+          'content-type': 'application/json'
+        }
+      })
+    )
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient().use(
+      retryPlugin({
+        retries: 1,
+        delay: 0
+      })
+    )
+
+    await expect(
+      request.post('/orders', {
+        json: {
+          item: 'book'
+        }
+      })
+    ).rejects.toMatchObject({
+      code: 'HTTP_ERROR',
+      status: 500
+    })
+
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('should allow explicitly retrying a non-idempotent method', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ message: 'Server Error' }), {
+          status: 500,
+          headers: {
+            'content-type': 'application/json'
+          }
+        })
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ ok: true }), {
+          status: 200,
+          headers: {
+            'content-type': 'application/json'
+          }
+        })
+      )
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient().use(
+      retryPlugin({
+        retries: 1,
+        methods: ['POST'],
+        delay: 0
+      })
+    )
+
+    await expect(
+      request.post('/orders', {
+        json: {
+          item: 'book'
+        }
+      })
+    ).resolves.toEqual({
+      ok: true
+    })
+
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('should respect Retry-After and maxDelay', async () => {
+    vi.useFakeTimers()
+
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ message: 'Busy' }), {
+          status: 503,
+          headers: {
+            'content-type': 'application/json',
+            'retry-after': '10'
+          }
+        })
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ ok: true }), {
+          status: 200,
+          headers: {
+            'content-type': 'application/json'
+          }
+        })
+      )
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient().use(
+      retryPlugin({
+        retries: 1,
+        delay: 0,
+        maxDelay: 1000
+      })
+    )
+
+    const promise = request.get('/busy')
+
+    await vi.advanceTimersByTimeAsync(999)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+
+    await vi.advanceTimersByTimeAsync(1)
+
+    await expect(promise).resolves.toEqual({
+      ok: true
+    })
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('should abort immediately during retry delay', async () => {
+    const controller = new AbortController()
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ message: 'Server Error' }), {
+        status: 500,
+        headers: {
+          'content-type': 'application/json'
+        }
+      })
+    )
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient().use(
+      retryPlugin({
+        retries: 1,
+        delay: 10000
+      })
+    )
+
+    const promise = request.get('/retry', {
+      signal: controller.signal
+    })
+
+    await vi.waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledTimes(1)
+    })
+
+    controller.abort(
+      new RequestError('Cancelled by user', {
+        code: 'ABORT_ERROR'
+      })
+    )
+
+    await expect(promise).rejects.toMatchObject({
+      code: 'ABORT_ERROR',
+      message: 'Cancelled by user'
+    })
+    expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 })

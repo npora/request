@@ -1,5 +1,16 @@
-import { describe, expect, it } from 'vitest'
+import {
+  afterEach,
+  describe,
+  expect,
+  it,
+  vi
+} from 'vitest'
+import { createClient } from '../src'
 import { buildRequest } from '../src/utils/buildRequest'
+
+afterEach(() => {
+  vi.unstubAllGlobals()
+})
 
 describe('request config', () => {
   it('should build url with baseURL and query', () => {
@@ -18,6 +29,46 @@ describe('request config', () => {
     expect(url).toBe(
       'https://api.example.com/users?page=1&keyword=npora&active=true&tags=ts&tags=fetch'
     )
+  })
+
+  it('should normalize baseURL joins and preserve hash fragments', () => {
+    const { url } = buildRequest({
+      baseURL: 'https://api.example.com/v1/',
+      url: '/users?active=true#results',
+      query: {
+        page: 1
+      }
+    })
+
+    expect(url).toBe(
+      'https://api.example.com/v1/users?active=true&page=1#results'
+    )
+  })
+
+  it('should not prepend baseURL to an absolute request URL', () => {
+    const { url } = buildRequest({
+      baseURL: 'https://api.example.com',
+      url: 'https://uploads.example.com/file'
+    })
+
+    expect(url).toBe('https://uploads.example.com/file')
+  })
+
+  it('should pass native Fetch options to RequestInit', () => {
+    const { init } = buildRequest({
+      url: '/users',
+      fetchOptions: {
+        credentials: 'include',
+        redirect: 'manual',
+        cache: 'no-store'
+      }
+    })
+
+    expect(init).toMatchObject({
+      credentials: 'include',
+      redirect: 'manual',
+      cache: 'no-store'
+    })
   })
 
   it('should serialize json body', () => {
@@ -52,5 +103,93 @@ describe('request config', () => {
       'application/x-www-form-urlencoded;charset=UTF-8'
     )
     expect(body.toString()).toBe('username=npora&remember=true')
+  })
+
+  it('should reject mutually exclusive body options', async () => {
+    const fetchMock = vi.fn()
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient()
+
+    await expect(
+      request.post('/users', {
+        json: {
+          name: 'Npora'
+        },
+        form: {
+          name: 'Npora'
+        }
+      })
+    ).rejects.toMatchObject({
+      code: 'CONFIG_ERROR',
+      config: {
+        url: '/users',
+        method: 'POST'
+      }
+    })
+
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('should reject invalid timeout values', async () => {
+    const fetchMock = vi.fn()
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient()
+
+    await expect(
+      request.get('/users', {
+        timeout: Number.POSITIVE_INFINITY
+      })
+    ).rejects.toMatchObject({
+      code: 'CONFIG_ERROR'
+    })
+
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('should reject invalid headers', async () => {
+    const fetchMock = vi.fn()
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient()
+
+    await expect(
+      request.get('/users', {
+        headers: {
+          'invalid header name': 'value'
+        }
+      })
+    ).rejects.toMatchObject({
+      code: 'CONFIG_ERROR',
+      message: 'Request headers are invalid'
+    })
+
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('should wrap body serialization failures as CONFIG_ERROR', async () => {
+    const fetchMock = vi.fn()
+    const json: Record<string, unknown> = {}
+
+    json.self = json
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient()
+
+    await expect(
+      request.post('/users', {
+        json
+      })
+    ).rejects.toMatchObject({
+      code: 'CONFIG_ERROR',
+      message: 'Failed to build request'
+    })
+
+    expect(fetchMock).not.toHaveBeenCalled()
   })
 })

@@ -65,7 +65,11 @@ const request = createClient(options)
 
 request.request(config)
 
+request.requestResponse(config)
+
 request.get(url)
+
+request.getResponse(url)
 
 request.post(url)
 
@@ -83,6 +87,10 @@ request.interceptors.response.use()
 
 request.interceptors.error.use()
 ```
+
+Data-first methods return the parsed response body. Use `requestResponse()` or
+an HTTP `*Response()` method when status, headers or the native `Response` is
+needed.
 
 ---
 

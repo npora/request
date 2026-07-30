@@ -11,12 +11,44 @@ export type ResponseType =
   | 'arrayBuffer'
   | 'stream'
 
+/**
+ * Native Fetch options passed to the underlying adapter.
+ *
+ * Request fields managed by Npora Request are intentionally omitted so there
+ * is a single source of truth for method, headers, body and cancellation.
+ */
+export type FetchOptions = Omit<
+  RequestInit,
+  'method' | 'headers' | 'body' | 'signal'
+>
+
 export interface RetryOptions {
   retries?: number
+
+  /**
+   * HTTP methods that may be retried.
+   *
+   * @default GET, HEAD, OPTIONS, PUT and DELETE
+   */
+  methods?: readonly HttpMethod[]
 
   delay?:
     | number
     | ((attempt: number, error: unknown) => number | Promise<number>)
+
+  /**
+   * Respect the server Retry-After response header.
+   *
+   * @default true
+   */
+  respectRetryAfter?: boolean
+
+  /**
+   * Maximum retry delay in milliseconds.
+   *
+   * @default 60000
+   */
+  maxDelay?: number
 
   shouldRetry?: (
     error: unknown,
@@ -83,6 +115,8 @@ export interface RequestConfig {
   method?: HttpMethod
 
   baseURL?: string
+
+  fetchOptions?: FetchOptions
 
   headers?: HeadersInit
 

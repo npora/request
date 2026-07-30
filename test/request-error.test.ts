@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { RequestError } from '../src'
+import {
+  RequestError,
+  type NporaResponse,
+  type RequestConfig
+} from '../src'
 
 describe('RequestError', () => {
   it('should create a unified request error', () => {
@@ -29,7 +33,36 @@ describe('RequestError', () => {
     expect(error.status).toBe(404)
   })
 
+  it('should preserve response data and request config', () => {
+    const config: RequestConfig = {
+      url: '/users/1'
+    }
+    const response: NporaResponse<{ message: string }> = {
+      data: {
+        message: 'Not Found'
+      },
+      status: 404,
+      statusText: 'Not Found',
+      headers: new Headers(),
+      config,
+      raw: new Response()
+    }
+
+    const error = new RequestError('Not Found', {
+      code: 'HTTP_ERROR',
+      response
+    })
+
+    expect(error.status).toBe(404)
+    expect(error.data).toEqual({
+      message: 'Not Found'
+    })
+    expect(error.response).toBe(response)
+    expect(error.config).toBe(config)
+  })
+
   it.each([
+    'CONFIG_ERROR',
     'HTTP_ERROR',
     'NETWORK_ERROR',
     'TIMEOUT_ERROR',

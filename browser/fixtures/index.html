@@ -15,15 +15,22 @@
 </main>
 
 <script type="module">
-  import {
-    createClient
-  } from '/dist/index.js'
+  try {
+    const {
+      createClient
+    } = await import('/dist/index.js')
 
-  window.nporaRequest = createClient({
-    baseURL: '/api'
-  })
+    window.nporaRequest = createClient({
+      baseURL: '/api'
+    })
 
-  window.nporaReady = true
+    window.nporaReady = true
+  } catch (error) {
+    window.nporaError =
+      error instanceof Error
+        ? error.message
+        : String(error)
+  }
 </script>
 </body>
 </html>

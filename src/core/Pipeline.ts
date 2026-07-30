@@ -3,6 +3,8 @@ import type {
 } from '../interceptors/InterceptorManager'
 import type { PluginHooks } from '../interceptors/PluginHooks'
 import type { Adapter, NporaResponse, RequestConfig } from '../types'
+import { RequestError } from '../errors'
+import { validateRequestConfig } from '../utils'
 import { RequestContext } from './RequestContext'
 
 export interface PipelineInterceptors {
@@ -28,6 +30,15 @@ export class Pipeline {
 
     try {
       context.config = await this.interceptors.request.run(context.config)
+
+      try {
+        validateRequestConfig(context.config)
+      } catch (error) {
+        context.error = error
+        await this.hooks.runError(context)
+        context.error = await this.interceptors.error.run(context.error)
+        throw context.error
+      }
 
       await this.hooks.runRequest(context)
 
@@ -64,8 +75,14 @@ export class Pipeline {
           context.response = undefined
           attempt += 1
 
-          if (decision.delay && decision.delay > 0) {
-            await sleep(decision.delay)
+          try {
+            await waitForRetry(
+              decision.delay ?? 0,
+              context.config
+            )
+          } catch (waitError) {
+            context.error = await this.interceptors.error.run(waitError)
+            throw context.error
           }
         }
       }
@@ -75,8 +92,60 @@ export class Pipeline {
   }
 }
 
-function sleep(milliseconds: number): Promise<void> {
-  return new Promise(resolve => {
-    setTimeout(resolve, milliseconds)
+function waitForRetry(
+  milliseconds: number,
+  config: RequestConfig
+): Promise<void> {
+  const signal = config.signal
+
+  if (signal?.aborted) {
+    return Promise.reject(createAbortError(signal.reason, config))
+  }
+
+  if (milliseconds <= 0) {
+    return Promise.resolve()
+  }
+
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      cleanup()
+      resolve()
+    }, milliseconds)
+
+    const onAbort = () => {
+      clearTimeout(timer)
+      cleanup()
+      reject(createAbortError(signal?.reason, config))
+    }
+
+    const cleanup = () => {
+      signal?.removeEventListener('abort', onAbort)
+    }
+
+    signal?.addEventListener('abort', onAbort, {
+      once: true
+    })
+  })
+}
+
+function createAbortError(
+  reason: unknown,
+  config: RequestConfig
+): RequestError {
+  if (reason instanceof RequestError) {
+    return new RequestError(reason.message, {
+      code: reason.code,
+      status: reason.status,
+      data: reason.data,
+      response: reason.response,
+      config: reason.config ?? config,
+      cause: reason
+    })
+  }
+
+  return new RequestError('Request aborted during retry delay', {
+    code: 'ABORT_ERROR',
+    config,
+    cause: reason
   })
 }

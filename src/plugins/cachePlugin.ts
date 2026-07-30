@@ -1,26 +1,88 @@
-import type { RequestConfig } from '../types'
+import type {
+  HttpMethod,
+  RequestConfig
+} from '../types'
 import type { Plugin } from './Plugin'
 
 interface CacheRecord {
   data: unknown
   expiresAt: number
+  status: number
+  statusText: string
+  headers: Headers
+  raw?: Response
 }
 
-const cacheStore = new Map<string, CacheRecord>()
+export interface CachePluginOptions {
+  /**
+   * HTTP methods that may be cached.
+   *
+   * @default GET and HEAD
+   */
+  methods?: readonly HttpMethod[]
 
-export function cachePlugin(): Plugin {
-  return {
+  /**
+   * Request headers included in the default cache key.
+   *
+   * @default authorization, cookie, accept and accept-language
+   */
+  varyHeaders?: readonly string[]
+}
+
+export interface CachePlugin extends Plugin {
+  clear(): void
+}
+
+const DEFAULT_CACHE_METHODS: readonly HttpMethod[] = [
+  'GET',
+  'HEAD'
+]
+
+const DEFAULT_VARY_HEADERS = [
+  'authorization',
+  'cookie',
+  'accept',
+  'accept-language'
+] as const
+
+let cacheGeneration = 0
+
+export function cachePlugin(
+  options: CachePluginOptions = {}
+): CachePlugin {
+  const cacheStore = new Map<string, CacheRecord>()
+  const methods = new Set(
+    options.methods ?? DEFAULT_CACHE_METHODS
+  )
+  const varyHeaders =
+    options.varyHeaders ?? DEFAULT_VARY_HEADERS
+  let localGeneration = cacheGeneration
+
+  const plugin: CachePlugin = {
     name: 'cache',
+
+    clear() {
+      cacheStore.clear()
+      localGeneration = cacheGeneration
+    },
 
     install(context) {
       context.hooks.onRequest(requestContext => {
+        syncGeneration()
+
         const cache = requestContext.config.cache
 
-        if (!cache?.enabled) {
+        if (
+          !cache?.enabled ||
+          !isCacheableRequest(requestContext.config, methods)
+        ) {
           return
         }
 
-        const key = createCacheKey(requestContext.config)
+        const key = createCacheKey(
+          requestContext.config,
+          varyHeaders
+        )
         const record = cacheStore.get(key)
 
         if (!record) {
@@ -33,47 +95,133 @@ export function cachePlugin(): Plugin {
         }
 
         requestContext.response = {
-          data: record.data,
-          status: 200,
-          statusText: 'OK',
-          headers: new Headers(),
+          data: cloneCacheValue(record.data),
+          status: record.status,
+          statusText: record.statusText,
+          headers: new Headers(record.headers),
           config: requestContext.config,
-          raw: new Response()
+          raw: cloneRawResponse(record)
         }
       })
 
       context.hooks.onResponse(requestContext => {
+        syncGeneration()
+
         const cache = requestContext.config.cache
 
-        if (!cache?.enabled || !requestContext.response) {
+        if (
+          !cache?.enabled ||
+          !requestContext.response ||
+          !isCacheableRequest(requestContext.config, methods)
+        ) {
           return
         }
 
-        const key = createCacheKey(requestContext.config)
+        const key = createCacheKey(
+          requestContext.config,
+          varyHeaders
+        )
         const ttl = cache.ttl ?? 30000
 
+        if (ttl <= 0) {
+          cacheStore.delete(key)
+          return
+        }
+
         cacheStore.set(key, {
-          data: requestContext.response.data,
-          expiresAt: Date.now() + ttl
+          data: cloneCacheValue(requestContext.response.data),
+          expiresAt: Date.now() + ttl,
+          status: requestContext.response.status,
+          statusText: requestContext.response.statusText,
+          headers: new Headers(requestContext.response.headers),
+          raw: cloneResponse(requestContext.response.raw)
         })
       })
     }
   }
+
+  return plugin
+
+  function syncGeneration(): void {
+    if (localGeneration === cacheGeneration) {
+      return
+    }
+
+    cacheStore.clear()
+    localGeneration = cacheGeneration
+  }
 }
 
 export function clearCache(): void {
-  cacheStore.clear()
+  cacheGeneration += 1
 }
 
-function createCacheKey(config: RequestConfig): string {
+function isCacheableRequest(
+  config: RequestConfig,
+  methods: ReadonlySet<HttpMethod>
+): boolean {
+  return (
+    methods.has(config.method ?? 'GET') &&
+    config.responseType !== 'stream'
+  )
+}
+
+function createCacheKey(
+  config: RequestConfig,
+  varyHeaders: readonly string[]
+): string {
   if (config.cache?.key) {
     return config.cache.key
   }
+
+  const headers = new Headers(config.headers)
 
   return JSON.stringify({
     method: config.method ?? 'GET',
     baseURL: config.baseURL,
     url: config.url,
-    query: config.query
+    query: config.query,
+    headers: Object.fromEntries(
+      varyHeaders.map(name => [
+        name.toLowerCase(),
+        headers.get(name)
+      ])
+    )
   })
+}
+
+function cloneRawResponse(record: CacheRecord): Response {
+  if (record.raw) {
+    const cloned = cloneResponse(record.raw)
+
+    if (cloned) {
+      return cloned
+    }
+  }
+
+  return new Response(null, {
+    status: record.status,
+    statusText: record.statusText,
+    headers: record.headers
+  })
+}
+
+function cloneResponse(response: Response): Response | undefined {
+  try {
+    return response.clone()
+  } catch {
+    return undefined
+  }
+}
+
+function cloneCacheValue<T>(value: T): T {
+  if (typeof structuredClone !== 'function') {
+    return value
+  }
+
+  try {
+    return structuredClone(value)
+  } catch {
+    return value
+  }
 }

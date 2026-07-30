@@ -39,6 +39,7 @@ export async function parseResponse<T = unknown>(
     throw new RequestError('Failed to parse response', {
       code: 'PARSER_ERROR',
       status: response.status,
+      config,
       cause: error
     })
   }

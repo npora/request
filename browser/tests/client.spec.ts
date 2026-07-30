@@ -21,53 +21,7 @@ interface BrowserWindow extends Window {
 test(
   'should send a GET request in the browser',
   async ({ page }) => {
-    await page.setContent(`
-      <!doctype html>
-      <html lang="en">
-        <head>
-          <meta charset="UTF-8" />
-
-          <meta
-            name="viewport"
-            content="width=device-width, initial-scale=1.0"
-          />
-
-          <title>
-            Npora Request Browser Test
-          </title>
-        </head>
-
-        <body>
-          <main>
-            <h1>
-              Npora Request Browser Test
-            </h1>
-          </main>
-
-          <script type="module">
-            try {
-              const {
-                createClient
-              } = await import(
-                'http://127.0.0.1:4173/dist/index.js'
-              )
-
-              window.nporaRequest = createClient({
-                baseURL:
-                  'http://127.0.0.1:4173/api'
-              })
-
-              window.nporaReady = true
-            } catch (error) {
-              window.nporaError =
-                error instanceof Error
-                  ? error.message
-                  : String(error)
-            }
-          </script>
-        </body>
-      </html>
-    `)
+    await page.goto('/')
 
     await page.waitForFunction(() => {
       const browserWindow =

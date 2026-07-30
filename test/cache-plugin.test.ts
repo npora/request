@@ -108,4 +108,157 @@ describe('cachePlugin', () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(1)
   })
+
+  it('should isolate cache stores between plugin instances', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(createJsonResponse({ client: 1 }))
+      .mockResolvedValueOnce(createJsonResponse({ client: 2 }))
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const firstClient = createClient().use(cachePlugin())
+    const secondClient = createClient().use(cachePlugin())
+    const config = {
+      cache: {
+        enabled: true
+      }
+    }
+
+    await expect(firstClient.get('/user', config)).resolves.toEqual({
+      client: 1
+    })
+    await expect(secondClient.get('/user', config)).resolves.toEqual({
+      client: 2
+    })
+
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('should vary the default cache key by authorization header', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(createJsonResponse({ user: 1 }))
+      .mockResolvedValueOnce(createJsonResponse({ user: 2 }))
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient().use(cachePlugin())
+    const cache = {
+      enabled: true
+    }
+
+    await expect(
+      request.get('/profile', {
+        cache,
+        headers: {
+          authorization: 'Bearer token-1'
+        }
+      })
+    ).resolves.toEqual({
+      user: 1
+    })
+
+    await expect(
+      request.get('/profile', {
+        cache,
+        headers: {
+          authorization: 'Bearer token-2'
+        }
+      })
+    ).resolves.toEqual({
+      user: 2
+    })
+
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('should not cache non-idempotent methods by default', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(createJsonResponse({ order: 1 }))
+      .mockResolvedValueOnce(createJsonResponse({ order: 2 }))
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient().use(cachePlugin())
+    const config = {
+      cache: {
+        enabled: true
+      },
+      json: {
+        item: 'book'
+      }
+    }
+
+    await expect(request.post('/orders', config)).resolves.toEqual({
+      order: 1
+    })
+    await expect(request.post('/orders', config)).resolves.toEqual({
+      order: 2
+    })
+
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('should return independent copies of cached data', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      createJsonResponse({
+        profile: {
+          name: 'Npora'
+        }
+      })
+    )
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient().use(cachePlugin())
+    const config = {
+      cache: {
+        enabled: true
+      }
+    }
+
+    const first = await request.get<{
+      profile: {
+        name: string
+      }
+    }>('/profile', config)
+
+    first.profile.name = 'Changed'
+
+    const second = await request.get<{
+      profile: {
+        name: string
+      }
+    }>('/profile', config)
+
+    expect(second.profile.name).toBe('Npora')
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('should clear one plugin cache instance', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(createJsonResponse({ version: 1 }))
+      .mockResolvedValueOnce(createJsonResponse({ version: 2 }))
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const plugin = cachePlugin()
+    const request = createClient().use(plugin)
+    const config = {
+      cache: {
+        enabled: true
+      }
+    }
+
+    await request.get('/version', config)
+    plugin.clear()
+
+    await expect(request.get('/version', config)).resolves.toEqual({
+      version: 2
+    })
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
 })

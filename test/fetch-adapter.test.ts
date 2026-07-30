@@ -72,13 +72,27 @@ describe('FetchAdapter', () => {
 
     const adapter = new FetchAdapter()
 
+    const config = {
+      url: 'https://api.example.com/not-found'
+    }
+
     await expect(
-      adapter.request({
+      adapter.request<{ message: string }>({
         url: 'https://api.example.com/not-found'
       })
     ).rejects.toMatchObject({
       code: 'HTTP_ERROR',
-      status: 404
+      status: 404,
+      data: {
+        message: 'Not Found'
+      },
+      config,
+      response: {
+        status: 404,
+        data: {
+          message: 'Not Found'
+        }
+      }
     })
   })
 
@@ -91,11 +105,12 @@ describe('FetchAdapter', () => {
     const adapter = new FetchAdapter()
 
     await expect(
-      adapter.request({
-        url: 'https://api.example.com/error'
-      })
+      adapter.request({ url: 'https://api.example.com/error' })
     ).rejects.toMatchObject({
-      code: 'NETWORK_ERROR'
+      code: 'NETWORK_ERROR',
+      config: {
+        url: 'https://api.example.com/error'
+      }
     })
   })
 

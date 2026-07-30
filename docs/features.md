@@ -35,6 +35,7 @@ Core features should remain stable.
 ### Base
 
 - [x] baseURL
+- [x] Native Fetch Options
 - [x] headers
 - [x] query
 - [x] body
@@ -54,12 +55,17 @@ Core features should remain stable.
 
 - [x] responseType
 - [x] validateStatus
+- [x] Complete Response API
 
 ---
 
 ## Pipeline
 
 - [x] Config Merge
+- [x] Case-insensitive Header Merge
+- [x] Query Merge
+- [x] Nested Option Merge
+- [x] Request Config Validation
 - [x] Request Pipeline
 - [x] Request Context
 
@@ -109,6 +115,9 @@ Everything below should be implemented as extensions.
 - [x] Retry
 - [x] Retry Delay
 - [x] Retry Condition
+- [x] Idempotent Method Guard
+- [x] Retry-After
+- [x] Abortable Backoff
 
 ---
 
@@ -117,6 +126,9 @@ Everything below should be implemented as extensions.
 - [x] Memory Cache
 - [x] TTL
 - [x] Custom Cache Key
+- [x] Per-client Isolation
+- [x] Authorization-aware Cache Key
+- [x] Cache Method Guard
 
 ---
 
@@ -199,7 +211,7 @@ Supported:
 - [x] Complete Type Definitions
 - [x] Generic Request
 - [x] Generic Response
-- [ ] Generic Error
+- [x] Generic Error
 
 ---
 
