@@ -69,6 +69,8 @@ Core features should remain stable.
 - [x] Query Merge
 - [x] Nested Option Merge
 - [x] Request Config Validation
+- [x] Final Plugin Config Validation
+- [x] GET/HEAD Body Guard
 - [x] Request Pipeline
 - [x] Request Context
 - [x] Unified Pipeline Error Lifecycle

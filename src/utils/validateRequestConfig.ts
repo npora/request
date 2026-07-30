@@ -53,6 +53,18 @@ function validateBody(config: RequestConfig): void {
   })
 
   if (activeFields.length <= 1) {
+    const method = config.method ?? 'GET'
+
+    if (
+      activeFields.length === 1 &&
+      (method === 'GET' || method === 'HEAD')
+    ) {
+      throw configError(
+        `${method} requests cannot include a body`,
+        config
+      )
+    }
+
     return
   }
 

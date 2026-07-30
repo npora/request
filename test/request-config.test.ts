@@ -5,7 +5,8 @@ import {
   it,
   vi
 } from 'vitest'
-import { createClient } from '../src'
+import type { Plugin } from '../src'
+import { createClient, MockAdapter } from '../src'
 import { buildRequest } from '../src/utils/buildRequest'
 
 afterEach(() => {
@@ -130,6 +131,76 @@ describe('request config', () => {
     })
 
     expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    ['GET', 'get'],
+    ['HEAD', 'head']
+  ] as const)(
+    'should reject a body on %s requests',
+    async (method, requestMethod) => {
+      const fetchMock = vi.fn()
+
+      vi.stubGlobal('fetch', fetchMock)
+
+      const request = createClient()
+      const promise = request[requestMethod]('/users', {
+        json: {
+          invalid: true
+        }
+      })
+
+      await expect(promise).rejects.toMatchObject({
+        code: 'CONFIG_ERROR',
+        message: `${method} requests cannot include a body`
+      })
+      expect(fetchMock).not.toHaveBeenCalled()
+    }
+  )
+
+  it('should reject an inherited body on GET requests', async () => {
+    const fetchMock = vi.fn()
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient({
+      json: {
+        inherited: true
+      }
+    })
+
+    await expect(request.get('/users')).rejects.toMatchObject({
+      code: 'CONFIG_ERROR',
+      message: 'GET requests cannot include a body'
+    })
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('should validate config after plugin request hooks', async () => {
+    const adapter = new MockAdapter()
+    const requestSpy = vi.spyOn(adapter, 'request')
+    const plugin: Plugin = {
+      name: 'invalid-config',
+      install({ hooks }) {
+        hooks.onRequest(context => {
+          context.config = {
+            ...context.config,
+            headers: {
+              'invalid header name': 'value'
+            }
+          }
+        })
+      }
+    }
+    const request = createClient({
+      adapter
+    }).use(plugin)
+
+    await expect(request.get('/users')).rejects.toMatchObject({
+      code: 'CONFIG_ERROR',
+      message: 'Request headers are invalid'
+    })
+    expect(requestSpy).not.toHaveBeenCalled()
   })
 
   it('should reject invalid timeout values', async () => {

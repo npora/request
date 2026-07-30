@@ -33,6 +33,7 @@ export class Pipeline {
         context.config = await this.interceptors.request.run(context.config)
         validateRequestConfig(context.config)
         await this.hooks.runRequest(context)
+        validateRequestConfig(context.config)
       } catch (error) {
         return this.fail(context, error)
       }
