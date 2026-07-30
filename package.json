@@ -63,7 +63,6 @@
     "test:browser:ui": "playwright test --config=browser/playwright.config.ts --ui",
     "test:browser:report": "playwright show-report playwright-report",
     "benchmark": "tsx benchmark/request.ts",
-    "benchmark:compare": "tsx benchmark/compare.ts",
     "benchmark:types": "tsc -p benchmark/tsconfig.json"
   },
   "devDependencies": {
@@ -71,7 +70,6 @@
     "@playwright/test": "^1.61.1",
     "@types/node": "^26.1.0",
     "@vitest/coverage-v8": "^4.1.10",
-    "axios": "^1.18.1",
     "tsup": "^8.5.1",
     "tsx": "^4.23.0",
     "typescript": "^6.0.3",

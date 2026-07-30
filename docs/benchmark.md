@@ -16,24 +16,6 @@ Generate a machine-readable report:
 pnpm benchmark -- --output benchmark-results/request.json
 ```
 
-Compare equivalent JSON requests through native Fetch, Npora Request, and
-Axios using its Fetch adapter:
-
-```sh
-pnpm benchmark:compare
-```
-
-Generate the comparison report and tune its sampling:
-
-```sh
-pnpm benchmark:compare -- \
-  --operations 5000 \
-  --concurrency 100 \
-  --warmup 500 \
-  --samples 5 \
-  --output benchmark-results/comparison.json
-```
-
 Tune the workload:
 
 ```sh
@@ -74,21 +56,15 @@ tests.
 
 ## Competitor Comparison
 
-The comparison benchmark uses an in-memory Fetch response to remove DNS,
-socket and server variance. Every client builds the same query and headers
-and parses the same JSON payload. Axios is explicitly configured with its
-Fetch adapter so transport behavior is comparable.
+The dated ecosystem evaluation and its limitations are documented in
+[`comparison.md`](comparison.md). Competitor packages are installed only for
+an evaluation run and removed afterward. They are deliberately absent from
+the project dependencies and CI.
 
-Each sequential and concurrent scenario runs multiple times. Execution order
-rotates between native Fetch, Npora Request, and Axios; the report retains the
-median-throughput sample. The exact Axios version is recorded in the JSON
-report and locked as a development dependency. It is never shipped with the
-library.
-
-This benchmark measures client-side request construction and response parsing
-overhead. It does not measure real network throughput, connection pooling,
-proxies, HTTP/2, or server performance. Results are observations rather than
-release thresholds.
+The checked-in benchmark remains focused on repeatable regressions in this
+library. Cross-library snapshots are observations rather than release
+thresholds because transport implementations, connection reuse, Node.js
+versions, and machine scheduling differ.
 
 ## Hot-path Design
 

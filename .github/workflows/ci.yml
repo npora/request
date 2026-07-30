@@ -71,14 +71,11 @@ jobs:
       - name: Run performance benchmarks
         run: pnpm benchmark -- --output benchmark-results/request.json
 
-      - name: Compare Fetch and Axios performance
-        run: pnpm benchmark:compare -- --output benchmark-results/comparison.json
-
       - name: Upload performance report
         uses: actions/upload-artifact@v4
         with:
-          name: request-benchmarks
-          path: benchmark-results/
+          name: request-benchmark
+          path: benchmark-results/request.json
           retention-days: 30
 
   browser:

@@ -31,5 +31,6 @@ Add a production-ready request lifecycle and extension API.
   query parameters, forms, and FormData records.
 - Enforce raw, gzip, declaration, and npm tarball size budgets in package,
   release, and CI verification with machine-readable reports.
-- Add a rotating, multi-sample native Fetch and Axios comparison benchmark
-  that records equivalent JSON pipeline throughput without network variance.
+- Evaluate Axios and nine representative GitHub request libraries with
+  equivalent rotating local HTTP workloads, then remove every competitor
+  dependency and document the resulting architecture decisions.

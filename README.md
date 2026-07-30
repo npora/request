@@ -253,15 +253,11 @@ pnpm test:size
 See [`docs/package-size.md`](docs/package-size.md) for the checked metrics and
 budget policy.
 
-Run the controlled native Fetch, Npora Request, and Axios comparison:
-
-```sh
-pnpm benchmark:compare
-```
-
-The comparison rotates execution order across multiple samples and reports
-the median run. Axios is a development-only dependency and is excluded from
-the published package.
+The ecosystem evaluation covers Axios and nine representative GitHub request
+libraries with equivalent local HTTP workloads. Competitor packages were
+removed after measurement and are not project dependencies. See
+[`docs/comparison.md`](docs/comparison.md) for the snapshot and design
+decisions.
 
 ---
 
@@ -273,6 +269,7 @@ Project documentation is located in the `docs` directory.
 docs
 ├── benchmark.md
 ├── blueprint.md
+├── comparison.md
 ├── features.md
 ├── package-size.md
 ├── structure.md
@@ -281,6 +278,7 @@ docs
 
 - **Blueprint** — Project vision and architecture
 - **Benchmark** — Performance measurement methodology
+- **Comparison** — Ten-library ecosystem evaluation
 - **Package Size** — Published asset budgets and regression checks
 - **Structure** — Directory responsibilities
 - **Features** — Product roadmap
