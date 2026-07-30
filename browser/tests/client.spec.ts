@@ -20,6 +20,19 @@ interface BrowserRequestClient {
     url: string,
     config?: BrowserRequestConfig
   ): Promise<T>
+
+  headResponse(
+    url: string,
+    config?: BrowserRequestConfig
+  ): Promise<{
+    data: undefined
+    status: number
+  }>
+
+  options<T>(
+    url: string,
+    config?: BrowserRequestConfig
+  ): Promise<T>
 }
 
 interface BrowserClientOptions {
@@ -321,6 +334,43 @@ test(
       second: {
         count: 1
       }
+    })
+  }
+)
+
+test(
+  'should send HEAD and OPTIONS requests in the browser',
+  async ({ page }) => {
+    await openFixture(page)
+
+    const result = await page.evaluate(async () => {
+      const browserWindow = window as BrowserWindow
+      const request = browserWindow.nporaRequest
+
+      if (!request) {
+        throw new Error(
+          'Npora request client is unavailable'
+        )
+      }
+
+      const head = await request.headResponse('/user')
+      const options = await request.options('/user')
+
+      return {
+        head: {
+          data: head.data,
+          status: head.status
+        },
+        options
+      }
+    })
+
+    expect(result).toEqual({
+      head: {
+        data: undefined,
+        status: 200
+      },
+      options: undefined
     })
   }
 )

@@ -8,7 +8,11 @@ export async function parseResponse<T = unknown>(
   response: Response,
   config: RequestConfig
 ): Promise<T> {
-  if (response.status === 204 || response.status === 205) {
+  if (
+    config.method === 'HEAD' ||
+    response.status === 204 ||
+    response.status === 205
+  ) {
     return undefined as T
   }
 

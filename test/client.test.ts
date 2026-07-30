@@ -20,6 +20,10 @@ describe('client', () => {
     expect(typeof client.put).toBe('function')
     expect(typeof client.patch).toBe('function')
     expect(typeof client.delete).toBe('function')
+    expect(typeof client.head).toBe('function')
+    expect(typeof client.headResponse).toBe('function')
+    expect(typeof client.options).toBe('function')
+    expect(typeof client.optionsResponse).toBe('function')
   })
 
   it('should use custom adapter', async () => {
@@ -233,6 +237,63 @@ describe('client', () => {
     await child.get('/isolated')
 
     expect(requestInterceptor).not.toHaveBeenCalled()
+  })
+
+  it('should send HEAD and OPTIONS requests', async () => {
+    const methods: Array<RequestConfig['method']> = []
+    const adapter: Adapter = {
+      async request<T = unknown>(
+        config: RequestConfig
+      ): Promise<NporaResponse<T>> {
+        methods.push(config.method)
+
+        return {
+          data: (
+            config.method === 'HEAD'
+              ? undefined
+              : {
+                  allowed: true
+                }
+          ) as T,
+          status: 200,
+          statusText: 'OK',
+          headers: new Headers({
+            allow: 'GET, HEAD, OPTIONS'
+          }),
+          config,
+          raw: new Response()
+        }
+      }
+    }
+    const client = createClient({ adapter })
+
+    await expect(client.head('/resource')).resolves.toBeUndefined()
+    await expect(
+      client.headResponse('/resource')
+    ).resolves.toMatchObject({
+      status: 200,
+      data: undefined
+    })
+    await expect(
+      client.options<{ allowed: boolean }>('/resource')
+    ).resolves.toEqual({
+      allowed: true
+    })
+    await expect(
+      client.optionsResponse<{ allowed: boolean }>('/resource')
+    ).resolves.toMatchObject({
+      status: 200,
+      data: {
+        allowed: true
+      }
+    })
+
+    expect(methods).toEqual([
+      'HEAD',
+      'HEAD',
+      'OPTIONS',
+      'OPTIONS'
+    ])
   })
 })
 

@@ -89,12 +89,16 @@ request.post<T>(url, config?)
 request.put<T>(url, config?)
 request.patch<T>(url, config?)
 request.delete<T>(url, config?)
+request.head(url, config?)
+request.options<T>(url, config?)
 
 request.getResponse<T>(url, config?)
 request.postResponse<T>(url, config?)
 request.putResponse<T>(url, config?)
 request.patchResponse<T>(url, config?)
 request.deleteResponse<T>(url, config?)
+request.headResponse(url, config?)
+request.optionsResponse<T>(url, config?)
 ```
 
 Example:
@@ -105,6 +109,9 @@ const user = await request.get<User>('/user')
 const response = await request.getResponse<User>('/user')
 console.log(response.headers)
 ```
+
+`head()` resolves to `undefined` because HEAD responses do not contain a
+response body. Use `headResponse()` to inspect status and headers.
 
 ---
 

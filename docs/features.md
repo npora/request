@@ -27,6 +27,8 @@ Core features should remain stable.
 - [x] put()
 - [x] patch()
 - [x] delete()
+- [x] head()
+- [x] options()
 
 ---
 

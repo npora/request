@@ -255,6 +255,50 @@ export class Client {
     })
   }
 
+  head(
+    url: string,
+    config: Omit<RequestConfig, 'url' | 'method'> = {}
+  ): Promise<void> {
+    return this.request<void>({
+      ...config,
+      url,
+      method: 'HEAD'
+    })
+  }
+
+  headResponse(
+    url: string,
+    config: Omit<RequestConfig, 'url' | 'method'> = {}
+  ): Promise<NporaResponse<void>> {
+    return this.requestResponse<void>({
+      ...config,
+      url,
+      method: 'HEAD'
+    })
+  }
+
+  options<T = unknown>(
+    url: string,
+    config: Omit<RequestConfig, 'url' | 'method'> = {}
+  ): Promise<T> {
+    return this.request<T>({
+      ...config,
+      url,
+      method: 'OPTIONS'
+    })
+  }
+
+  optionsResponse<T = unknown>(
+    url: string,
+    config: Omit<RequestConfig, 'url' | 'method'> = {}
+  ): Promise<NporaResponse<T>> {
+    return this.requestResponse<T>({
+      ...config,
+      url,
+      method: 'OPTIONS'
+    })
+  }
+
   private createPipeline(adapter: Adapter): Pipeline {
     return new Pipeline(adapter, this.interceptors, this.hooks)
   }

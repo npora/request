@@ -82,6 +82,10 @@ request.patch(url)
 
 request.delete(url)
 
+request.head(url)
+
+request.options(url)
+
 request.use(plugin)
 
 request.unuse(pluginName)

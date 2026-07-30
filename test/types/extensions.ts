@@ -63,6 +63,12 @@ const extended: Client = client.extend({
     'x-client': 'extended'
   }
 })
+const headData: Promise<void> = client.head('/health')
+const optionsData: Promise<{ allowed: boolean }> = client.options<{
+  allowed: boolean
+}>('/resource')
 
 void installed
 void extended
+void headData
+void optionsData

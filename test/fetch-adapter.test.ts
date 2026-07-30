@@ -160,6 +160,30 @@ describe('FetchAdapter', () => {
     expect(response.data).toBeUndefined()
   })
 
+  it('should not parse a HEAD response body', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(null, {
+          status: 200,
+          headers: {
+            'content-type': 'application/json',
+            'content-length': '128'
+          }
+        })
+      )
+    )
+
+    const adapter = new FetchAdapter()
+    const response = await adapter.request<void>({
+      url: 'https://api.example.com/resource',
+      method: 'HEAD'
+    })
+
+    expect(response.data).toBeUndefined()
+    expect(response.headers.get('content-length')).toBe('128')
+  })
+
   it('should expose RequestError instances', async () => {
     vi.stubGlobal(
       'fetch',
