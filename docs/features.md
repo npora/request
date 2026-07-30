@@ -264,6 +264,7 @@ Supported:
 - [x] ESM Entrypoint
 - [x] CommonJS Entrypoint
 - [x] Package Exports Smoke Test
+- [x] Tarball Manifest Verification
 
 ## v0.1
 
