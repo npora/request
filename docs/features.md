@@ -259,6 +259,12 @@ Supported:
 
 # Release
 
+## Package Verification
+
+- [x] ESM Entrypoint
+- [x] CommonJS Entrypoint
+- [x] Package Exports Smoke Test
+
 ## v0.1
 
 Core

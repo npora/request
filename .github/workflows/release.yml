@@ -48,6 +48,7 @@ jobs:
           pnpm typecheck
           pnpm test:run
           pnpm build
+          pnpm test:package
 
       - name: Create or update release pull request
         uses: changesets/action@v1.7.0
