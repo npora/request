@@ -16,3 +16,4 @@ Add a production-ready request lifecycle and extension API.
   concurrent Node and browser stress coverage.
 - Add Node integration, Chromium/WebKit, Web Worker, package entrypoint,
   tarball manifest, public type, and example validation.
+- Align the default and CI browser matrix on Chromium and WebKit.

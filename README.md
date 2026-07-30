@@ -255,14 +255,13 @@ Supported runtimes:
 
 - Chrome
 - Edge
-- Firefox
 - Safari
 - Node.js
 - Web Workers
 
 Automated runtime coverage uses Node.js integration tests and Playwright
-browser tests for Chromium, Firefox and WebKit. Local verification may run a
-subset of browser engines.
+browser tests for Chromium and WebKit. Firefox is outside the current
+verification scope.
 
 Internet Explorer is **not supported**.
 

@@ -50,26 +50,6 @@ export default defineConfig({
     },
 
     {
-      name: 'firefox',
-
-      use: {
-        ...devices['Desktop Firefox']
-      },
-
-      launchOptions: {
-        firefoxUserPrefs: {
-          'network.proxy.type': 0,
-
-          'network.proxy.no_proxies_on':
-            'localhost, 127.0.0.1',
-
-          'network.proxy.allow_hijacking_localhost':
-            false
-        }
-      }
-    },
-
-    {
       name: 'webkit',
 
       use: {

@@ -208,13 +208,15 @@ Supported:
 
 - Chrome
 - Edge
-- Firefox
 - Safari
 - Node.js 20+
 
 Internet Explorer is not supported.
 
 Polyfills are not included.
+
+Automated browser verification covers Chromium and WebKit. Firefox is outside
+the current verification scope.
 
 ---
 

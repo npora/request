@@ -217,10 +217,11 @@ Everything below should be implemented as extensions.
 
 Supported:
 
-- [ ] Chrome
-- [ ] Edge
-- [ ] Firefox
-- [ ] Safari
+- [x] Chrome (Chromium)
+- [x] Edge (Chromium)
+- [x] Safari (WebKit)
+
+Firefox is outside the current verification scope.
 
 ---
 
