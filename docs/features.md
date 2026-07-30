@@ -181,6 +181,7 @@ Everything below should be implemented as extensions.
 - [x] Request Logger
 - [x] Response Logger
 - [x] Error Logger
+- [x] Sensitive Log Redaction
 
 ---
 
