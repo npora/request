@@ -52,6 +52,7 @@ Core features should remain stable.
 
 - [x] timeout
 - [x] signal
+- [x] Timeout/Signal Resource Cleanup
 
 ### Response
 

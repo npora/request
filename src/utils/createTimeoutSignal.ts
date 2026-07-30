@@ -17,8 +17,23 @@ export function createTimeoutSignal(
   }
 
   const controller = new AbortController()
+  let timer: ReturnType<typeof setTimeout> | undefined
+  let onAbort: (() => void) | undefined
 
-  const timer = setTimeout(() => {
+  const clear = () => {
+    if (timer !== undefined) {
+      clearTimeout(timer)
+      timer = undefined
+    }
+
+    if (signal && onAbort) {
+      signal.removeEventListener('abort', onAbort)
+      onAbort = undefined
+    }
+  }
+
+  timer = setTimeout(() => {
+    clear()
     controller.abort(
       new RequestError(`Request timeout after ${timeout}ms`, {
         code: 'TIMEOUT_ERROR'
@@ -28,18 +43,22 @@ export function createTimeoutSignal(
 
   if (signal) {
     if (signal.aborted) {
+      clear()
       controller.abort(signal.reason)
     } else {
+      onAbort = () => {
+        clear()
+        controller.abort(
+          signal.reason ??
+          new RequestError('Request aborted', {
+            code: 'ABORT_ERROR'
+          })
+        )
+      }
+
       signal.addEventListener(
         'abort',
-        () => {
-          controller.abort(
-            signal.reason ??
-            new RequestError('Request aborted', {
-              code: 'ABORT_ERROR'
-            })
-          )
-        },
+        onAbort,
         {
           once: true
         }
@@ -49,9 +68,7 @@ export function createTimeoutSignal(
 
   return {
     signal: controller.signal,
-    clear: () => {
-      clearTimeout(timer)
-    }
+    clear
   }
 }
 

@@ -168,6 +168,9 @@ await request.get('/account', {
 }
 ```
 
+Timeout timers and composed abort listeners are released when a request
+settles, times out or is externally aborted.
+
 ---
 
 ## Response
