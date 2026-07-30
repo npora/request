@@ -155,6 +155,8 @@ Everything below should be implemented as extensions.
 - [x] Authorization Header
 - [x] Refresh Token
 - [x] Token Storage
+- [x] Concurrent Refresh Deduplication
+- [x] Refresh Failure Recovery
 
 ---
 

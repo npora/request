@@ -255,4 +255,201 @@ describe('authPlugin refresh token', () => {
       'Bearer refreshed-token'
     )
   })
+
+  it('should preserve the request auth scheme after refresh', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        createJsonResponse(
+          {
+            message: 'Unauthorized'
+          },
+          401,
+          'Unauthorized'
+        )
+      )
+      .mockResolvedValueOnce(
+        createJsonResponse({
+          ok: true
+        })
+      )
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient().use(
+      authPlugin({
+        refreshToken: async () => 'refreshed-token'
+      })
+    )
+
+    await request.get('/user', {
+      extensions: {
+        auth: {
+          token: 'expired-token',
+          scheme: 'Token'
+        }
+      }
+    })
+
+    const retryHeaders = new Headers(
+      fetchMock.mock.calls[1]?.[1]?.headers
+    )
+
+    expect(retryHeaders.get('authorization')).toBe(
+      'Token refreshed-token'
+    )
+  })
+
+  it('should re-read a request token provider after refresh', async () => {
+    let token = 'expired-token'
+
+    const fetchMock = vi.fn(
+      async (_input: RequestInfo | URL, init?: RequestInit) => {
+        const headers = new Headers(init?.headers)
+
+        if (
+          headers.get('authorization') ===
+          'Bearer expired-token'
+        ) {
+          return createJsonResponse(
+            {
+              message: 'Unauthorized'
+            },
+            401,
+            'Unauthorized'
+          )
+        }
+
+        return createJsonResponse({
+          ok: true
+        })
+      }
+    )
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient().use(
+      authPlugin({
+        refreshToken() {
+          token = 'refreshed-token'
+        }
+      })
+    )
+
+    await expect(
+      request.get('/user', {
+        extensions: {
+          auth: {
+            token: () => token
+          }
+        }
+      })
+    ).resolves.toEqual({
+      ok: true
+    })
+
+    const retryHeaders = new Headers(
+      fetchMock.mock.calls[1]?.[1]?.headers
+    )
+
+    expect(retryHeaders.get('authorization')).toBe(
+      'Bearer refreshed-token'
+    )
+  })
+
+  it('should use a returned refresh token without re-reading providers', async () => {
+    const token = vi
+      .fn()
+      .mockReturnValueOnce('expired-token')
+      .mockImplementation(() => {
+        throw new Error('token provider should not run again')
+      })
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        createJsonResponse(
+          {
+            message: 'Unauthorized'
+          },
+          401,
+          'Unauthorized'
+        )
+      )
+      .mockResolvedValueOnce(
+        createJsonResponse({
+          ok: true
+        })
+      )
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient().use(
+      authPlugin({
+        refreshToken: async () => 'refreshed-token'
+      })
+    )
+
+    await expect(
+      request.get('/user', {
+        extensions: {
+          auth: {
+            token
+          }
+        }
+      })
+    ).resolves.toEqual({
+      ok: true
+    })
+    expect(token).toHaveBeenCalledTimes(1)
+  })
+
+  it('should recover on a later request after refresh fails', async () => {
+    let token = 'expired-token'
+    const refreshToken = vi
+      .fn()
+      .mockRejectedValueOnce(new Error('refresh failed'))
+      .mockImplementationOnce(() => {
+        token = 'refreshed-token'
+        return token
+      })
+    const fetchMock = vi.fn(
+      async (_input: RequestInfo | URL, init?: RequestInit) => {
+        const headers = new Headers(init?.headers)
+
+        if (
+          headers.get('authorization') ===
+          'Bearer expired-token'
+        ) {
+          return createJsonResponse(
+            {
+              message: 'Unauthorized'
+            },
+            401,
+            'Unauthorized'
+          )
+        }
+
+        return createJsonResponse({
+          ok: true
+        })
+      }
+    )
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient().use(
+      authPlugin({
+        token: () => token,
+        refreshToken
+      })
+    )
+
+    await expect(request.get('/first')).rejects.toMatchObject({
+      status: 401
+    })
+    await expect(request.get('/second')).resolves.toEqual({
+      ok: true
+    })
+    expect(refreshToken).toHaveBeenCalledTimes(2)
+  })
 })

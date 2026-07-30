@@ -95,22 +95,22 @@ export function authPlugin(options: AuthPluginOptions = {}): Plugin {
           const refreshedToken = await refreshAccessToken(
             options.refreshToken
           )
+          const authorization = await resolveAuthorization(
+            requestContext.config,
+            options,
+            typeof refreshedToken === 'string'
+              ? refreshedToken
+              : undefined
+          )
 
-          if (refreshedToken) {
-            await options.storage?.set(refreshedToken)
-          }
-
-          const token =
-            refreshedToken || (await resolvePluginToken(options))
-
-          if (!token) {
+          if (!authorization.token) {
             return undefined
           }
 
           requestContext.config = setAuthorizationHeader(
             requestContext.config,
-            token,
-            options.scheme
+            authorization.token,
+            authorization.scheme
           )
 
           return {
@@ -128,9 +128,17 @@ export function authPlugin(options: AuthPluginOptions = {}): Plugin {
     refreshToken: NonNullable<AuthPluginOptions['refreshToken']>
   ): Promise<string | void> {
     if (!refreshPromise) {
-      refreshPromise = Promise.resolve(refreshToken()).finally(() => {
-        refreshPromise = undefined
-      })
+      refreshPromise = Promise.resolve(refreshToken())
+        .then(async token => {
+          if (token) {
+            await options.storage?.set(token)
+          }
+
+          return token
+        })
+        .finally(() => {
+          refreshPromise = undefined
+        })
     }
 
     return refreshPromise
@@ -141,25 +149,47 @@ async function applyAuthorization(
   config: RequestConfig,
   options: AuthPluginOptions
 ): Promise<RequestConfig> {
+  const authorization = await resolveAuthorization(config, options)
+
+  if (!authorization.token) {
+    return config
+  }
+
+  return setAuthorizationHeader(
+    config,
+    authorization.token,
+    authorization.scheme
+  )
+}
+
+async function resolveAuthorization(
+  config: RequestConfig,
+  options: AuthPluginOptions,
+  tokenOverride?: string
+): Promise<ResolvedAuthorization> {
   const requestAuth = resolveExtensionConfig(
     config,
     'auth',
     config.auth
   )
 
-  const token = requestAuth?.token
-    ? await resolveToken(requestAuth.token)
-    : await resolvePluginToken(options)
+  const token =
+    tokenOverride ??
+    (
+      requestAuth?.token
+        ? await resolveToken(requestAuth.token)
+        : await resolvePluginToken(options)
+    )
 
-  if (!token) {
-    return config
-  }
-
-  return setAuthorizationHeader(
-    config,
+  return {
     token,
-    requestAuth?.scheme ?? options.scheme
-  )
+    scheme: requestAuth?.scheme ?? options.scheme
+  }
+}
+
+interface ResolvedAuthorization {
+  token: string
+  scheme?: string
 }
 
 async function resolvePluginToken(

@@ -208,6 +208,64 @@ describe('authPlugin token storage', () => {
     expect(refreshToken).toHaveBeenCalledTimes(1)
   })
 
+  it('should persist a shared concurrent refresh only once', async () => {
+    let storedToken = 'expired-token'
+    const storage: AuthTokenStorage = {
+      get: vi.fn(() => storedToken),
+      set: vi.fn(token => {
+        storedToken = token
+      }),
+      remove: vi.fn()
+    }
+    const refreshToken = vi.fn(async () => {
+      await new Promise<void>(resolve => {
+        setTimeout(resolve, 10)
+      })
+
+      return 'refreshed-token'
+    })
+    const fetchMock = vi.fn(
+      async (_input: RequestInfo | URL, init?: RequestInit) => {
+        const headers = new Headers(init?.headers)
+
+        if (
+          headers.get('authorization') ===
+          'Bearer expired-token'
+        ) {
+          return createJsonResponse(
+            {
+              message: 'Unauthorized'
+            },
+            401,
+            'Unauthorized'
+          )
+        }
+
+        return createJsonResponse({
+          ok: true
+        })
+      }
+    )
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient().use(
+      authPlugin({
+        storage,
+        refreshToken
+      })
+    )
+
+    await Promise.all([
+      request.get('/first'),
+      request.get('/second')
+    ])
+
+    expect(refreshToken).toHaveBeenCalledTimes(1)
+    expect(storage.set).toHaveBeenCalledTimes(1)
+    expect(storage.set).toHaveBeenCalledWith('refreshed-token')
+  })
+
   it('should support removing a stored token', async () => {
     const storage: AuthTokenStorage = {
       get: vi.fn().mockResolvedValue('stored-token'),

@@ -431,6 +431,27 @@ cachePlugin({
 Passing a custom `extensions.cache.key` bypasses automatic key generation, so the
 application is responsible for including any user or authorization scope.
 
+## Authentication
+
+```ts
+const request = createClient().use(
+  authPlugin({
+    token: () => accessToken,
+    storage: tokenStorage,
+    refreshToken: async () => {
+      return refreshAccessToken()
+    }
+  })
+)
+```
+
+Request-level `extensions.auth` values take precedence over plugin defaults.
+Concurrent 401 responses share one refresh operation and persist its returned
+token once. A refresh retry preserves the request-level authorization scheme.
+When `refreshToken()` updates external state and returns `void`, token providers
+and storage are read again before retrying. Failed refreshes preserve the
+original request error and do not block later requests from trying again.
+
 ---
 
 # Response
