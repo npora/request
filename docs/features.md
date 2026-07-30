@@ -254,6 +254,8 @@ Supported:
 - [x] Machine-readable Benchmark Reports
 - [x] Cached Interceptor and Hook Ordering
 - [x] Empty Pipeline Fast Path
+- [x] Allocation-aware Config Merge
+- [x] Single-pass Header Normalization
 
 ---
 

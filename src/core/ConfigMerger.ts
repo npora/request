@@ -31,64 +31,97 @@ export class ConfigMerger {
     defaults: Partial<RequestConfig>,
     config: Partial<RequestConfig>
   ): Partial<RequestConfig> {
-    return {
+    const result: Partial<RequestConfig> = {
       ...defaults,
-      ...config,
+      ...config
+    }
 
-      fetchOptions: this.mergeFetchOptions(
+    if (defaults.fetchOptions || config.fetchOptions) {
+      result.fetchOptions = this.mergeFetchOptions(
         defaults.fetchOptions,
         config.fetchOptions
-      ),
+      )
+    }
 
-      headers: this.mergeHeaders(
+    if (defaults.headers || config.headers) {
+      result.headers = this.mergeHeaders(
         defaults.headers,
         config.headers
-      ),
+      )
+    }
 
-      query: this.mergeObject(
+    if (defaults.query || config.query) {
+      result.query = this.mergeObject(
         defaults.query,
         config.query
-      ),
+      )
+    }
 
-      extensions: this.mergeExtensions(
+    if (defaults.extensions || config.extensions) {
+      result.extensions = this.mergeExtensions(
         defaults.extensions,
         config.extensions
-      ),
+      )
+    }
 
-      // Compatibility fields are supplied through built-in plugin module
-      // augmentation and remain supported during the v0.x migration.
-      retry: this.mergeRetry(
+    // Compatibility fields are supplied through built-in plugin module
+    // augmentation and remain supported during the v0.x migration.
+    if (
+      defaults.retry !== undefined ||
+      config.retry !== undefined
+    ) {
+      result.retry = this.mergeRetry(
         defaults.retry,
         config.retry
-      ),
+      )
+    }
 
-      cache: this.mergeObject(
+    if (defaults.cache || config.cache) {
+      result.cache = this.mergeObject(
         defaults.cache,
         config.cache
-      ),
+      )
+    }
 
-      auth: this.mergeObject(
+    if (defaults.auth || config.auth) {
+      result.auth = this.mergeObject(
         defaults.auth,
         config.auth
-      ),
+      )
+    }
 
-      logger: this.mergeObject(
+    if (defaults.logger || config.logger) {
+      result.logger = this.mergeObject(
         defaults.logger,
         config.logger
-      ),
+      )
+    }
 
-      upload: this.mergeObject(
+    if (defaults.upload || config.upload) {
+      result.upload = this.mergeObject(
         defaults.upload,
         config.upload
-      ),
+      )
+    }
 
-      download: this.mergeObject(
+    if (defaults.download || config.download) {
+      result.download = this.mergeObject(
         defaults.download,
         config.download
-      ),
-
-      ...this.mergeBodyConfig(defaults, config)
+      )
     }
+
+    if (
+      this.hasBodyConfig(defaults) ||
+      this.hasBodyConfig(config)
+    ) {
+      Object.assign(
+        result,
+        this.mergeBodyConfig(defaults, config)
+      )
+    }
+
+    return result
   }
 
   private static mergeFetchOptions(
@@ -116,37 +149,53 @@ export class ConfigMerger {
       return undefined
     }
 
-    return {
-      ...this.normalizeHeaders(defaults),
-      ...this.normalizeHeaders(headers)
-    }
+    const result: Record<string, string> = {}
+
+    this.appendHeaders(result, defaults)
+    this.appendHeaders(result, headers)
+
+    return result
   }
 
-  private static normalizeHeaders(
+  private static appendHeaders(
+    result: Record<string, string>,
     headers?: HeadersInit
-  ): Record<string, string> {
+  ): void {
     if (!headers) {
-      return {}
+      return
     }
-
-    const entries: [string, string][] = []
 
     if (headers instanceof Headers) {
       headers.forEach((value, key) => {
-        entries.push([key, value])
+        setHeader(result, key, value)
       })
-    } else if (Array.isArray(headers)) {
-      entries.push(...headers)
-    } else {
-      entries.push(...Object.entries(headers))
+
+      return
     }
 
-    return Object.fromEntries(
-      entries.map(([key, value]) => [
-        key.toLowerCase(),
-        String(value)
-      ])
-    )
+    if (Array.isArray(headers)) {
+      for (const [key, value] of headers) {
+        setHeader(
+          result,
+          key.toLowerCase(),
+          String(value)
+        )
+      }
+
+      return
+    }
+
+    for (const key in headers) {
+      if (
+        Object.prototype.hasOwnProperty.call(headers, key)
+      ) {
+        setHeader(
+          result,
+          key.toLowerCase(),
+          String(headers[key])
+        )
+      }
+    }
   }
 
   private static mergeObject<T extends object>(
@@ -200,12 +249,16 @@ export class ConfigMerger {
       ...defaults,
       ...extensions
     }
-    const keys = new Set([
-      ...Object.keys(defaults ?? {}),
-      ...Object.keys(extensions ?? {})
-    ])
+    for (const key in extensions) {
+      if (
+        !Object.prototype.hasOwnProperty.call(
+          extensions,
+          key
+        )
+      ) {
+        continue
+      }
 
-    for (const key of keys) {
       const defaultValue = (defaults as Record<string, unknown> | undefined)?.[
         key
       ]
@@ -225,6 +278,21 @@ export class ConfigMerger {
     }
 
     return result
+  }
+
+  private static hasBodyConfig(
+    config: Partial<RequestConfig>
+  ): boolean {
+    return (
+      config.body !== undefined ||
+      config.json !== undefined ||
+      config.form !== undefined ||
+      config.formData !== undefined ||
+      Object.prototype.hasOwnProperty.call(config, 'body') ||
+      Object.prototype.hasOwnProperty.call(config, 'json') ||
+      Object.prototype.hasOwnProperty.call(config, 'form') ||
+      Object.prototype.hasOwnProperty.call(config, 'formData')
+    )
   }
 
   private static mergeBodyConfig(
@@ -264,4 +332,23 @@ function isPlainObject(
   value: unknown
 ): value is Record<string, unknown> {
   return Object.prototype.toString.call(value) === '[object Object]'
+}
+
+function setHeader(
+  headers: Record<string, string>,
+  key: string,
+  value: string
+): void {
+  if (key === '__proto__') {
+    Object.defineProperty(headers, key, {
+      value,
+      enumerable: true,
+      configurable: true,
+      writable: true
+    })
+
+    return
+  }
+
+  headers[key] = value
 }

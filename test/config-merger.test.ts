@@ -24,6 +24,65 @@ describe('ConfigMerger', () => {
     expect(headers.get('x-client')).toBe('npora')
   })
 
+  it('should isolate merged headers without emitting absent fields', () => {
+    const defaults = {
+      headers: {
+        Authorization: 'Bearer default'
+      }
+    }
+    const first = ConfigMerger.merge(defaults, {
+      url: '/first'
+    })
+    const firstHeaders = first.headers as Record<string, string>
+
+    firstHeaders.authorization = 'Bearer changed'
+    firstHeaders['x-request'] = 'first'
+
+    const second = ConfigMerger.merge(defaults, {
+      url: '/second'
+    })
+
+    expect(new Headers(second.headers).get('authorization')).toBe(
+      'Bearer default'
+    )
+    expect(new Headers(second.headers).get('x-request')).toBeNull()
+    expect(defaults.headers.Authorization).toBe('Bearer default')
+    expect(Object.keys(
+      ConfigMerger.merge({}, {
+        url: '/minimal'
+      })
+    )).toEqual(['url'])
+  })
+
+  it('should apply the last case-insensitive tuple header', () => {
+    const config = ConfigMerger.merge(
+      {
+        headers: [
+          ['X-Mode', 'default']
+        ]
+      },
+      {
+        url: '/headers',
+        headers: [
+          ['x-mode', 'request'],
+          ['X-MODE', 'final'],
+          ['__proto__', 'safe']
+        ]
+      }
+    )
+
+    expect(new Headers(config.headers).get('x-mode')).toBe('final')
+    expect(
+      Object.getOwnPropertyDescriptor(
+        config.headers,
+        '__proto__'
+      )?.value
+    ).toBe('safe')
+    expect(Object.getPrototypeOf(config.headers)).toBe(
+      Object.prototype
+    )
+  })
+
   it('should merge default and request query parameters', () => {
     const config = ConfigMerger.merge(
       {
@@ -146,5 +205,25 @@ describe('ConfigMerger', () => {
     expect(config.form).toEqual({
       source: 'request'
     })
+  })
+
+  it('should clear a default body mode when explicitly set to undefined', () => {
+    const config = ConfigMerger.merge(
+      {
+        json: {
+          source: 'default'
+        }
+      },
+      {
+        url: '/submit',
+        method: 'POST',
+        json: undefined
+      }
+    )
+
+    expect(config.json).toBeUndefined()
+    expect(config.body).toBeUndefined()
+    expect(config.form).toBeUndefined()
+    expect(config.formData).toBeUndefined()
   })
 })

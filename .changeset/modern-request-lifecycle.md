@@ -21,3 +21,5 @@ Add a production-ready request lifecycle and extension API.
   memory observations, and CI JSON artifacts.
 - Cache interceptor and plugin-hook order at registration time and skip empty
   async pipeline stages on the common request path.
+- Avoid absent nested config allocations and normalize merged headers in one
+  pass while preserving case-insensitive overrides and default isolation.

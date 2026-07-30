@@ -55,3 +55,8 @@ change. Requests iterate cached ordered arrays, and clients without active
 interceptors or hooks skip those async stages entirely. This keeps plugin
 ordering deterministic without allocating and sorting collections on every
 request.
+
+Configuration merging creates nested values only when either side supplies
+them. Header normalization writes directly into one case-insensitive result
+instead of building intermediate entry arrays and objects. Request-specific
+headers remain isolated from reusable client defaults.
