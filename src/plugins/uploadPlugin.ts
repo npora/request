@@ -1,4 +1,5 @@
 import type { Plugin } from './Plugin'
+import { resolveExtensionConfig } from './resolveExtensionConfig'
 
 export function uploadPlugin(): Plugin {
   return {
@@ -6,14 +7,20 @@ export function uploadPlugin(): Plugin {
 
     install(context) {
       context.interceptors.request.use(config => {
-        if (!config.upload) {
+        const upload = resolveExtensionConfig(
+          config,
+          'upload',
+          config.upload
+        )
+
+        if (!upload) {
           return config
         }
 
         return {
           ...config,
           method: config.method ?? 'POST',
-          formData: config.upload.data,
+          formData: upload.data,
           upload: undefined
         }
       })

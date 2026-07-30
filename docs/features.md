@@ -108,6 +108,11 @@ Core features should remain stable.
 
 Everything below should be implemented as extensions.
 
+- [x] Namespaced Extension Config
+- [x] Typed Extension Registry
+- [x] Third-party Config Augmentation
+- [x] Legacy Config Compatibility
+
 ---
 
 ## Retry

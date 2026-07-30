@@ -33,6 +33,13 @@ export class ConfigMerger {
         config.query
       ),
 
+      extensions: this.mergeExtensions(
+        defaults.extensions,
+        config.extensions
+      ),
+
+      // Compatibility fields are supplied through built-in plugin module
+      // augmentation and remain supported during the v0.x migration.
       retry: this.mergeRetry(
         defaults.retry,
         config.retry
@@ -164,6 +171,45 @@ export class ConfigMerger {
     }
   }
 
+  private static mergeExtensions(
+    defaults?: RequestConfig['extensions'],
+    extensions?: RequestConfig['extensions']
+  ): RequestConfig['extensions'] {
+    if (!defaults && !extensions) {
+      return undefined
+    }
+
+    const result: Record<string, unknown> = {
+      ...defaults,
+      ...extensions
+    }
+    const keys = new Set([
+      ...Object.keys(defaults ?? {}),
+      ...Object.keys(extensions ?? {})
+    ])
+
+    for (const key of keys) {
+      const defaultValue = (defaults as Record<string, unknown> | undefined)?.[
+        key
+      ]
+      const requestValue = (
+        extensions as Record<string, unknown> | undefined
+      )?.[key]
+
+      if (
+        isPlainObject(defaultValue) &&
+        isPlainObject(requestValue)
+      ) {
+        result[key] = {
+          ...defaultValue,
+          ...requestValue
+        }
+      }
+    }
+
+    return result
+  }
+
   private static mergeBodyConfig(
     defaults: Partial<RequestConfig>,
     config: RequestConfig
@@ -195,4 +241,10 @@ export class ConfigMerger {
       formData: config.formData
     }
   }
+}
+
+function isPlainObject(
+  value: unknown
+): value is Record<string, unknown> {
+  return Object.prototype.toString.call(value) === '[object Object]'
 }

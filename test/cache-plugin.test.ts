@@ -39,6 +39,31 @@ describe('cachePlugin', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 
+  it('should read cache options from extensions', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      createJsonResponse({
+        name: 'Npora'
+      })
+    )
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient().use(cachePlugin())
+    const config = {
+      extensions: {
+        cache: {
+          enabled: true,
+          ttl: 1000
+        }
+      }
+    }
+
+    await request.get('/user', config)
+    await request.get('/user', config)
+
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
   it('should not cache response when cache is disabled', async () => {
     const fetchMock = vi
       .fn()

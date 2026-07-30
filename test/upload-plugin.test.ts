@@ -38,6 +38,37 @@ describe('uploadPlugin', () => {
     expect(init.body).toBeInstanceOf(FormData)
   })
 
+  it('should read upload options from extensions', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: {
+          'content-type': 'application/json'
+        }
+      })
+    )
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient().use(uploadPlugin())
+
+    await request.request({
+      url: '/upload',
+      extensions: {
+        upload: {
+          data: {
+            name: 'Npora'
+          }
+        }
+      }
+    })
+
+    const [, init] = fetchMock.mock.calls[0]
+
+    expect(init.method).toBe('POST')
+    expect(init.body).toBeInstanceOf(FormData)
+  })
+
   it('should keep custom method when provided', async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       new Response(JSON.stringify({ ok: true }), {

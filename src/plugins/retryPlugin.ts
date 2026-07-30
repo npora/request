@@ -5,6 +5,7 @@ import type {
   RetryOptions
 } from '../types'
 import type { Plugin } from './Plugin'
+import { resolveExtensionConfig } from './resolveExtensionConfig'
 
 const DEFAULT_RETRY_METHODS: readonly HttpMethod[] = [
   'GET',
@@ -47,7 +48,11 @@ export function retryPlugin(
         }
 
         const retryOptions = normalizeRetryOptions(
-          requestContext.config.retry,
+          resolveExtensionConfig(
+            requestContext.config,
+            'retry',
+            requestContext.config.retry
+          ),
           defaultOptions
         )
 

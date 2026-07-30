@@ -1,6 +1,7 @@
 import { RequestError } from '../errors'
 import type { RequestConfig } from '../types'
 import type { Plugin } from './Plugin'
+import { resolveExtensionConfig } from './resolveExtensionConfig'
 
 type MaybePromise<T> = T | Promise<T>
 
@@ -140,7 +141,11 @@ async function applyAuthorization(
   config: RequestConfig,
   options: AuthPluginOptions
 ): Promise<RequestConfig> {
-  const requestAuth = config.auth
+  const requestAuth = resolveExtensionConfig(
+    config,
+    'auth',
+    config.auth
+  )
 
   const token = requestAuth?.token
     ? await resolveToken(requestAuth.token)

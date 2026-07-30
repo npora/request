@@ -1,5 +1,6 @@
 export * from './adapter'
 export * from './client'
 export * from './config'
+export * from './extensions'
 export * from './method'
 export * from './response'

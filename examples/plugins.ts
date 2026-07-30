@@ -36,9 +36,11 @@ const request = createClient({
   )
 
 const todo = await request.get<Todo>('/todos/1', {
-  cache: {
-    enabled: true,
-    ttl: 30000
+  extensions: {
+    cache: {
+      enabled: true,
+      ttl: 30000
+    }
   }
 })
 

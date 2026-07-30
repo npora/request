@@ -76,6 +76,34 @@ describe('loggerPlugin', () => {
     expect(logSpy).not.toHaveBeenCalled()
   })
 
+  it('should read logger options from extensions', async () => {
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ ok: true }), {
+          status: 200,
+          headers: {
+            'content-type': 'application/json'
+          }
+        })
+      )
+    )
+
+    const request = createClient().use(loggerPlugin())
+
+    await request.get('/user', {
+      extensions: {
+        logger: {
+          enabled: false
+        }
+      }
+    })
+
+    expect(logSpy).not.toHaveBeenCalled()
+  })
+
   it('should log error', async () => {
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})

@@ -89,6 +89,43 @@ describe('ConfigMerger', () => {
     })
   })
 
+  it('should merge namespaced extension options by plugin key', () => {
+    const config = ConfigMerger.merge(
+      {
+        extensions: {
+          retry: {
+            retries: 2,
+            delay: 300
+          },
+          logger: {
+            enabled: true
+          }
+        }
+      },
+      {
+        url: '/user',
+        extensions: {
+          retry: {
+            delay: 0
+          },
+          logger: {
+            enabled: false
+          }
+        }
+      }
+    )
+
+    expect(config.extensions).toEqual({
+      retry: {
+        retries: 2,
+        delay: 0
+      },
+      logger: {
+        enabled: false
+      }
+    })
+  })
+
   it('should replace the default body mode when a request supplies one', () => {
     const config = ConfigMerger.merge(
       {

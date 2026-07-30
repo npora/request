@@ -47,6 +47,46 @@ describe('retryPlugin', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2)
   })
 
+  it('should read retry options from extensions', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ message: 'Server Error' }), {
+          status: 500,
+          headers: {
+            'content-type': 'application/json'
+          }
+        })
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ ok: true }), {
+          status: 200,
+          headers: {
+            'content-type': 'application/json'
+          }
+        })
+      )
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient().use(retryPlugin())
+
+    await expect(
+      request.get('/retry', {
+        extensions: {
+          retry: {
+            retries: 1,
+            delay: 0
+          }
+        }
+      })
+    ).resolves.toEqual({
+      ok: true
+    })
+
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
   it('should not retry when retries is 0', async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       new Response(JSON.stringify({ message: 'Server Error' }), {

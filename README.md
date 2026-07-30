@@ -18,6 +18,7 @@ It builds on top of the Fetch API while keeping the native request model.
 - Extensible
 - Zero Runtime Dependency
 - Plugin Architecture
+- Typed Extension Configuration
 - Custom Adapter
 - Unified Error Handling
 

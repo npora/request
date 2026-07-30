@@ -1,5 +1,6 @@
 import type { LoggerOptions } from '../types'
 import type { Plugin } from './Plugin'
+import { resolveExtensionConfig } from './resolveExtensionConfig'
 
 export function loggerPlugin(defaultOptions: LoggerOptions = {}): Plugin {
   return {
@@ -7,7 +8,12 @@ export function loggerPlugin(defaultOptions: LoggerOptions = {}): Plugin {
 
     install(context) {
       context.interceptors.request.use(config => {
-        const logger = config.logger ?? defaultOptions
+        const logger =
+          resolveExtensionConfig(
+            config,
+            'logger',
+            config.logger
+          ) ?? defaultOptions
 
         if (logger.enabled === false) {
           return config
@@ -23,7 +29,12 @@ export function loggerPlugin(defaultOptions: LoggerOptions = {}): Plugin {
       })
 
       context.interceptors.response.use(response => {
-        const logger = response.config.logger ?? defaultOptions
+        const logger =
+          resolveExtensionConfig(
+            response.config,
+            'logger',
+            response.config.logger
+          ) ?? defaultOptions
 
         if (logger.enabled === false) {
           return response

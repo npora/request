@@ -1,4 +1,12 @@
 import type { HttpMethod } from './method'
+import type {
+  AuthOptions,
+  CacheOptions,
+  DownloadOptions,
+  LoggerOptions,
+  RetryOptions,
+  UploadOptions
+} from './extensions'
 
 export type QueryValue = string | number | boolean | null | undefined
 
@@ -22,91 +30,23 @@ export type FetchOptions = Omit<
   'method' | 'headers' | 'body' | 'signal'
 >
 
-export interface RetryOptions {
-  retries?: number
-
-  /**
-   * HTTP methods that may be retried.
-   *
-   * @default GET, HEAD, OPTIONS, PUT and DELETE
-   */
-  methods?: readonly HttpMethod[]
-
-  delay?:
-    | number
-    | ((attempt: number, error: unknown) => number | Promise<number>)
-
-  /**
-   * Respect the server Retry-After response header.
-   *
-   * @default true
-   */
-  respectRetryAfter?: boolean
-
-  /**
-   * Maximum retry delay in milliseconds.
-   *
-   * @default 60000
-   */
-  maxDelay?: number
-
-  shouldRetry?: (
-    error: unknown,
-    attempt: number
-  ) => boolean | Promise<boolean>
-}
-
-export interface CacheOptions {
-  enabled?: boolean
-
-  ttl?: number
-
-  key?: string
-}
-
-export interface AuthOptions {
-  token?: string | (() => string | Promise<string>)
-
-  scheme?: string
-}
-
-export interface LoggerOptions {
-  enabled?: boolean
-}
-
-export type UploadData = FormData | Record<string, unknown>
-
-export interface UploadOptions {
-  data: UploadData
-}
-
 /**
- * Download progress information.
+ * Plugin-owned request configuration.
+ *
+ * Plugins extend this interface through TypeScript module augmentation.
  */
-export interface DownloadProgress {
-  /**
-   * Number of bytes received.
-   */
-  loaded: number
+export interface RequestExtensions {
+  auth?: AuthOptions
 
-  /**
-   * Total response size when Content-Length is available.
-   */
-  total?: number
+  cache?: CacheOptions
 
-  /**
-   * Progress ratio between 0 and 1 when total is available.
-   */
-  progress?: number
-}
+  download?: DownloadOptions
 
-export interface DownloadOptions {
-  filename?: string
+  logger?: LoggerOptions
 
-  /**
-   * Called while the response stream is being consumed.
-   */
-  onProgress?: (progress: DownloadProgress) => void
+  retry?: number | RetryOptions
+
+  upload?: UploadOptions
 }
 
 export interface RequestConfig {
@@ -138,15 +78,35 @@ export interface RequestConfig {
 
   validateStatus?: (status: number) => boolean
 
+  extensions?: RequestExtensions
+
+  /**
+   * @deprecated Use extensions.retry instead.
+   */
   retry?: number | RetryOptions
 
+  /**
+   * @deprecated Use extensions.cache instead.
+   */
   cache?: CacheOptions
 
+  /**
+   * @deprecated Use extensions.auth instead.
+   */
   auth?: AuthOptions
 
+  /**
+   * @deprecated Use extensions.logger instead.
+   */
   logger?: LoggerOptions
 
+  /**
+   * @deprecated Use extensions.upload instead.
+   */
   upload?: UploadOptions
 
+  /**
+   * @deprecated Use extensions.download instead.
+   */
   download?: DownloadOptions
 }

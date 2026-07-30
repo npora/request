@@ -21,6 +21,35 @@ afterEach(() => {
 })
 
 describe('authPlugin refresh token', () => {
+  it('should read request auth options from extensions', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      createJsonResponse({
+        ok: true
+      })
+    )
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient().use(authPlugin())
+
+    await request.get('/user', {
+      extensions: {
+        auth: {
+          token: 'extension-token',
+          scheme: 'Token'
+        }
+      }
+    })
+
+    const headers = new Headers(
+      fetchMock.mock.calls[0]?.[1]?.headers
+    )
+
+    expect(headers.get('authorization')).toBe(
+      'Token extension-token'
+    )
+  })
+
   it('should refresh token after 401 and retry the request', async () => {
     let token = 'expired-token'
 

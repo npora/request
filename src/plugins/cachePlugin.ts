@@ -1,8 +1,10 @@
 import type {
+  CacheOptions,
   HttpMethod,
   RequestConfig
 } from '../types'
 import type { Plugin } from './Plugin'
+import { resolveExtensionConfig } from './resolveExtensionConfig'
 
 interface CacheRecord {
   data: unknown
@@ -70,7 +72,11 @@ export function cachePlugin(
       context.hooks.onRequest(requestContext => {
         syncGeneration()
 
-        const cache = requestContext.config.cache
+        const cache = resolveExtensionConfig(
+          requestContext.config,
+          'cache',
+          requestContext.config.cache
+        )
 
         if (
           !cache?.enabled ||
@@ -81,6 +87,7 @@ export function cachePlugin(
 
         const key = createCacheKey(
           requestContext.config,
+          cache,
           varyHeaders
         )
         const record = cacheStore.get(key)
@@ -107,7 +114,11 @@ export function cachePlugin(
       context.hooks.onResponse(requestContext => {
         syncGeneration()
 
-        const cache = requestContext.config.cache
+        const cache = resolveExtensionConfig(
+          requestContext.config,
+          'cache',
+          requestContext.config.cache
+        )
 
         if (
           !cache?.enabled ||
@@ -119,6 +130,7 @@ export function cachePlugin(
 
         const key = createCacheKey(
           requestContext.config,
+          cache,
           varyHeaders
         )
         const ttl = cache.ttl ?? 30000
@@ -168,10 +180,11 @@ function isCacheableRequest(
 
 function createCacheKey(
   config: RequestConfig,
+  cache: CacheOptions,
   varyHeaders: readonly string[]
 ): string {
-  if (config.cache?.key) {
-    return config.cache.key
+  if (cache.key) {
+    return cache.key
   }
 
   const headers = new Headers(config.headers)

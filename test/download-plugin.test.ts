@@ -30,6 +30,28 @@ describe('downloadPlugin', () => {
     expect(init.method).toBe('GET')
   })
 
+  it('should read download options from extensions', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(new Blob(['hello npora']), {
+        status: 200
+      })
+    )
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient().use(downloadPlugin())
+
+    const data = await request.get<Blob>('/download', {
+      extensions: {
+        download: {
+          filename: 'npora.txt'
+        }
+      }
+    })
+
+    expect(data).toBeInstanceOf(Blob)
+  })
+
   it('should keep custom responseType when provided', async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       new Response('hello npora', {

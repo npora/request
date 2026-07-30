@@ -88,6 +88,7 @@ console.log(response.headers)
   fetchOptions?: FetchOptions
   headers?: HeadersInit
   query?: QueryParams
+  extensions?: RequestExtensions
 }
 ```
 
@@ -146,7 +147,7 @@ Client defaults and request configuration are merged deterministically:
 - Request values override client defaults.
 - Header names are merged case-insensitively.
 - `query` and `fetchOptions` are shallow merged.
-- Retry, cache, auth, logger, upload and download options are shallow merged.
+- Each `extensions` entry is shallow merged when both values are objects.
 - Supplying a request body mode replaces the default body mode.
 
 The body options `body`, `json`, `form` and `formData` are mutually exclusive.
@@ -198,6 +199,64 @@ Plugins must not replace client methods.
 
 Plugins should extend the request lifecycle through supported extension points.
 
+## Extension Configuration
+
+Plugin-owned request configuration belongs under `extensions`:
+
+```ts
+await request.get('/user', {
+  extensions: {
+    retry: {
+      retries: 2
+    },
+    cache: {
+      enabled: true,
+      ttl: 30000
+    }
+  }
+})
+```
+
+The previous top-level `retry`, `cache`, `auth`, `logger`, `upload` and
+`download` fields remain available during v0.x, but are deprecated in favor of
+their namespaced equivalents.
+
+Third-party plugins can add strongly typed configuration without modifying
+Npora Request core types:
+
+```ts
+import type { Plugin } from '@npora/request'
+
+interface MetricsOptions {
+  enabled?: boolean
+  sampleRate?: number
+}
+
+declare module '@npora/request' {
+  interface RequestExtensions {
+    metrics?: MetricsOptions
+  }
+}
+
+export function metricsPlugin(): Plugin {
+  return {
+    name: 'metrics',
+
+    install({ interceptors }) {
+      interceptors.request.use(config => {
+        const metrics = config.extensions?.metrics
+
+        if (metrics?.enabled) {
+          // Attach request metrics.
+        }
+
+        return config
+      })
+    }
+  }
+}
+```
+
 ## Retry
 
 ```ts
@@ -227,9 +286,11 @@ const cache = cachePlugin()
 const request = createClient().use(cache)
 
 await request.get('/user', {
-  cache: {
-    enabled: true,
-    ttl: 30000
+  extensions: {
+    cache: {
+      enabled: true,
+      ttl: 30000
+    }
   }
 })
 
@@ -248,7 +309,7 @@ cachePlugin({
 })
 ```
 
-Passing a custom `cache.key` bypasses automatic key generation, so the
+Passing a custom `extensions.cache.key` bypasses automatic key generation, so the
 application is responsible for including any user or authorization scope.
 
 ---

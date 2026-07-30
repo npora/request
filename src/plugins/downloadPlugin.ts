@@ -4,6 +4,7 @@ import type {
   NporaResponse
 } from '../types'
 import type { Plugin } from './Plugin'
+import { resolveExtensionConfig } from './resolveExtensionConfig'
 
 export function downloadPlugin(): Plugin {
   return {
@@ -11,11 +12,17 @@ export function downloadPlugin(): Plugin {
 
     install(context) {
       context.interceptors.request.use(config => {
-        if (!config.download) {
+        const download = resolveExtensionConfig(
+          config,
+          'download',
+          config.download
+        )
+
+        if (!download) {
           return config
         }
 
-        const responseType = config.download.onProgress
+        const responseType = download.onProgress
           ? 'stream'
           : config.responseType ?? 'blob'
 
@@ -26,7 +33,11 @@ export function downloadPlugin(): Plugin {
       })
 
       context.interceptors.response.use(async response => {
-        const download = response.config.download
+        const download = resolveExtensionConfig(
+          response.config,
+          'download',
+          response.config.download
+        )
         const onProgress = download?.onProgress
 
         if (!download || !onProgress) {
