@@ -1,12 +1,11 @@
 import { RequestError } from '../errors'
 import type {
   DownloadProgress,
-  NporaResponse,
-  RequestConfig
+  NporaResponse
 } from '../types'
-import { buildRequest } from '../utils'
 import type { Plugin } from './Plugin'
 import { resolveExtensionConfig } from './resolveExtensionConfig'
+import { xhrRequest } from './xhrTransport'
 
 export type DownloadTransport = 'auto' | 'fetch' | 'xhr'
 
@@ -83,9 +82,11 @@ export function downloadPlugin(
           )
         }
 
-        requestContext.response = await downloadWithXHR(
+        requestContext.response = await xhrRequest<Blob>(
           requestContext.config,
-          onProgress
+          {
+            onDownloadProgress: onProgress
+          }
         )
         xhrContexts.add(requestContext)
       })
@@ -168,289 +169,6 @@ function supportsFetchResponseStream(): boolean {
   )
 }
 
-function downloadWithXHR(
-  config: RequestConfig,
-  onProgress: (progress: DownloadProgress) => void
-): Promise<NporaResponse<Blob>> {
-  let request: ReturnType<typeof buildRequest> | undefined
-  let xhr: XMLHttpRequest
-
-  try {
-    request = buildRequest(config)
-    xhr = new XMLHttpRequest()
-  } catch (error) {
-    request?.clear()
-
-    return Promise.reject(
-      new RequestError(
-        'Failed to create XMLHttpRequest download',
-        {
-          code: 'CONFIG_ERROR',
-          config,
-          cause: error
-        }
-      )
-    )
-  }
-
-  const signal = request.init.signal
-
-  return new Promise((resolve, reject) => {
-    let settled = false
-
-    const cleanup = () => {
-      signal?.removeEventListener('abort', onSignalAbort)
-      request.clear()
-      xhr.onload = null
-      xhr.onerror = null
-      xhr.onabort = null
-      xhr.onprogress = null
-    }
-
-    const settle = (
-      handler: typeof resolve | typeof reject,
-      value: NporaResponse<Blob> | unknown
-    ) => {
-      if (settled) {
-        return
-      }
-
-      settled = true
-      cleanup()
-      handler(value as NporaResponse<Blob>)
-    }
-
-    const settleError = (error: unknown) => {
-      settle(reject, error)
-    }
-
-    const onSignalAbort = () => {
-      const error = createXHRAbortError(
-        signal?.reason,
-        config
-      )
-
-      settleError(error)
-      xhr.abort()
-    }
-
-    xhr.onload = () => {
-      try {
-        if (xhr.status === 0) {
-          settleError(
-            new RequestError('Network request failed', {
-              code: 'NETWORK_ERROR',
-              config
-            })
-          )
-          return
-        }
-
-        const headers = parseXHRHeaders(
-          xhr.getAllResponseHeaders()
-        )
-        const data =
-          xhr.response instanceof Blob
-            ? xhr.response
-            : new Blob(
-                xhr.response === null
-                  ? []
-                  : [xhr.response],
-                {
-                  type:
-                    headers.get('content-type') ?? ''
-                }
-              )
-        const response: NporaResponse<Blob> = {
-          data,
-          status: xhr.status,
-          statusText: xhr.statusText,
-          headers,
-          config,
-          raw: new Response(
-            isNullBodyStatus(xhr.status)
-              ? null
-              : data,
-            {
-              status: xhr.status,
-              statusText: xhr.statusText,
-              headers
-            }
-          )
-        }
-        const validateStatus =
-          config.validateStatus ?? defaultValidateStatus
-
-        if (!validateStatus(xhr.status)) {
-          settleError(
-            new RequestError(
-              xhr.statusText || 'Request failed',
-              {
-                code: 'HTTP_ERROR',
-                response
-              }
-            )
-          )
-          return
-        }
-
-        settle(resolve, response)
-      } catch (error) {
-        settleError(
-          error instanceof RequestError
-            ? error
-            : new RequestError(
-                'Failed to process XMLHttpRequest download',
-                {
-                  code: 'PARSER_ERROR',
-                  config,
-                  cause: error
-                }
-              )
-        )
-      }
-    }
-
-    xhr.onerror = () => {
-      settleError(
-        new RequestError('Network request failed', {
-          code: 'NETWORK_ERROR',
-          config
-        })
-      )
-    }
-
-    xhr.onabort = () => {
-      settleError(
-        createXHRAbortError(signal?.reason, config)
-      )
-    }
-
-    xhr.onprogress = event => {
-      try {
-        onProgress(
-          createProgress(
-            event.loaded,
-            event.lengthComputable
-              ? event.total
-              : undefined
-          )
-        )
-      } catch (error) {
-        settleError(error)
-        xhr.abort()
-      }
-    }
-
-    try {
-      xhr.open(
-        request.init.method ?? 'GET',
-        request.url,
-        true
-      )
-      xhr.responseType = 'blob'
-      xhr.withCredentials =
-        request.init.credentials === 'include'
-
-      const headers = new Headers(request.init.headers)
-
-      headers.forEach((value, name) => {
-        xhr.setRequestHeader(name, value)
-      })
-
-      if (signal?.aborted) {
-        onSignalAbort()
-        return
-      }
-
-      signal?.addEventListener('abort', onSignalAbort, {
-        once: true
-      })
-
-      const body = request.init.body
-
-      if (
-        typeof ReadableStream !== 'undefined' &&
-        body instanceof ReadableStream
-      ) {
-        settleError(
-          new RequestError(
-            'XMLHttpRequest cannot send a ReadableStream body',
-            {
-              code: 'CONFIG_ERROR',
-              config
-            }
-          )
-        )
-        xhr.abort()
-        return
-      }
-
-      xhr.send(body as XMLHttpRequestBodyInit | null)
-    } catch (error) {
-      settleError(
-        new RequestError(
-          'Failed to create XMLHttpRequest download',
-          {
-            code: 'CONFIG_ERROR',
-            config,
-            cause: error
-          }
-        )
-      )
-    }
-  })
-}
-
-function parseXHRHeaders(value: string): Headers {
-  const headers = new Headers()
-
-  for (const line of value.split(/\r?\n/)) {
-    const separator = line.indexOf(':')
-
-    if (separator <= 0) {
-      continue
-    }
-
-    headers.append(
-      line.slice(0, separator).trim(),
-      line.slice(separator + 1).trim()
-    )
-  }
-
-  return headers
-}
-
-function createXHRAbortError(
-  reason: unknown,
-  config: RequestConfig
-): RequestError {
-  if (reason instanceof RequestError) {
-    return new RequestError(reason.message, {
-      code: reason.code,
-      status: reason.status,
-      data: reason.data,
-      response: reason.response,
-      config: reason.config ?? config,
-      cause: reason
-    })
-  }
-
-  return new RequestError('Request aborted', {
-    code: 'ABORT_ERROR',
-    config,
-    cause: reason
-  })
-}
-
-function defaultValidateStatus(status: number): boolean {
-  return status >= 200 && status < 300
-}
-
-function isNullBodyStatus(status: number): boolean {
-  return status === 204 || status === 205 || status === 304
-}
-
 async function consumeDownloadStream(
   stream: ReadableStream<Uint8Array<ArrayBufferLike>>,
   response: NporaResponse,
@@ -458,11 +176,9 @@ async function consumeDownloadStream(
 ): Promise<Blob> {
   const reader = stream.getReader()
   const chunks: ArrayBuffer[] = []
-
   const total = parseContentLength(
     response.headers.get('content-length')
   )
-
   let loaded = 0
 
   try {
@@ -474,11 +190,9 @@ async function consumeDownloadStream(
       }
 
       const chunk = result.value
-      const buffer = toDownloadBuffer(chunk)
 
-      chunks.push(buffer)
+      chunks.push(toDownloadBuffer(chunk))
       loaded += chunk.byteLength
-
       onProgress(createProgress(loaded, total))
     }
   } catch (error) {

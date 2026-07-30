@@ -104,6 +104,18 @@ const server = createServer(
         return
       }
 
+      if (url.pathname === '/api/upload') {
+        const body = await readRequestBuffer(request)
+
+        sendJson(response, 200, {
+          received: body.byteLength,
+          contentType:
+            request.headers['content-type']
+        })
+
+        return
+      }
+
       if (url.pathname === '/api/count') {
         const key = url.searchParams.get('key') ?? 'default'
         const count = (requestCounts.get(key) ?? 0) + 1
@@ -313,6 +325,12 @@ function sendPreflight(response) {
 }
 
 async function readRequestBody(request) {
+  const content = await readRequestBuffer(request)
+
+  return content.toString('utf8')
+}
+
+async function readRequestBuffer(request) {
   const chunks = []
 
   for await (const chunk of request) {
@@ -323,7 +341,7 @@ async function readRequestBody(request) {
     )
   }
 
-  return Buffer.concat(chunks).toString('utf8')
+  return Buffer.concat(chunks)
 }
 
 function delay(milliseconds) {

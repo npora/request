@@ -165,7 +165,8 @@ Everything below should be implemented as extensions.
 ## Upload
 
 - [x] Upload
-- [ ] Upload Progress
+- [x] Native XHR Upload Progress
+- [x] Concurrent Upload Stress Tests
 
 ---
 

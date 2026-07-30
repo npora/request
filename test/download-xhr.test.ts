@@ -216,14 +216,14 @@ describe('downloadPlugin XMLHttpRequest fallback', () => {
     const request = createClient().use(
       downloadPlugin({ transport: 'xhr' })
     )
-    const response = await request.getResponse<Blob>('/empty', {
+    const response = await request.getResponse<void>('/empty', {
       download: {
         onProgress: vi.fn()
       }
     })
 
     expect(response.status).toBe(204)
-    expect(response.data.size).toBe(0)
+    expect(response.data).toBeUndefined()
     expect(response.raw.body).toBeNull()
   })
 

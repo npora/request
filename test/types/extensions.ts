@@ -3,7 +3,8 @@ import type {
   DownloadPluginOptions,
   Plugin,
   RequestConfig,
-  RetryOptions
+  RetryOptions,
+  UploadProgress
 } from '@npora/request'
 import { downloadPlugin } from '@npora/request'
 
@@ -80,3 +81,9 @@ const downloadOptions: DownloadPluginOptions = {
 }
 
 client.use(downloadPlugin(downloadOptions))
+
+const uploadProgress = (progress: UploadProgress) => {
+  return progress.progress
+}
+
+void uploadProgress

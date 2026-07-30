@@ -482,6 +482,99 @@ test(
   }
 )
 
+test(
+  'should handle concurrent native XHR upload progress',
+  async ({ page }) => {
+    await openFixture(page)
+
+    const result = await page.evaluate(async () => {
+      const moduleURL = `${location.origin}/dist/index.js`
+      const {
+        createClient,
+        uploadPlugin
+      } = await import(moduleURL)
+      const request = createClient({
+        baseURL: '/api'
+      }).use(uploadPlugin())
+      const originalFetch = window.fetch
+      let fetchCalls = 0
+
+      window.fetch = (...args) => {
+        fetchCalls += 1
+
+        return originalFetch(...args)
+      }
+
+      try {
+        const uploads = await Promise.all(
+          Array.from({ length: 32 }, async (_, id) => {
+            const events: Array<{
+              loaded: number
+              total?: number
+              progress?: number
+            }> = []
+            const data = await request.post('/upload', {
+              query: {
+                id
+              },
+              extensions: {
+                upload: {
+                  data: {
+                    id,
+                    file: new Blob([
+                      new Uint8Array(64 * 1024)
+                    ])
+                  },
+                  onProgress(progress: {
+                    loaded: number
+                    total?: number
+                    progress?: number
+                  }) {
+                    events.push(progress)
+                  }
+                }
+              }
+            }) as {
+              received: number
+              contentType: string
+            }
+            const last = events.at(-1)
+
+            return {
+              received: data.received,
+              contentType: data.contentType,
+              eventCount: events.length,
+              loaded: last?.loaded,
+              total: last?.total,
+              progress: last?.progress
+            }
+          })
+        )
+
+        return {
+          uploads,
+          fetchCalls
+        }
+      } finally {
+        window.fetch = originalFetch
+      }
+    })
+
+    expect(result.fetchCalls).toBe(0)
+    expect(result.uploads).toHaveLength(32)
+
+    for (const upload of result.uploads) {
+      expect(upload.received).toBeGreaterThan(64 * 1024)
+      expect(upload.contentType).toContain(
+        'multipart/form-data; boundary='
+      )
+      expect(upload.eventCount).toBeGreaterThan(0)
+      expect(upload.loaded).toBe(upload.total)
+      expect(upload.progress).toBe(1)
+    }
+  }
+)
+
 async function openFixture(
   page: import('@playwright/test').Page
 ): Promise<void> {

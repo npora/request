@@ -12,5 +12,7 @@ Add a production-ready request lifecycle and extension API.
   pipeline error handling, short-circuit responses, and logger redaction.
 - Add automatic native XHR fallback for download progress, explicit transport
   selection, stream cancellation, and concurrent download stress coverage.
+- Add native XHR upload progress with shared transport resource cleanup and
+  concurrent Node and browser stress coverage.
 - Add Node integration, Chromium/WebKit, Web Worker, package entrypoint,
   tarball manifest, public type, and example validation.

@@ -1,0 +1,353 @@
+import { RequestError } from '../errors'
+import type {
+  NporaResponse,
+  RequestConfig
+} from '../types'
+import {
+  buildRequest,
+  parseResponse
+} from '../utils'
+
+interface TransferProgress {
+  loaded: number
+  total?: number
+  progress?: number
+}
+
+export interface XHRTransportOptions {
+  onDownloadProgress?: (progress: TransferProgress) => void
+  onUploadProgress?: (progress: TransferProgress) => void
+}
+
+export function xhrRequest<T>(
+  config: RequestConfig,
+  options: XHRTransportOptions = {}
+): Promise<NporaResponse<T>> {
+  let request: ReturnType<typeof buildRequest> | undefined
+  let xhr: XMLHttpRequest
+
+  try {
+    request = buildRequest(config)
+    xhr = new XMLHttpRequest()
+  } catch (error) {
+    request?.clear()
+
+    return Promise.reject(
+      createConfigError(config, error)
+    )
+  }
+
+  const signal = request.init.signal
+
+  return new Promise((resolve, reject) => {
+    let settled = false
+
+    const cleanup = () => {
+      signal?.removeEventListener('abort', onSignalAbort)
+      request.clear()
+      xhr.onload = null
+      xhr.onerror = null
+      xhr.onabort = null
+      xhr.onprogress = null
+
+      if (xhr.upload) {
+        xhr.upload.onprogress = null
+      }
+    }
+
+    const resolveOnce = (response: NporaResponse<T>) => {
+      if (settled) {
+        return
+      }
+
+      settled = true
+      cleanup()
+      resolve(response)
+    }
+
+    const rejectOnce = (error: unknown) => {
+      if (settled) {
+        return
+      }
+
+      settled = true
+      cleanup()
+      reject(error)
+    }
+
+    const abortWith = (error: unknown) => {
+      rejectOnce(error)
+      xhr.abort()
+    }
+
+    const onSignalAbort = () => {
+      abortWith(
+        createAbortError(signal?.reason, config)
+      )
+    }
+
+    xhr.onload = () => {
+      void processResponse<T>(xhr, config).then(
+        resolveOnce,
+        rejectOnce
+      )
+    }
+    xhr.onerror = () => {
+      rejectOnce(
+        new RequestError('Network request failed', {
+          code: 'NETWORK_ERROR',
+          config
+        })
+      )
+    }
+    xhr.onabort = () => {
+      rejectOnce(
+        createAbortError(signal?.reason, config)
+      )
+    }
+    xhr.onprogress = createProgressHandler(
+      options.onDownloadProgress,
+      abortWith
+    )
+
+    if (xhr.upload) {
+      xhr.upload.onprogress = createProgressHandler(
+        options.onUploadProgress,
+        abortWith
+      )
+    }
+
+    try {
+      xhr.open(
+        request.init.method ?? 'GET',
+        request.url,
+        true
+      )
+      xhr.responseType = 'blob'
+      xhr.withCredentials =
+        request.init.credentials === 'include'
+
+      new Headers(request.init.headers).forEach(
+        (value, name) => {
+          xhr.setRequestHeader(name, value)
+        }
+      )
+
+      if (signal?.aborted) {
+        onSignalAbort()
+        return
+      }
+
+      signal?.addEventListener('abort', onSignalAbort, {
+        once: true
+      })
+
+      const body = request.init.body
+
+      if (
+        typeof ReadableStream !== 'undefined' &&
+        body instanceof ReadableStream
+      ) {
+        abortWith(
+          new RequestError(
+            'XMLHttpRequest cannot send a ReadableStream body',
+            {
+              code: 'CONFIG_ERROR',
+              config
+            }
+          )
+        )
+        return
+      }
+
+      xhr.send(body as XMLHttpRequestBodyInit | null)
+    } catch (error) {
+      abortWith(createConfigError(config, error))
+    }
+  })
+}
+
+async function processResponse<T>(
+  xhr: XMLHttpRequest,
+  config: RequestConfig
+): Promise<NporaResponse<T>> {
+  if (xhr.status === 0) {
+    throw new RequestError('Network request failed', {
+      code: 'NETWORK_ERROR',
+      config
+    })
+  }
+
+  try {
+    const headers = parseHeaders(
+      xhr.getAllResponseHeaders()
+    )
+    const blob =
+      xhr.response instanceof Blob
+        ? xhr.response
+        : new Blob(
+            xhr.response === null
+              ? []
+              : [xhr.response],
+            {
+              type: headers.get('content-type') ?? ''
+            }
+          )
+    const raw = new Response(
+      isNullBodyStatus(xhr.status)
+        ? null
+        : blob,
+      {
+        status: xhr.status,
+        statusText: xhr.statusText,
+        headers
+      }
+    )
+    const parseTarget =
+      config.responseType === 'stream'
+        ? raw
+        : raw.clone()
+    const data = await parseResponse<T>(
+      parseTarget,
+      config
+    )
+    const response: NporaResponse<T> = {
+      data,
+      status: xhr.status,
+      statusText: xhr.statusText,
+      headers,
+      config,
+      raw
+    }
+    const validateStatus =
+      config.validateStatus ?? defaultValidateStatus
+
+    if (!validateStatus(xhr.status)) {
+      throw new RequestError(
+        xhr.statusText || 'Request failed',
+        {
+          code: 'HTTP_ERROR',
+          response
+        }
+      )
+    }
+
+    return response
+  } catch (error) {
+    if (error instanceof RequestError) {
+      throw error
+    }
+
+    throw new RequestError(
+      'Failed to process XMLHttpRequest response',
+      {
+        code: 'PARSER_ERROR',
+        config,
+        cause: error
+      }
+    )
+  }
+}
+
+function createProgressHandler(
+  callback: ((progress: TransferProgress) => void) | undefined,
+  abortWith: (error: unknown) => void
+): ((event: ProgressEvent<EventTarget>) => void) | null {
+  if (!callback) {
+    return null
+  }
+
+  return event => {
+    try {
+      callback(
+        createProgress(
+          event.loaded,
+          event.lengthComputable
+            ? event.total
+            : undefined
+        )
+      )
+    } catch (error) {
+      abortWith(error)
+    }
+  }
+}
+
+function createProgress(
+  loaded: number,
+  total?: number
+): TransferProgress {
+  if (total === undefined || total === 0) {
+    return {
+      loaded,
+      total
+    }
+  }
+
+  return {
+    loaded,
+    total,
+    progress: Math.min(loaded / total, 1)
+  }
+}
+
+function parseHeaders(value: string): Headers {
+  const headers = new Headers()
+
+  for (const line of value.split(/\r?\n/)) {
+    const separator = line.indexOf(':')
+
+    if (separator > 0) {
+      headers.append(
+        line.slice(0, separator).trim(),
+        line.slice(separator + 1).trim()
+      )
+    }
+  }
+
+  return headers
+}
+
+function createAbortError(
+  reason: unknown,
+  config: RequestConfig
+): RequestError {
+  if (reason instanceof RequestError) {
+    return new RequestError(reason.message, {
+      code: reason.code,
+      status: reason.status,
+      data: reason.data,
+      response: reason.response,
+      config: reason.config ?? config,
+      cause: reason
+    })
+  }
+
+  return new RequestError('Request aborted', {
+    code: 'ABORT_ERROR',
+    config,
+    cause: reason
+  })
+}
+
+function createConfigError(
+  config: RequestConfig,
+  cause: unknown
+): RequestError {
+  return new RequestError(
+    'Failed to create XMLHttpRequest',
+    {
+      code: 'CONFIG_ERROR',
+      config,
+      cause
+    }
+  )
+}
+
+function isNullBodyStatus(status: number): boolean {
+  return status === 204 || status === 205 || status === 304
+}
+
+function defaultValidateStatus(status: number): boolean {
+  return status >= 200 && status < 300
+}

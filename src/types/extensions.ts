@@ -57,8 +57,33 @@ export interface LoggerOptions {
 
 export type UploadData = FormData | Record<string, unknown>
 
+/**
+ * Upload progress information.
+ */
+export interface UploadProgress {
+  /**
+   * Number of bytes sent.
+   */
+  loaded: number
+
+  /**
+   * Total request size when the browser provides it.
+   */
+  total?: number
+
+  /**
+   * Progress ratio between 0 and 1 when total is available.
+   */
+  progress?: number
+}
+
 export interface UploadOptions {
   data: UploadData
+
+  /**
+   * Called while XMLHttpRequest uploads the request body.
+   */
+  onProgress?: (progress: UploadProgress) => void
 }
 
 /**

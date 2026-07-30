@@ -259,6 +259,34 @@ const request = createClient()
   .use(authPlugin())
 ```
 
+### Upload Progress
+
+Upload progress uses native `XMLHttpRequest`, because Fetch does not expose
+portable request-body progress events. Requests without `onProgress` continue
+through the normal Fetch adapter.
+
+```ts
+const request = createClient().use(uploadPlugin())
+
+const result = await request.post('/upload', {
+  extensions: {
+    upload: {
+      data: {
+        file,
+        category: 'reports'
+      },
+      onProgress({ loaded, total, progress }) {
+        console.log({ loaded, total, progress })
+      }
+    }
+  }
+})
+```
+
+The XHR upload path preserves URL, query, headers, timeout, cancellation,
+status validation, response parsing, response hooks and response interceptors.
+The browser generates the multipart boundary automatically.
+
 ### Download Progress Transport
 
 `downloadPlugin()` prefers Fetch response streams for progress reporting. When
