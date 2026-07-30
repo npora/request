@@ -71,6 +71,7 @@ Core features should remain stable.
 - [x] Request Config Validation
 - [x] Request Pipeline
 - [x] Request Context
+- [x] Unified Pipeline Error Lifecycle
 
 ---
 

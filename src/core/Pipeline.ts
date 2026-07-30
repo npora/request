@@ -29,18 +29,13 @@ export class Pipeline {
     const context = new RequestContext<T>(config)
 
     try {
-      context.config = await this.interceptors.request.run(context.config)
-
       try {
+        context.config = await this.interceptors.request.run(context.config)
         validateRequestConfig(context.config)
+        await this.hooks.runRequest(context)
       } catch (error) {
-        context.error = error
-        await this.hooks.runError(context)
-        context.error = await this.interceptors.error.run(context.error)
-        throw context.error
+        return this.fail(context, error)
       }
-
-      await this.hooks.runRequest(context)
 
       if (context.response) {
         return context.response
@@ -60,15 +55,25 @@ export class Pipeline {
 
           return context.response
         } catch (error) {
-          context.error = error
+          const errorHooksSucceeded = await this.notifyError(
+            context,
+            error
+          )
 
-          await this.hooks.runError(context)
+          if (!errorHooksSucceeded) {
+            return this.fail(context, context.error, false)
+          }
 
-          const decision = await this.hooks.resolveRetry(context, attempt)
+          let decision
+
+          try {
+            decision = await this.hooks.resolveRetry(context, attempt)
+          } catch (retryError) {
+            return this.fail(context, retryError)
+          }
 
           if (!decision.retry) {
-            context.error = await this.interceptors.error.run(context.error)
-            throw context.error
+            return this.fail(context, context.error, false)
           }
 
           context.error = undefined
@@ -81,14 +86,43 @@ export class Pipeline {
               context.config
             )
           } catch (waitError) {
-            context.error = await this.interceptors.error.run(waitError)
-            throw context.error
+            return this.fail(context, waitError)
           }
         }
       }
     } finally {
       context.endTime = Date.now()
     }
+  }
+
+  private async notifyError<T>(
+    context: RequestContext<T>,
+    error: unknown
+  ): Promise<boolean> {
+    context.error = error
+
+    try {
+      await this.hooks.runError(context)
+      return true
+    } catch (hookError) {
+      context.error = hookError
+      return false
+    }
+  }
+
+  private async fail<T>(
+    context: RequestContext<T>,
+    error: unknown,
+    notifyHooks = true
+  ): Promise<never> {
+    if (notifyHooks) {
+      await this.notifyError(context, error)
+    } else {
+      context.error = error
+    }
+
+    context.error = await this.interceptors.error.run(context.error)
+    throw context.error
   }
 }
 

@@ -210,6 +210,11 @@ request.interceptors.error.use(error => error)
 
 Interceptors are user-level extension points.
 
+Errors thrown by request or response interceptors follow the same error
+lifecycle as adapter failures. Plugin error hooks run before user error
+interceptors. Failures in request, error or retry hooks are also forwarded to
+the final error interceptor.
+
 An optional priority controls execution order. Higher values run first and
 equal priorities preserve registration order.
 
