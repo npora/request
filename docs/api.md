@@ -416,7 +416,9 @@ cache.clear()
 
 Each cache plugin instance owns an isolated memory store. By default only
 `GET` and `HEAD` are cached. The generated cache key varies by
-`authorization`, `cookie`, `accept` and `accept-language` headers.
+`authorization`, `cookie`, `accept` and `accept-language` headers. Query keys
+are normalized independently of object insertion order, and different response
+parsing types use separate cache entries.
 
 Additional methods must be enabled explicitly:
 

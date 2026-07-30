@@ -144,6 +144,8 @@ Everything below should be implemented as extensions.
 - [x] Custom Cache Key
 - [x] Per-client Isolation
 - [x] Authorization-aware Cache Key
+- [x] Deterministic Cache Key
+- [x] Response Type Cache Isolation
 - [x] Cache Method Guard
 
 ---

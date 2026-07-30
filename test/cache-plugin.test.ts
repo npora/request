@@ -171,6 +171,78 @@ describe('cachePlugin', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 
+  it('should normalize query key order in the default cache key', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      createJsonResponse({
+        ok: true
+      })
+    )
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient().use(cachePlugin())
+    const cache = {
+      enabled: true
+    }
+
+    await request.get('/search', {
+      cache,
+      query: {
+        page: 1,
+        keyword: 'npora'
+      }
+    })
+    await request.get('/search', {
+      cache,
+      query: {
+        keyword: 'npora',
+        page: 1
+      }
+    })
+
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('should isolate cached data by response type', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response('Npora', {
+          status: 200,
+          headers: {
+            'content-type': 'text/plain'
+          }
+        })
+      )
+      .mockResolvedValueOnce(
+        new Response(new TextEncoder().encode('Npora'), {
+          status: 200,
+          headers: {
+            'content-type': 'application/octet-stream'
+          }
+        })
+      )
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient().use(cachePlugin())
+    const cache = {
+      enabled: true
+    }
+    const text = await request.get<string>('/document', {
+      cache,
+      responseType: 'text'
+    })
+    const buffer = await request.get<ArrayBuffer>('/document', {
+      cache,
+      responseType: 'arrayBuffer'
+    })
+
+    expect(text).toBe('Npora')
+    expect(new TextDecoder().decode(buffer)).toBe('Npora')
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
   it('should isolate cache stores between plugin instances', async () => {
     const fetchMock = vi
       .fn()

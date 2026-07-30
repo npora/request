@@ -312,18 +312,34 @@ test(
         baseURL: '/api'
       }).use(cachePlugin())
       const key = crypto.randomUUID()
-      const config = {
+      const firstConfig = {
         extensions: {
           cache: {
             enabled: true,
             ttl: 1000
           }
+        },
+        query: {
+          key,
+          page: 1
+        }
+      }
+      const secondConfig = {
+        extensions: {
+          cache: {
+            enabled: true,
+            ttl: 1000
+          }
+        },
+        query: {
+          page: 1,
+          key
         }
       }
 
       return {
-        first: await request.get(`/count?key=${key}`, config),
-        second: await request.get(`/count?key=${key}`, config)
+        first: await request.get('/count', firstConfig),
+        second: await request.get('/count', secondConfig)
       }
     })
 

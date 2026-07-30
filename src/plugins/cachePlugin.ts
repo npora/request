@@ -1,6 +1,7 @@
 import type {
   CacheOptions,
   HttpMethod,
+  QueryParams,
   RequestConfig
 } from '../types'
 import type { Plugin } from './Plugin'
@@ -199,7 +200,8 @@ function createCacheKey(
     method: config.method ?? 'GET',
     baseURL: config.baseURL,
     url: config.url,
-    query: config.query,
+    query: normalizeQuery(config.query),
+    responseType: config.responseType ?? 'auto',
     headers: Object.fromEntries(
       varyHeaders.map(name => [
         name.toLowerCase(),
@@ -207,6 +209,42 @@ function createCacheKey(
       ])
     )
   })
+}
+
+function normalizeQuery(
+  query?: QueryParams
+): Array<[string, string]> {
+  if (!query) {
+    return []
+  }
+
+  const entries: Array<[string, string]> = []
+
+  for (const key of Object.keys(query).sort()) {
+    appendQueryValue(entries, key, query[key])
+  }
+
+  return entries
+}
+
+function appendQueryValue(
+  entries: Array<[string, string]>,
+  key: string,
+  value: QueryParams[string]
+): void {
+  if (value === null || value === undefined) {
+    return
+  }
+
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      appendQueryValue(entries, key, item)
+    }
+
+    return
+  }
+
+  entries.push([key, String(value)])
 }
 
 function cloneRawResponse(record: CacheRecord): Response {
