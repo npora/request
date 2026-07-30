@@ -25,7 +25,10 @@ export class Pipeline {
     private readonly hooks: PluginHooks
   ) {}
 
-  async execute<T = unknown>(config: RequestConfig): Promise<NporaResponse<T>> {
+  async execute<T = unknown>(
+    config: RequestConfig,
+    preserveRaw = true
+  ): Promise<NporaResponse<T>> {
     const context = new RequestContext<T>(config)
     let validatedHeaders: Headers | undefined
 
@@ -68,7 +71,10 @@ export class Pipeline {
             headers && this.adapter.requestValidated
               ? await this.adapter.requestValidated<T>(
                   context.config,
-                  headers
+                  headers,
+                  preserveRaw ||
+                  this.hooks.hasResponseHooks ||
+                  this.interceptors.response.active
                 )
               : await this.adapter.request<T>(
                   context.config

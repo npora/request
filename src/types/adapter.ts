@@ -19,6 +19,7 @@ export interface Adapter {
    */
   requestValidated?<T = unknown>(
     config: RequestConfig,
-    validatedHeaders: Headers
+    validatedHeaders: Headers,
+    preserveRaw?: boolean
   ): Promise<NporaResponse<T>>
 }

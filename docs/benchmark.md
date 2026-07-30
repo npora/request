@@ -34,6 +34,8 @@ pnpm benchmark -- \
   interceptors and request/response plugin hooks.
 - `fetchAdapterClient`: complete FetchAdapter lifecycle against an in-memory
   Fetch response, without network latency.
+- `fetchAdapterCompleteResponse`: the same Fetch lifecycle while preserving
+  a separately readable raw `Response`.
 
 Each result includes duration, operations per second, heap delta, mean latency
 and p50/p95/p99/max latency. The report also includes client overhead relative
@@ -66,3 +68,8 @@ headers remain isolated from reusable client defaults.
 The Pipeline passes its final validated `Headers` directly to the first
 adapter attempt. FetchAdapter reuses that instance for request construction;
 direct adapter calls and retries still perform their own validation.
+
+Successful data-only Fetch requests parse the original response without
+cloning when no response hooks or interceptors need `raw`. Complete responses,
+response lifecycle extensions and HTTP errors retain a separately readable
+raw body.

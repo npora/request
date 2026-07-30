@@ -13,20 +13,27 @@ export class FetchAdapter implements Adapter {
   ): Promise<NporaResponse<T>> {
     return this.execute<T>(
       config,
-      validateRequestConfig(config)
+      validateRequestConfig(config),
+      true
     )
   }
 
   requestValidated<T = unknown>(
     config: RequestConfig,
-    validatedHeaders: Headers
+    validatedHeaders: Headers,
+    preserveRaw = true
   ): Promise<NporaResponse<T>> {
-    return this.execute<T>(config, validatedHeaders)
+    return this.execute<T>(
+      config,
+      validatedHeaders,
+      preserveRaw
+    )
   }
 
   private async execute<T>(
     config: RequestConfig,
-    headers: Headers
+    headers: Headers,
+    preserveRaw: boolean
   ): Promise<NporaResponse<T>> {
     let request: BuiltRequest | undefined
 
@@ -34,8 +41,13 @@ export class FetchAdapter implements Adapter {
       request = buildRequestWithHeaders(config, headers)
       const response = await fetch(request.url, request.init)
       const validateStatus = config.validateStatus ?? defaultValidateStatus
+      const validStatus = validateStatus(response.status)
       const parseTarget =
-        config.responseType === 'stream'
+        config.responseType === 'stream' ||
+        (
+          !preserveRaw &&
+          validStatus
+        )
           ? response
           : response.clone()
       const data = await parseResponse<T>(parseTarget, config)
@@ -48,7 +60,7 @@ export class FetchAdapter implements Adapter {
         raw: response
       }
 
-      if (!validateStatus(response.status)) {
+      if (!validStatus) {
         throw new RequestError<T>(response.statusText || 'Request failed', {
           code: 'HTTP_ERROR',
           response: nporaResponse

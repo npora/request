@@ -182,6 +182,11 @@ settles, times out or is externally aborted.
 }
 ```
 
+Data-only methods parse successful Fetch responses directly when no response
+hooks or interceptors are installed. Complete response methods, response
+lifecycle extensions and HTTP errors preserve a separately readable `raw`
+Response.
+
 ## Config Merge Rules
 
 Client defaults and request configuration are merged deterministically:

@@ -84,6 +84,7 @@ Core features should remain stable.
 
 - [x] Fetch Adapter
 - [x] Validated Header Handoff
+- [x] Data-only Response Clone Elision
 
 ### Future
 

@@ -133,7 +133,14 @@ export class Client {
   }
 
   async request<T = unknown>(config: RequestConfig): Promise<T> {
-    const response = await this.requestResponse<T>(config)
+    const mergedConfig = ConfigMerger.merge(
+      this.defaults,
+      config
+    )
+    const response = await this.pipeline.execute<T>(
+      mergedConfig,
+      false
+    )
 
     return response.data
   }

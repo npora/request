@@ -264,14 +264,16 @@ describe('plugin', () => {
   it('should automatically clean plugin interceptors, hooks and resources', async () => {
     const cleanup = vi.fn()
     const hook = vi.fn()
-    const fetchMock = vi.fn().mockResolvedValue(
-      new Response(JSON.stringify({ ok: true }), {
-        status: 200,
-        headers: {
-          'content-type': 'application/json'
-        }
-      })
-    )
+    const fetchMock = vi.fn().mockImplementation(() => {
+      return Promise.resolve(
+        new Response(JSON.stringify({ ok: true }), {
+          status: 200,
+          headers: {
+            'content-type': 'application/json'
+          }
+        })
+      )
+    })
 
     vi.stubGlobal('fetch', fetchMock)
 

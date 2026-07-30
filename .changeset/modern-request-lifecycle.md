@@ -25,3 +25,5 @@ Add a production-ready request lifecycle and extension API.
   pass while preserving case-insensitive overrides and default isolation.
 - Reuse the Pipeline's final validated Headers for the first FetchAdapter
   attempt while retaining standalone and retry validation.
+- Skip Fetch Response cloning for successful data-only requests while
+  preserving raw bodies for complete responses, extensions, and HTTP errors.
