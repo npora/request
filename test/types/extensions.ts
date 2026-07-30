@@ -57,5 +57,12 @@ client.use(plugin)
 client.unuse(plugin.name)
 
 const installed: boolean = client.hasPlugin(plugin.name)
+const extended: Client = client.extend({
+  baseURL: '/v2',
+  headers: {
+    'x-client': 'extended'
+  }
+})
 
 void installed
+void extended

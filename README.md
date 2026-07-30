@@ -64,6 +64,8 @@ console.log(user)
 ```ts
 const request = createClient(options)
 
+const childRequest = request.extend(options)
+
 request.request(config)
 
 request.requestResponse(config)

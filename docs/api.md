@@ -23,6 +23,38 @@ const request = createClient({
 
 ---
 
+## extend()
+
+```ts
+const childRequest = request.extend(options)
+```
+
+Creates a new isolated client by merging `options` with the current client's
+defaults. The child inherits the adapter unless a replacement is supplied.
+Headers, query parameters, native Fetch options and extension configuration use
+the same merge rules as individual requests.
+
+```ts
+const api = createClient({
+  baseURL: '/api',
+  headers: {
+    'x-app': 'dashboard'
+  }
+})
+
+const adminApi = api.extend({
+  baseURL: '/api/admin',
+  headers: {
+    'x-role': 'admin'
+  }
+})
+```
+
+Interceptors and installed plugins are instance-scoped and are not copied to
+the child client.
+
+---
+
 ## request()
 
 ```ts

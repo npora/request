@@ -17,7 +17,7 @@ Core features should remain stable.
 ### Instance
 
 - [x] createClient()
-- [ ] createClient().extend()
+- [x] createClient().extend()
 
 ### Request API
 

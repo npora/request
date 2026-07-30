@@ -14,6 +14,23 @@ export class ConfigMerger {
     defaults: Partial<RequestConfig>,
     config: RequestConfig
   ): RequestConfig {
+    return this.mergeConfig(defaults, config) as RequestConfig
+  }
+
+  /**
+   * Merge two sets of client defaults.
+   */
+  static mergeDefaults(
+    defaults: Partial<RequestConfig>,
+    overrides: Partial<RequestConfig>
+  ): Partial<RequestConfig> {
+    return this.mergeConfig(defaults, overrides)
+  }
+
+  private static mergeConfig(
+    defaults: Partial<RequestConfig>,
+    config: Partial<RequestConfig>
+  ): Partial<RequestConfig> {
     return {
       ...defaults,
       ...config,
@@ -212,7 +229,7 @@ export class ConfigMerger {
 
   private static mergeBodyConfig(
     defaults: Partial<RequestConfig>,
-    config: RequestConfig
+    config: Partial<RequestConfig>
   ): Pick<RequestConfig, 'body' | 'json' | 'form' | 'formData'> {
     const keys = [
       'body',

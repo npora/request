@@ -18,6 +18,8 @@ import type {
 export class Client {
   private readonly defaults: Partial<RequestConfig>
 
+  private readonly adapter: Adapter
+
   private readonly installedPlugins = new Map<
     string,
     InstalledPlugin
@@ -37,7 +39,27 @@ export class Client {
     const { adapter = new FetchAdapter(), ...defaults } = options
 
     this.defaults = defaults
+    this.adapter = adapter
     this.pipeline = this.createPipeline(adapter)
+  }
+
+  /**
+   * Create an isolated client that inherits this client's defaults.
+   */
+  extend(options: ClientOptions = {}): Client {
+    const {
+      adapter = this.adapter,
+      ...overrides
+    } = options
+    const defaults = ConfigMerger.mergeDefaults(
+      this.defaults,
+      overrides
+    )
+
+    return new Client({
+      ...defaults,
+      adapter
+    })
   }
 
   use(plugin: Plugin): this {
