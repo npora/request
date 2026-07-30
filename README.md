@@ -243,6 +243,16 @@ movement for the adapter, client and plugin pipeline. CI stores a JSON report
 for comparisons between equivalent runners. See
 [`docs/benchmark.md`](docs/benchmark.md) for methodology and options.
 
+Verify the built entrypoint, declaration, gzip and npm tarball size budgets:
+
+```sh
+pnpm build
+pnpm test:size
+```
+
+See [`docs/package-size.md`](docs/package-size.md) for the checked metrics and
+budget policy.
+
 ---
 
 # Documentation
@@ -253,13 +263,15 @@ Project documentation is located in the `docs` directory.
 docs
 ├── benchmark.md
 ├── blueprint.md
-├── structure.md
 ├── features.md
+├── package-size.md
+├── structure.md
 └── api.md
 ```
 
 - **Blueprint** — Project vision and architecture
 - **Benchmark** — Performance measurement methodology
+- **Package Size** — Published asset budgets and regression checks
 - **Structure** — Directory responsibilities
 - **Features** — Product roadmap
 - **API** — Public API contract

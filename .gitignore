@@ -9,6 +9,7 @@ coverage
 
 # Benchmarks
 benchmark-results
+package-size-results
 
 # Playwright
 playwright-report

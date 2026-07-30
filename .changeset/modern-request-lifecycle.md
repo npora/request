@@ -29,3 +29,5 @@ Add a production-ready request lifecycle and extension API.
   preserving raw bodies for complete responses, extensions, and HTTP errors.
 - Reduce request-construction allocations for body validation, URL joining,
   query parameters, forms, and FormData records.
+- Enforce raw, gzip, declaration, and npm tarball size budgets in package,
+  release, and CI verification with machine-readable reports.

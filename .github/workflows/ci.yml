@@ -58,6 +58,16 @@ jobs:
       - name: Verify package entrypoints
         run: pnpm test:package
 
+      - name: Record package size
+        run: pnpm test:size -- --output package-size-results/report.json
+
+      - name: Upload package size report
+        uses: actions/upload-artifact@v4
+        with:
+          name: package-size
+          path: package-size-results/report.json
+          retention-days: 30
+
       - name: Run performance benchmarks
         run: pnpm benchmark -- --output benchmark-results/request.json
 

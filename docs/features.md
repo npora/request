@@ -259,6 +259,8 @@ Supported:
 - [x] Empty Pipeline Fast Path
 - [x] Allocation-aware Config Merge
 - [x] Single-pass Header Normalization
+- [x] Package Size Regression Gate
+- [x] Machine-readable Package Size Reports
 
 ---
 
@@ -280,6 +282,7 @@ Supported:
 - [x] CommonJS Entrypoint
 - [x] Package Exports Smoke Test
 - [x] Tarball Manifest Verification
+- [x] Package Size Budget Verification
 
 ## v0.1
 
