@@ -12,6 +12,17 @@ export interface BuiltRequest {
  */
 export function buildRequest(config: RequestConfig): BuiltRequest {
   const headers = new Headers(config.headers)
+
+  return buildRequestWithHeaders(config, headers)
+}
+
+/**
+ * Internal fast path for a Headers instance already created by validation.
+ */
+export function buildRequestWithHeaders(
+  config: RequestConfig,
+  headers: Headers
+): BuiltRequest {
   const body = buildBody(config, headers)
   const timeoutSignal = createTimeoutSignal(config.signal, config.timeout)
 

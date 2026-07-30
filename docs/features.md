@@ -83,6 +83,7 @@ Core features should remain stable.
 ### Built-in
 
 - [x] Fetch Adapter
+- [x] Validated Header Handoff
 
 ### Future
 

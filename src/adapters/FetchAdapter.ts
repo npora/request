@@ -1,19 +1,37 @@
 import { RequestError } from '../errors'
 import type { Adapter, NporaResponse, RequestConfig } from '../types'
 import {
-  buildRequest,
   type BuiltRequest,
   parseResponse,
   validateRequestConfig
 } from '../utils'
+import { buildRequestWithHeaders } from '../utils/buildRequest'
 
 export class FetchAdapter implements Adapter {
-  async request<T = unknown>(config: RequestConfig): Promise<NporaResponse<T>> {
+  async request<T = unknown>(
+    config: RequestConfig
+  ): Promise<NporaResponse<T>> {
+    return this.execute<T>(
+      config,
+      validateRequestConfig(config)
+    )
+  }
+
+  requestValidated<T = unknown>(
+    config: RequestConfig,
+    validatedHeaders: Headers
+  ): Promise<NporaResponse<T>> {
+    return this.execute<T>(config, validatedHeaders)
+  }
+
+  private async execute<T>(
+    config: RequestConfig,
+    headers: Headers
+  ): Promise<NporaResponse<T>> {
     let request: BuiltRequest | undefined
 
     try {
-      validateRequestConfig(config)
-      request = buildRequest(config)
+      request = buildRequestWithHeaders(config, headers)
       const response = await fetch(request.url, request.init)
       const validateStatus = config.validateStatus ?? defaultValidateStatus
       const parseTarget =

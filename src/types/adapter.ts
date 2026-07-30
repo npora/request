@@ -9,4 +9,16 @@ export interface Adapter {
    * Send request.
    */
   request<T = unknown>(config: RequestConfig): Promise<NporaResponse<T>>
+
+  /**
+   * Optional first-attempt fast path for built-in adapters.
+   *
+   * Custom adapters do not need to implement this method.
+   *
+   * @internal
+   */
+  requestValidated?<T = unknown>(
+    config: RequestConfig,
+    validatedHeaders: Headers
+  ): Promise<NporaResponse<T>>
 }

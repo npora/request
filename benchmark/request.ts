@@ -64,6 +64,23 @@ const client = createClient({
 const pipelineClient = createClient({
   adapter
 }).use(createBenchmarkPlugin())
+const originalFetch = globalThis.fetch
+const fetchClient = createClient({
+  baseURL: 'https://benchmark.example.com',
+  headers: {
+    accept: 'text/plain',
+    'x-client': 'npora'
+  }
+})
+
+globalThis.fetch = async () => {
+  return new Response('ok', {
+    status: 200,
+    headers: {
+      'content-type': 'text/plain'
+    }
+  })
+}
 
 await warmUp(options.warmup)
 
@@ -85,6 +102,18 @@ const pluginPipeline = await runConcurrent(
   options.concurrency,
   () => pipelineClient.get('/benchmark', requestConfig)
 )
+const fetchAdapterClient = await runSequential(
+  options.operations,
+  () => fetchClient.get('/benchmark', {
+    headers: {
+      'x-request': 'benchmark'
+    },
+    responseType: 'text'
+  })
+)
+
+globalThis.fetch = originalFetch
+
 const report = {
   schemaVersion: 1,
   generatedAt: new Date().toISOString(),
@@ -102,7 +131,8 @@ const report = {
     directAdapter: direct,
     sequentialClient: sequential,
     concurrentClient: concurrent,
-    concurrentPluginPipeline: pluginPipeline
+    concurrentPluginPipeline: pluginPipeline,
+    fetchAdapterClient
   },
   comparison: {
     sequentialClientOverhead:
@@ -134,6 +164,9 @@ async function warmUp(iterations: number): Promise<void> {
   for (let index = 0; index < iterations; index += 1) {
     await client.get('/benchmark', requestConfig)
     await pipelineClient.get('/benchmark', requestConfig)
+    await fetchClient.get('/benchmark', {
+      responseType: 'text'
+    })
   }
 }
 

@@ -11,11 +11,13 @@ const BODY_FIELDS = [
 /**
  * Validate configuration before request hooks or adapters act on it.
  */
-export function validateRequestConfig(config: RequestConfig): void {
+export function validateRequestConfig(config: RequestConfig): Headers {
   validateURL(config)
   validateTimeout(config)
-  validateHeaders(config)
+  const headers = validateHeaders(config)
   validateBody(config)
+
+  return headers
 }
 
 function validateURL(config: RequestConfig): void {
@@ -37,9 +39,9 @@ function validateTimeout(config: RequestConfig): void {
   }
 }
 
-function validateHeaders(config: RequestConfig): void {
+function validateHeaders(config: RequestConfig): Headers {
   try {
-    new Headers(config.headers)
+    return new Headers(config.headers)
   } catch (error) {
     throw configError('Request headers are invalid', config, error)
   }

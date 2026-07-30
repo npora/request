@@ -32,6 +32,8 @@ pnpm benchmark -- \
 - `concurrentClient`: complete client pipeline with bounded concurrency.
 - `concurrentPluginPipeline`: concurrent client with request/response
   interceptors and request/response plugin hooks.
+- `fetchAdapterClient`: complete FetchAdapter lifecycle against an in-memory
+  Fetch response, without network latency.
 
 Each result includes duration, operations per second, heap delta, mean latency
 and p50/p95/p99/max latency. The report also includes client overhead relative
@@ -60,3 +62,7 @@ Configuration merging creates nested values only when either side supplies
 them. Header normalization writes directly into one case-insensitive result
 instead of building intermediate entry arrays and objects. Request-specific
 headers remain isolated from reusable client defaults.
+
+The Pipeline passes its final validated `Headers` directly to the first
+adapter attempt. FetchAdapter reuses that instance for request construction;
+direct adapter calls and retries still perform their own validation.

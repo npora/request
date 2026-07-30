@@ -620,6 +620,16 @@ createClient({
 
 Adapters are responsible for network I/O only.
 
+Built-in adapters may expose an optional internal fast path:
+
+```ts
+requestValidated(config, validatedHeaders)
+```
+
+The client uses it only for the first adapter attempt. Custom adapters do not
+need to implement it and continue to receive exactly `request(config)`.
+Retries and direct adapter calls use the regular method and validate again.
+
 ---
 
 # Stability

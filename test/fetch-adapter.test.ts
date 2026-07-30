@@ -114,6 +114,26 @@ describe('FetchAdapter', () => {
     })
   })
 
+  it('should validate headers when used without the client pipeline', async () => {
+    const fetchMock = vi.fn()
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const adapter = new FetchAdapter()
+
+    await expect(
+      adapter.request({
+        url: 'https://api.example.com/invalid-headers',
+        headers: {
+          'x-invalid': 'line one\nline two'
+        }
+      })
+    ).rejects.toMatchObject({
+      code: 'CONFIG_ERROR'
+    })
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
   it('should throw PARSER_ERROR when json parsing fails', async () => {
     vi.stubGlobal(
       'fetch',

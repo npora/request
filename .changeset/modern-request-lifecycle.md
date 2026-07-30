@@ -23,3 +23,5 @@ Add a production-ready request lifecycle and extension API.
   async pipeline stages on the common request path.
 - Avoid absent nested config allocations and normalize merged headers in one
   pass while preserving case-insensitive overrides and default isolation.
+- Reuse the Pipeline's final validated Headers for the first FetchAdapter
+  attempt while retaining standalone and retry validation.

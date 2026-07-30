@@ -27,6 +27,7 @@ export class Pipeline {
 
   async execute<T = unknown>(config: RequestConfig): Promise<NporaResponse<T>> {
     const context = new RequestContext<T>(config)
+    let validatedHeaders: Headers | undefined
 
     try {
       try {
@@ -36,12 +37,14 @@ export class Pipeline {
           )
         }
 
-        validateRequestConfig(context.config)
+        let headers = validateRequestConfig(context.config)
 
         if (this.hooks.hasRequestHooks) {
           await this.hooks.runRequest(context)
-          validateRequestConfig(context.config)
+          headers = validateRequestConfig(context.config)
         }
+
+        validatedHeaders = headers
       } catch (error) {
         return this.fail(context, error)
       }
@@ -58,7 +61,18 @@ export class Pipeline {
 
       while (true) {
         try {
-          context.response = await this.adapter.request<T>(context.config)
+          const headers = validatedHeaders
+
+          validatedHeaders = undefined
+          context.response =
+            headers && this.adapter.requestValidated
+              ? await this.adapter.requestValidated<T>(
+                  context.config,
+                  headers
+                )
+              : await this.adapter.request<T>(
+                  context.config
+                )
           return await this.processResponse(context)
         } catch (error) {
           const errorHooksSucceeded = await this.notifyError(
