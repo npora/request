@@ -46,6 +46,9 @@ jobs:
       - name: Typecheck examples
         run: pnpm test:examples
 
+      - name: Typecheck benchmarks
+        run: pnpm benchmark:types
+
       - name: Unit, integration and coverage tests
         run: pnpm test:coverage
 
@@ -54,6 +57,16 @@ jobs:
 
       - name: Verify package entrypoints
         run: pnpm test:package
+
+      - name: Run performance benchmarks
+        run: pnpm benchmark -- --output benchmark-results/request.json
+
+      - name: Upload performance report
+        uses: actions/upload-artifact@v4
+        with:
+          name: request-benchmark
+          path: benchmark-results/request.json
+          retention-days: 30
 
   browser:
     name: Browser Tests

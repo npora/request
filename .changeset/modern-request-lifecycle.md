@@ -17,3 +17,5 @@ Add a production-ready request lifecycle and extension API.
 - Add Node integration, Chromium/WebKit, Web Worker, package entrypoint,
   tarball manifest, public type, and example validation.
 - Align the default and CI browser matrix on Chromium and WebKit.
+- Add repeatable request pipeline benchmarks with throughput, latency,
+  memory observations, and CI JSON artifacts.

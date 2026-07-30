@@ -250,6 +250,8 @@ Supported:
 - [x] Integration Tests
 - [x] Browser Tests
 - [x] Coverage Regression Gate
+- [x] Request Pipeline Performance Benchmarks
+- [x] Machine-readable Benchmark Reports
 
 ---
 

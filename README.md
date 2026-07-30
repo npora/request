@@ -230,12 +230,28 @@ Examples are typechecked in CI with `pnpm test:examples`.
 
 ---
 
+# Performance
+
+Run the request-pipeline benchmark:
+
+```sh
+pnpm benchmark
+```
+
+It reports sequential and concurrent throughput, latency percentiles and heap
+movement for the adapter, client and plugin pipeline. CI stores a JSON report
+for comparisons between equivalent runners. See
+[`docs/benchmark.md`](docs/benchmark.md) for methodology and options.
+
+---
+
 # Documentation
 
 Project documentation is located in the `docs` directory.
 
 ```
 docs
+├── benchmark.md
 ├── blueprint.md
 ├── structure.md
 ├── features.md
@@ -243,6 +259,7 @@ docs
 ```
 
 - **Blueprint** — Project vision and architecture
+- **Benchmark** — Performance measurement methodology
 - **Structure** — Directory responsibilities
 - **Features** — Product roadmap
 - **API** — Public API contract

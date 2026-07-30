@@ -1,0 +1,49 @@
+# Performance Benchmarks
+
+The benchmark suite measures request-library overhead without network latency.
+It uses `MockAdapter`, a warm-up phase and the same workload for every
+scenario.
+
+Run the default benchmark:
+
+```sh
+pnpm benchmark
+```
+
+Generate a machine-readable report:
+
+```sh
+pnpm benchmark -- --output benchmark-results/request.json
+```
+
+Tune the workload:
+
+```sh
+pnpm benchmark -- \
+  --operations 10000 \
+  --concurrency 100 \
+  --warmup 500
+```
+
+## Scenarios
+
+- `directAdapter`: adapter-only control measurement.
+- `sequentialClient`: complete client pipeline, one request at a time.
+- `concurrentClient`: complete client pipeline with bounded concurrency.
+- `concurrentPluginPipeline`: concurrent client with request/response
+  interceptors and request/response plugin hooks.
+
+Each result includes duration, operations per second, heap delta, mean latency
+and p50/p95/p99/max latency. The report also includes client overhead relative
+to the direct adapter and plugin throughput relative to the plain concurrent
+client.
+
+## Interpreting Results
+
+Benchmark values depend on CPU, operating system, Node.js version and current
+machine load. Compare reports produced on equivalent runners and look for
+repeated trends rather than treating a single run as a release gate.
+
+CI stores the JSON report as a build artifact. Correctness and resource
+cleanup remain enforced separately by unit, integration and browser stress
+tests.

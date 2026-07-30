@@ -25,6 +25,19 @@ Do not mix responsibilities.
 
 ---
 
+# benchmark
+
+Responsible for repeatable development-time performance measurements.
+
+Rules:
+
+- Must not become part of the published package.
+- Must not add runtime dependencies.
+- Reports are observational and environment-specific.
+- Correctness belongs in the test suite, not benchmark thresholds.
+
+---
+
 # client
 
 Responsible for the public API.

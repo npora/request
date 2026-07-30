@@ -7,6 +7,9 @@ dist
 # Coverage
 coverage
 
+# Benchmarks
+benchmark-results
+
 # Playwright
 playwright-report
 test-results

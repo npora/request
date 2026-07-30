@@ -60,7 +60,9 @@
     "test:package": "node test/package/esm.mjs && node test/package/cjs.cjs && node test/package/manifest.mjs",
     "test:browser": "playwright test --config=browser/playwright.config.ts",
     "test:browser:ui": "playwright test --config=browser/playwright.config.ts --ui",
-    "test:browser:report": "playwright show-report playwright-report"
+    "test:browser:report": "playwright show-report playwright-report",
+    "benchmark": "tsx benchmark/request.ts",
+    "benchmark:types": "tsc -p benchmark/tsconfig.json"
   },
   "devDependencies": {
     "@changesets/cli": "^2.31.0",
