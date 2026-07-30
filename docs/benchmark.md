@@ -47,3 +47,11 @@ repeated trends rather than treating a single run as a release gate.
 CI stores the JSON report as a build artifact. Correctness and resource
 cleanup remain enforced separately by unit, integration and browser stress
 tests.
+
+## Hot-path Design
+
+Interceptor and plugin-hook priority is recalculated only when registrations
+change. Requests iterate cached ordered arrays, and clients without active
+interceptors or hooks skip those async stages entirely. This keeps plugin
+ordering deterministic without allocating and sorting collections on every
+request.

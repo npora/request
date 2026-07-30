@@ -30,10 +30,18 @@ export class Pipeline {
 
     try {
       try {
-        context.config = await this.interceptors.request.run(context.config)
+        if (this.interceptors.request.active) {
+          context.config = await this.interceptors.request.run(
+            context.config
+          )
+        }
+
         validateRequestConfig(context.config)
-        await this.hooks.runRequest(context)
-        validateRequestConfig(context.config)
+
+        if (this.hooks.hasRequestHooks) {
+          await this.hooks.runRequest(context)
+          validateRequestConfig(context.config)
+        }
       } catch (error) {
         return this.fail(context, error)
       }
@@ -59,6 +67,10 @@ export class Pipeline {
           )
 
           if (!errorHooksSucceeded) {
+            return this.fail(context, context.error, false)
+          }
+
+          if (!this.hooks.hasRetryHooks) {
             return this.fail(context, context.error, false)
           }
 
@@ -96,13 +108,17 @@ export class Pipeline {
   private async processResponse<T>(
     context: RequestContext<T>
   ): Promise<NporaResponse<T>> {
-    await this.hooks.runResponse(context)
+    if (this.hooks.hasResponseHooks) {
+      await this.hooks.runResponse(context)
+    }
 
-    context.response = (await this.interceptors.response.run(
-      context.response as NporaResponse
-    )) as NporaResponse<T>
+    if (this.interceptors.response.active) {
+      context.response = (await this.interceptors.response.run(
+        context.response as NporaResponse
+      )) as NporaResponse<T>
+    }
 
-    return context.response
+    return context.response as NporaResponse<T>
   }
 
   private async notifyError<T>(
@@ -111,13 +127,17 @@ export class Pipeline {
   ): Promise<boolean> {
     context.error = error
 
-    try {
-      await this.hooks.runError(context)
-      return true
-    } catch (hookError) {
-      context.error = hookError
-      return false
+    if (this.hooks.hasErrorHooks) {
+      try {
+        await this.hooks.runError(context)
+        return true
+      } catch (hookError) {
+        context.error = hookError
+        return false
+      }
     }
+
+    return true
   }
 
   private async fail<T>(
@@ -131,7 +151,12 @@ export class Pipeline {
       context.error = error
     }
 
-    context.error = await this.interceptors.error.run(context.error)
+    if (this.interceptors.error.active) {
+      context.error = await this.interceptors.error.run(
+        context.error
+      )
+    }
+
     throw context.error
   }
 }

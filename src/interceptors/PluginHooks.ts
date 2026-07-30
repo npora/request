@@ -28,62 +28,77 @@ export type RetryHook = (
 /**
  * Internal plugin lifecycle manager.
  *
- * It coordinates plugin hooks without exposing Client internals.
+ * Hook order is calculated when registrations change so the hot request path
+ * can iterate a stable array without allocating and sorting per request.
  */
 export class PluginHooks {
-  private id = 0
+  private readonly requestHooks = new HookRegistry<RequestHook>()
 
-  private readonly requestHooks = new Map<number, HookEntry<RequestHook>>()
+  private readonly responseHooks = new HookRegistry<RequestHook>()
 
-  private readonly responseHooks = new Map<number, HookEntry<RequestHook>>()
+  private readonly errorHooks = new HookRegistry<RequestHook>()
 
-  private readonly errorHooks = new Map<number, HookEntry<RequestHook>>()
+  private readonly retryHooks = new HookRegistry<RetryHook>()
 
-  private readonly retryHooks = new Map<number, HookEntry<RetryHook>>()
+  get hasRequestHooks(): boolean {
+    return this.requestHooks.active
+  }
+
+  get hasResponseHooks(): boolean {
+    return this.responseHooks.active
+  }
+
+  get hasErrorHooks(): boolean {
+    return this.errorHooks.active
+  }
+
+  get hasRetryHooks(): boolean {
+    return this.retryHooks.active
+  }
 
   onRequest(
     hook: RequestHook,
     options: HookOptions = {}
   ): HookDisposer {
-    return this.register(this.requestHooks, hook, options)
+    return this.requestHooks.register(hook, options)
   }
 
   onResponse(
     hook: RequestHook,
     options: HookOptions = {}
   ): HookDisposer {
-    return this.register(this.responseHooks, hook, options)
+    return this.responseHooks.register(hook, options)
   }
 
   onError(
     hook: RequestHook,
     options: HookOptions = {}
   ): HookDisposer {
-    return this.register(this.errorHooks, hook, options)
+    return this.errorHooks.register(hook, options)
   }
 
   onRetry(
     hook: RetryHook,
     options: HookOptions = {}
   ): HookDisposer {
-    return this.register(this.retryHooks, hook, options)
+    return this.retryHooks.register(hook, options)
   }
 
   async runRequest(context: RequestContext<unknown>): Promise<void> {
-    for (const entry of sortedHooks(this.requestHooks)) {
-      await entry.hook(context)
+    for (const hook of this.requestHooks.values()) {
+      await hook(context)
     }
   }
 
   async runResponse(context: RequestContext<unknown>): Promise<void> {
-    for (const entry of sortedHooks(this.responseHooks)) {
-      await entry.hook(context)
+    for (const hook of this.responseHooks.values()) {
+      await hook(context)
     }
   }
 
   async runError(context: RequestContext<unknown>): Promise<void> {
-    for (const entry of sortedHooks(this.errorHooks)) {
-      await entry.hook(context)
+    for (const hook of this.errorHooks.values()) {
+      await hook(context)
     }
   }
 
@@ -91,8 +106,8 @@ export class PluginHooks {
     context: RequestContext<unknown>,
     attempt: number
   ): Promise<RetryDecision> {
-    for (const entry of sortedHooks(this.retryHooks)) {
-      const decision = await entry.hook(context, attempt)
+    for (const hook of this.retryHooks.values()) {
+      const decision = await hook(context, attempt)
 
       if (decision) {
         return decision
@@ -104,41 +119,61 @@ export class PluginHooks {
       delay: 0
     }
   }
+}
 
-  private register<Hook>(
-    hooks: Map<number, HookEntry<Hook>>,
+interface HookEntry<Hook> {
+  id: number
+  hook: Hook
+  priority: number
+}
+
+class HookRegistry<Hook> {
+  private id = 0
+
+  private readonly hooks = new Map<number, HookEntry<Hook>>()
+
+  private orderedHooks: Hook[] = []
+
+  get active(): boolean {
+    return this.orderedHooks.length > 0
+  }
+
+  register(
     hook: Hook,
     options: HookOptions
   ): HookDisposer {
     const id = this.id++
 
-    hooks.set(id, {
+    this.hooks.set(id, {
+      id,
       hook,
       priority: normalizePriority(options.priority)
     })
+    this.refreshOrder()
 
     return () => {
-      hooks.delete(id)
+      if (this.hooks.delete(id)) {
+        this.refreshOrder()
+      }
     }
   }
-}
 
-interface HookEntry<Hook> {
-  hook: Hook
-  priority: number
-}
+  values(): readonly Hook[] {
+    return this.orderedHooks
+  }
 
-function sortedHooks<Hook>(
-  hooks: Map<number, HookEntry<Hook>>
-): HookEntry<Hook>[] {
-  return [...hooks.entries()]
-    .sort(([firstId, first], [secondId, second]) => {
-      return (
-        second.priority - first.priority ||
-        firstId - secondId
-      )
-    })
-    .map(([, entry]) => entry)
+  private refreshOrder(): void {
+    this.orderedHooks = [
+      ...this.hooks.values()
+    ]
+      .sort((first, second) => {
+        return (
+          second.priority - first.priority ||
+          first.id - second.id
+        )
+      })
+      .map(entry => entry.hook)
+  }
 }
 
 function normalizePriority(priority?: number): number {

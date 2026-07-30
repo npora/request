@@ -252,6 +252,8 @@ Supported:
 - [x] Coverage Regression Gate
 - [x] Request Pipeline Performance Benchmarks
 - [x] Machine-readable Benchmark Reports
+- [x] Cached Interceptor and Hook Ordering
+- [x] Empty Pipeline Fast Path
 
 ---
 

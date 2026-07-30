@@ -1,11 +1,34 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { createClient, RequestError } from '../src'
+import {
+  createClient,
+  InterceptorManager,
+  RequestError
+} from '../src'
 
 afterEach(() => {
   vi.unstubAllGlobals()
 })
 
 describe('interceptors', () => {
+  it('should track whether the optimized interceptor path is active', () => {
+    const interceptors = new InterceptorManager<number>()
+
+    expect(interceptors.active).toBe(false)
+
+    const first = interceptors.use(value => value + 1)
+
+    expect(interceptors.active).toBe(true)
+
+    interceptors.eject(first)
+
+    expect(interceptors.active).toBe(false)
+
+    interceptors.use(value => value + 1)
+    interceptors.clear()
+
+    expect(interceptors.active).toBe(false)
+  })
+
   it('should run request interceptor', async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       new Response(JSON.stringify({ ok: true }), {

@@ -19,3 +19,5 @@ Add a production-ready request lifecycle and extension API.
 - Align the default and CI browser matrix on Chromium and WebKit.
 - Add repeatable request pipeline benchmarks with throughput, latency,
   memory observations, and CI JSON artifacts.
+- Cache interceptor and plugin-hook order at registration time and skip empty
+  async pipeline stages on the common request path.

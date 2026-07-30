@@ -10,6 +10,7 @@ export interface InterceptorOptions {
 }
 
 interface InterceptorEntry<T> {
+  id: number
   interceptor: Interceptor<T>
   priority: number
 }
@@ -19,6 +20,12 @@ export class InterceptorManager<T> {
 
   private readonly interceptors = new Map<number, InterceptorEntry<T>>()
 
+  private orderedInterceptors: InterceptorEntry<T>[] = []
+
+  get active(): boolean {
+    return this.orderedInterceptors.length > 0
+  }
+
   use(
     interceptor: Interceptor<T>,
     options: InterceptorOptions = {}
@@ -26,37 +33,44 @@ export class InterceptorManager<T> {
     const id = this.id++
 
     this.interceptors.set(id, {
+      id,
       interceptor,
       priority: normalizePriority(options.priority)
     })
+    this.refreshOrder()
 
     return id
   }
 
   eject(id: number): void {
-    this.interceptors.delete(id)
+    if (this.interceptors.delete(id)) {
+      this.refreshOrder()
+    }
   }
 
   clear(): void {
     this.interceptors.clear()
+    this.orderedInterceptors = []
   }
 
   async run(value: T): Promise<T> {
     let result = value
 
-    for (const [, entry] of this.sortedEntries()) {
+    for (const entry of this.orderedInterceptors) {
       result = await entry.interceptor(result)
     }
 
     return result
   }
 
-  private sortedEntries(): [number, InterceptorEntry<T>][] {
-    return [...this.interceptors.entries()].sort(
-      ([firstId, first], [secondId, second]) => {
+  private refreshOrder(): void {
+    this.orderedInterceptors = [
+      ...this.interceptors.values()
+    ].sort(
+      (first, second) => {
         return (
           second.priority - first.priority ||
-          firstId - secondId
+          first.id - second.id
         )
       }
     )
