@@ -72,6 +72,7 @@ Core features should remain stable.
 - [x] Request Pipeline
 - [x] Request Context
 - [x] Unified Pipeline Error Lifecycle
+- [x] Short-circuit Response Lifecycle
 
 ---
 

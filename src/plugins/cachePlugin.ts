@@ -53,6 +53,7 @@ export function cachePlugin(
   options: CachePluginOptions = {}
 ): CachePlugin {
   const cacheStore = new Map<string, CacheRecord>()
+  const cacheHits = new WeakSet<object>()
   const methods = new Set(
     options.methods ?? DEFAULT_CACHE_METHODS
   )
@@ -109,10 +110,15 @@ export function cachePlugin(
           config: requestContext.config,
           raw: cloneRawResponse(record)
         }
+        cacheHits.add(requestContext)
       })
 
       context.hooks.onResponse(requestContext => {
         syncGeneration()
+
+        if (cacheHits.has(requestContext)) {
+          return
+        }
 
         const cache = resolveExtensionConfig(
           requestContext.config,

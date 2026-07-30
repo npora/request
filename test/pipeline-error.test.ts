@@ -133,6 +133,49 @@ describe('pipeline error lifecycle', () => {
       })
     )
   })
+
+  it('should handle response errors from a short-circuited request', async () => {
+    const observedErrors: string[] = []
+    const plugin: Plugin = {
+      name: 'short-circuit-error',
+      install({ hooks }) {
+        hooks.onRequest(context => {
+          context.response = {
+            data: {
+              cached: true
+            },
+            status: 200,
+            statusText: 'OK',
+            headers: new Headers(),
+            config: context.config,
+            raw: new Response()
+          }
+        })
+        hooks.onError(context => {
+          observedErrors.push(
+            (context.error as Error).message
+          )
+        })
+      }
+    }
+    const request = createClient().use(plugin)
+
+    request.interceptors.response.use(() => {
+      throw new Error('response transform failed')
+    })
+    request.interceptors.error.use(error => {
+      return new Error(
+        `handled: ${(error as Error).message}`
+      )
+    })
+
+    await expect(request.get('/cached')).rejects.toThrow(
+      'handled: response transform failed'
+    )
+    expect(observedErrors).toEqual([
+      'response transform failed'
+    ])
+  })
 })
 
 function errorObserverPlugin(events: string[]): Plugin {

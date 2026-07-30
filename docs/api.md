@@ -259,6 +259,10 @@ const request = createClient()
 Plugins must not replace client methods.
 
 Plugins should extend the request lifecycle through supported extension points.
+Responses supplied early by a request hook still pass through plugin response
+hooks and user response interceptors. Response hooks run first so cache-like
+plugins can store the unmodified parsed response and apply user transforms
+exactly once per request.
 
 ## Plugin Lifecycle
 

@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import type { Plugin } from '../src'
 import { cachePlugin, clearCache, createClient } from '../src'
 
 function createJsonResponse(data: unknown): Response {
@@ -107,6 +108,42 @@ describe('cachePlugin', () => {
 
     expect(first).toEqual({ version: 1 })
     expect(second).toEqual({ version: 2 })
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('should not extend ttl when a cached response is read', async () => {
+    vi.useFakeTimers()
+
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(createJsonResponse({ version: 1 }))
+      .mockResolvedValueOnce(createJsonResponse({ version: 2 }))
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient().use(cachePlugin())
+    const config = {
+      cache: {
+        enabled: true,
+        ttl: 100
+      }
+    }
+
+    await expect(request.get('/version', config)).resolves.toEqual({
+      version: 1
+    })
+
+    vi.advanceTimersByTime(90)
+
+    await expect(request.get('/version', config)).resolves.toEqual({
+      version: 1
+    })
+
+    vi.advanceTimersByTime(11)
+
+    await expect(request.get('/version', config)).resolves.toEqual({
+      version: 2
+    })
     expect(fetchMock).toHaveBeenCalledTimes(2)
   })
 
@@ -259,6 +296,78 @@ describe('cachePlugin', () => {
     }>('/profile', config)
 
     expect(second.profile.name).toBe('Npora')
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('should run response interceptors once for every cache result', async () => {
+    const responseInterceptor = vi.fn(response => {
+      const data = response.data as {
+        value: number
+      }
+
+      return {
+        ...response,
+        data: {
+          value: data.value + 1
+        }
+      }
+    })
+    const fetchMock = vi.fn().mockResolvedValue(
+      createJsonResponse({
+        value: 0
+      })
+    )
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient().use(cachePlugin())
+    const config = {
+      cache: {
+        enabled: true
+      }
+    }
+
+    request.interceptors.response.use(responseInterceptor)
+
+    await expect(request.get('/value', config)).resolves.toEqual({
+      value: 1
+    })
+    await expect(request.get('/value', config)).resolves.toEqual({
+      value: 1
+    })
+    expect(responseInterceptor).toHaveBeenCalledTimes(2)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('should run other response hooks for cache hits', async () => {
+    const responseHook = vi.fn()
+    const observer: Plugin = {
+      name: 'cache-observer',
+      install({ hooks }) {
+        hooks.onResponse(responseHook)
+      }
+    }
+    const fetchMock = vi.fn().mockResolvedValue(
+      createJsonResponse({
+        ok: true
+      })
+    )
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient()
+      .use(cachePlugin())
+      .use(observer)
+    const config = {
+      cache: {
+        enabled: true
+      }
+    }
+
+    await request.get('/observed', config)
+    await request.get('/observed', config)
+
+    expect(responseHook).toHaveBeenCalledTimes(2)
     expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 

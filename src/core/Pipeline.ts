@@ -38,7 +38,11 @@ export class Pipeline {
       }
 
       if (context.response) {
-        return context.response
+        try {
+          return await this.processResponse(context)
+        } catch (error) {
+          return this.fail(context, error)
+        }
       }
 
       let attempt = 0
@@ -46,14 +50,7 @@ export class Pipeline {
       while (true) {
         try {
           context.response = await this.adapter.request<T>(context.config)
-
-          context.response = (await this.interceptors.response.run(
-            context.response as NporaResponse
-          )) as NporaResponse<T>
-
-          await this.hooks.runResponse(context)
-
-          return context.response
+          return await this.processResponse(context)
         } catch (error) {
           const errorHooksSucceeded = await this.notifyError(
             context,
@@ -93,6 +90,18 @@ export class Pipeline {
     } finally {
       context.endTime = Date.now()
     }
+  }
+
+  private async processResponse<T>(
+    context: RequestContext<T>
+  ): Promise<NporaResponse<T>> {
+    await this.hooks.runResponse(context)
+
+    context.response = (await this.interceptors.response.run(
+      context.response as NporaResponse
+    )) as NporaResponse<T>
+
+    return context.response
   }
 
   private async notifyError<T>(

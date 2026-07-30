@@ -141,6 +141,50 @@ describe('plugin', () => {
     ])
   })
 
+  it('should process responses supplied by request hooks', async () => {
+    const responseHook = vi.fn()
+    const responseInterceptor = vi.fn(response => {
+      return {
+        ...response,
+        data: {
+          ...(response.data as object),
+          intercepted: true
+        }
+      }
+    })
+    const fetchMock = vi.fn()
+    const plugin: Plugin = {
+      name: 'short-circuit',
+      install({ hooks }) {
+        hooks.onRequest(context => {
+          context.response = {
+            data: {
+              source: 'plugin'
+            },
+            status: 200,
+            statusText: 'OK',
+            headers: new Headers(),
+            config: context.config,
+            raw: new Response()
+          }
+        })
+        hooks.onResponse(responseHook)
+      }
+    }
+    const request = createClient().use(plugin)
+
+    vi.stubGlobal('fetch', fetchMock)
+    request.interceptors.response.use(responseInterceptor)
+
+    await expect(request.get('/short-circuit')).resolves.toEqual({
+      source: 'plugin',
+      intercepted: true
+    })
+    expect(responseHook).toHaveBeenCalledTimes(1)
+    expect(responseInterceptor).toHaveBeenCalledTimes(1)
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
   it('should require dependencies to be installed first', () => {
     const request = createClient()
     const plugin: Plugin = {
