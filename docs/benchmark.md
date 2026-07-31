@@ -1,8 +1,10 @@
 # Performance Benchmarks
 
 The benchmark suite measures request-library overhead without network latency.
-It uses `MockAdapter`, a warm-up phase and the same workload for every
-scenario.
+It uses a minimal stateless adapter, a warm-up phase and the same workload for
+every scenario. The adapter intentionally omits request history so test-only
+observability storage is not mistaken for production request overhead during
+long stress runs.
 
 Run the default benchmark:
 

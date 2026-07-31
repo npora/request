@@ -1,6 +1,7 @@
 import {
   createClient,
-  MockAdapter,
+  type Adapter,
+  type NporaResponse,
   type Plugin,
   type RequestConfig
 } from '../src'
@@ -20,14 +21,7 @@ const options = parseBenchmarkOptions(
     warmup: 250
   }
 )
-const adapter = new MockAdapter({
-  handlers: {
-    '/benchmark': config => ({
-      ok: true,
-      id: config.query?.id
-    })
-  }
-})
+const adapter = createBenchmarkAdapter()
 const requestConfig: RequestConfig = {
   url: '/benchmark',
   method: 'GET',
@@ -182,6 +176,28 @@ function createBenchmarkPlugin(): Plugin {
       hooks.onRequest(() => {})
       hooks.onResponse(() => {})
       interceptors.response.use(response => response)
+    }
+  }
+}
+
+function createBenchmarkAdapter(): Adapter {
+  return {
+    async request<T>(
+      config: RequestConfig
+    ): Promise<NporaResponse<T>> {
+      return {
+        data: {
+          ok: true,
+          id: config.query?.id
+        } as T,
+        status: 200,
+        statusText: 'OK',
+        headers: new Headers(),
+        config,
+        raw: new Response(null, {
+          status: 200
+        })
+      }
     }
   }
 }
