@@ -1,5 +1,14 @@
 # @npora/request
 
+## 0.4.0
+
+### Minor Changes
+
+- 0fe9456: Remove the deprecated top-level retry, cache, auth, logger, upload, and
+  download request fields. Plugin-owned configuration must now be provided under
+  the namespaced `extensions` field, keeping business options out of the stable
+  Core request contract.
+
 ## 0.3.0
 
 ### Minor Changes
