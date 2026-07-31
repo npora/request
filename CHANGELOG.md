@@ -1,5 +1,12 @@
 # @npora/request
 
+## 1.3.0
+
+### Minor Changes
+
+- 03a36a1: Add pluggable cache stores, concurrent request deduplication, and a final
+  settled plugin lifecycle hook.
+
 ## 1.2.0
 
 ### Minor Changes
