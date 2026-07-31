@@ -1,5 +1,12 @@
 # @npora/request
 
+## 1.5.0
+
+### Minor Changes
+
+- 98f6189: Add a circuit-breaker plugin with origin isolation, bounded half-open probes,
+  final-outcome failure accounting, state observers, and manual reset controls.
+
 ## 1.4.0
 
 ### Minor Changes
