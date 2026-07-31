@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
+import { getNpmPackManifest } from './npm-pack-result.mjs'
 import {
   mkdirSync,
   mkdtempSync,
@@ -110,7 +111,7 @@ function inspectPackage() {
       result.stderr || 'npm pack --dry-run failed'
     )
 
-    const [manifest] = JSON.parse(result.stdout)
+    const manifest = getNpmPackManifest(result.stdout)
 
     return {
       bytes: manifest.size,

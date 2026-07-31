@@ -6,6 +6,7 @@ import {
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { spawnSync } from 'node:child_process'
+import { getNpmPackManifest } from './npm-pack-result.mjs'
 
 const temporaryDirectory = mkdtempSync(
   join(tmpdir(), 'npora-request-pack-')
@@ -37,7 +38,7 @@ try {
     result.stderr || 'npm pack --dry-run failed'
   )
 
-  const [manifest] = JSON.parse(result.stdout)
+  const manifest = getNpmPackManifest(result.stdout)
   const paths = manifest.files
     .map(file => file.path)
     .sort()
