@@ -16,6 +16,13 @@ assert.deepEqual(
   manifest
 )
 
+assert.deepEqual(
+  getNpmPackManifest(JSON.stringify({
+    '@npora/request': manifest
+  })),
+  manifest
+)
+
 assert.throws(
   () => getNpmPackManifest('null'),
   /invalid manifest/
