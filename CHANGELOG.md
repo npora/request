@@ -1,5 +1,12 @@
 # @npora/request
 
+## 1.6.0
+
+### Minor Changes
+
+- edd4c9a: Bound the built-in memory cache and circuit-breaker state with configurable
+  LRU eviction while preserving active circuit records until requests settle.
+
 ## 1.5.0
 
 ### Minor Changes
