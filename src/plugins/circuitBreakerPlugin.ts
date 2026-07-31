@@ -37,6 +37,14 @@ export interface CircuitBreakerPluginOptions {
   halfOpenMaxRequests?: number
 
   /**
+   * Maximum inactive isolation states retained by this plugin instance.
+   * Active requests are never evicted and may temporarily exceed the limit.
+   *
+   * @default 1000
+   */
+  maxCircuits?: number
+
+  /**
    * Create the default isolation key for a request.
    *
    * @default the resolved request origin or "default"
@@ -74,12 +82,14 @@ interface CircuitRecord {
   openedAt: number
   probes: number
   generation: number
+  activeRequests: number
 }
 
 interface Admission {
   key: string
   generation: number
   probe: boolean
+  record: CircuitRecord
 }
 
 interface NormalizedOptions {
@@ -87,6 +97,7 @@ interface NormalizedOptions {
   successThreshold: number
   resetTimeout: number
   halfOpenMaxRequests: number
+  maxCircuits: number
   createKey: (config: RequestConfig) => string
   shouldCountFailure: NonNullable<
     CircuitBreakerPluginOptions['shouldCountFailure']
@@ -133,7 +144,11 @@ export function circuitBreakerPlugin(
         const key = normalizeKey(
           requestOptions?.key ?? normalized.createKey(requestContext.config)
         )
-        const record = getCircuit(circuits, key)
+        const record = getCircuit(
+          circuits,
+          key,
+          normalized.maxCircuits
+        )
 
         if (
           record.state === 'open' &&
@@ -156,10 +171,13 @@ export function circuitBreakerPlugin(
           record.probes += 1
         }
 
+        record.activeRequests += 1
+
         admissions.set(requestContext, {
           key,
           generation: record.generation,
-          probe
+          probe,
+          record
         })
       })
 
@@ -172,59 +190,68 @@ export function circuitBreakerPlugin(
 
         admissions.delete(requestContext)
 
+        const record = admission.record
+
         if (!active) {
+          record.activeRequests = Math.max(0, record.activeRequests - 1)
           return
         }
 
-        const record = circuits.get(admission.key)
+        try {
+          if (
+            circuits.get(admission.key) !== record ||
+            record.generation !== admission.generation
+          ) {
+            return
+          }
 
-        if (!record || record.generation !== admission.generation) {
-          return
-        }
+          if (admission.probe) {
+            record.probes = Math.max(0, record.probes - 1)
+          }
 
-        if (admission.probe) {
-          record.probes = Math.max(0, record.probes - 1)
-        }
+          if (!requestContext.error && requestContext.response) {
+            record.failures = 0
 
-        if (!requestContext.error && requestContext.response) {
-          record.failures = 0
+            if (admission.probe && record.state === 'half-open') {
+              record.successes += 1
+
+              if (record.successes >= normalized.successThreshold) {
+                transition(record, admission.key, 'closed', normalized)
+              }
+            }
+
+            return
+          }
+
+          const counted = await normalized.shouldCountFailure(
+            requestContext.error,
+            requestContext.config
+          )
+
+          if (
+            !active ||
+            circuits.get(admission.key) !== record ||
+            record.generation !== admission.generation ||
+            !counted
+          ) {
+            return
+          }
 
           if (admission.probe && record.state === 'half-open') {
-            record.successes += 1
+            transition(record, admission.key, 'open', normalized)
+            return
+          }
 
-            if (record.successes >= normalized.successThreshold) {
-              transition(record, admission.key, 'closed', normalized)
+          if (record.state === 'closed') {
+            record.failures += 1
+
+            if (record.failures >= normalized.failureThreshold) {
+              transition(record, admission.key, 'open', normalized)
             }
           }
-
-          return
-        }
-
-        const counted = await normalized.shouldCountFailure(
-          requestContext.error,
-          requestContext.config
-        )
-
-        if (
-          !active ||
-          circuits.get(admission.key) !== record ||
-          record.generation !== admission.generation ||
-          !counted
-        ) {
-          return
-        }
-
-        if (admission.probe && record.state === 'half-open') {
-          transition(record, admission.key, 'open', normalized)
-          return
-        }
-
-        if (record.state === 'closed') {
-          record.failures += 1
-
-          if (record.failures >= normalized.failureThreshold) {
-            transition(record, admission.key, 'open', normalized)
-          }
+        } finally {
+          record.activeRequests = Math.max(0, record.activeRequests - 1)
+          trimCircuits(circuits, normalized.maxCircuits)
         }
       })
 
@@ -255,6 +282,7 @@ function normalizeOptions(
       options.halfOpenMaxRequests,
       1
     ),
+    maxCircuits: normalizePositiveInteger(options.maxCircuits, 1000),
     createKey: options.createKey ?? createDefaultKey,
     shouldCountFailure:
       options.shouldCountFailure ?? defaultShouldCountFailure,
@@ -316,23 +344,53 @@ function createDefaultKey(config: RequestConfig): string {
 
 function getCircuit(
   circuits: Map<string, CircuitRecord>,
-  key: string
+  key: string,
+  maxCircuits: number
 ): CircuitRecord {
   let record = circuits.get(key)
 
-  if (!record) {
-    record = {
-      state: 'closed',
-      failures: 0,
-      successes: 0,
-      openedAt: 0,
-      probes: 0,
-      generation: 0
-    }
+  if (record) {
+    circuits.delete(key)
     circuits.set(key, record)
+    return record
   }
 
+  trimCircuits(circuits, maxCircuits - 1)
+
+  record = {
+    state: 'closed',
+    failures: 0,
+    successes: 0,
+    openedAt: 0,
+    probes: 0,
+    generation: 0,
+    activeRequests: 0
+  }
+  circuits.set(key, record)
+
   return record
+}
+
+function trimCircuits(
+  circuits: Map<string, CircuitRecord>,
+  maxCircuits: number
+): void {
+  while (circuits.size > maxCircuits) {
+    let removableKey: string | undefined
+
+    for (const [key, record] of circuits) {
+      if (record.activeRequests === 0) {
+        removableKey = key
+        break
+      }
+    }
+
+    if (removableKey === undefined) {
+      return
+    }
+
+    circuits.delete(removableKey)
+  }
 }
 
 function transition(

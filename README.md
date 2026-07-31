@@ -158,6 +158,10 @@ const cache = cachePlugin({
 })
 ```
 
+The default memory store keeps up to 1,000 entries using LRU eviction and
+removes expired entries when read. Set `maxEntries` to tune the bound, use `0`
+to disable storage, or use `Infinity` for an explicitly unbounded store.
+
 Built-in plugins:
 
 - `retryPlugin()`
@@ -176,7 +180,8 @@ Protect a failing upstream after retries are exhausted:
 ```ts
 const breaker = circuitBreakerPlugin({
   failureThreshold: 5,
-  resetTimeout: 30000
+  resetTimeout: 30000,
+  maxCircuits: 1000
 })
 
 const request = createClient()
@@ -186,7 +191,8 @@ const request = createClient()
 
 Circuits are isolated by request origin by default. Open circuits reject with
 the stable `CIRCUIT_OPEN` error code and permit a bounded half-open probe after
-the recovery window.
+the recovery window. Inactive circuit state is retained with LRU eviction;
+active requests are never evicted and can temporarily exceed `maxCircuits`.
 
 Inject a structured logger when request correlation and timing are needed:
 

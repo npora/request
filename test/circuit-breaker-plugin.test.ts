@@ -12,6 +12,93 @@ afterEach(() => {
 })
 
 describe('circuitBreakerPlugin', () => {
+  it('should evict the least recently used inactive circuit at capacity', async () => {
+    const adapter = new MockAdapter()
+    const breaker = circuitBreakerPlugin({
+      failureThreshold: 1,
+      maxCircuits: 2
+    })
+    const request = createClient({ adapter }).use(breaker)
+    const withKey = (key: string) => ({
+      extensions: {
+        circuitBreaker: {
+          key
+        }
+      }
+    })
+
+    adapter
+      .onGet('/first')
+      .reply(503)
+      .onGet('/second')
+      .reply(503)
+      .onGet('/third')
+      .reply(503)
+
+    await expect(request.get('/first', withKey('first'))).rejects.toMatchObject({
+      code: 'HTTP_ERROR'
+    })
+    await expect(request.get('/second', withKey('second'))).rejects.toMatchObject({
+      code: 'HTTP_ERROR'
+    })
+    await expect(request.get('/first', withKey('first'))).rejects.toMatchObject({
+      code: 'CIRCUIT_OPEN'
+    })
+    await expect(request.get('/third', withKey('third'))).rejects.toMatchObject({
+      code: 'HTTP_ERROR'
+    })
+
+    expect(breaker.getState('first')).toBe('open')
+    expect(breaker.getState('second')).toBe('closed')
+    expect(breaker.getState('third')).toBe('open')
+    expect(adapter.history).toHaveLength(3)
+  })
+
+  it('should retain active circuits while trimming settled states', async () => {
+    vi.useFakeTimers()
+
+    const adapter = new MockAdapter()
+    const breaker = circuitBreakerPlugin({
+      failureThreshold: 1,
+      maxCircuits: 1
+    })
+    const request = createClient({ adapter }).use(breaker)
+    const withKey = (key: string) => ({
+      extensions: {
+        circuitBreaker: {
+          key
+        }
+      }
+    })
+
+    adapter
+      .onGet('/active')
+      .reply(503, undefined, { delay: 100 })
+      .onGet('/settled')
+      .reply(503)
+
+    const activeRequest = expect(
+      request.get('/active', withKey('active'))
+    ).rejects.toMatchObject({
+      code: 'HTTP_ERROR'
+    })
+
+    await vi.waitFor(() => {
+      expect(adapter.history).toHaveLength(1)
+    })
+    await expect(
+      request.get('/settled', withKey('settled'))
+    ).rejects.toMatchObject({
+      code: 'HTTP_ERROR'
+    })
+
+    expect(breaker.getState('settled')).toBe('closed')
+
+    await vi.advanceTimersByTimeAsync(100)
+    await activeRequest
+    expect(breaker.getState('active')).toBe('open')
+  })
+
   it('should open after consecutive final failures and reject without I/O', async () => {
     const adapter = new MockAdapter()
     const breaker = circuitBreakerPlugin({

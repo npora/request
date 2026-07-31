@@ -7,6 +7,7 @@ import type {
   CircuitState,
   DownloadPluginOptions,
   LoggerEntry,
+  MemoryCacheStoreOptions,
   Plugin,
   RequestLogger,
   RequestConfig,
@@ -169,12 +170,16 @@ const cacheStore: CacheStore = {
 
 void cacheStore
 
-const memoryCacheStore: CacheStore = new MemoryCacheStore()
+const memoryCacheOptions: MemoryCacheStoreOptions = {
+  maxEntries: 100
+}
+const memoryCacheStore: CacheStore = new MemoryCacheStore(memoryCacheOptions)
 
 void memoryCacheStore
 
 const circuitOptions: CircuitBreakerPluginOptions = {
   failureThreshold: 3,
+  maxCircuits: 100,
   resetTimeout: 10000,
   shouldCountFailure(error, requestConfig) {
     void error
