@@ -1,5 +1,11 @@
 # @npora/request
 
+## 0.2.1
+
+### Patch Changes
+
+- 769e51e: Automate npm publishing, Git tags, and GitHub Releases through Changesets.
+
 ## 0.2.0
 
 ### Minor Changes
