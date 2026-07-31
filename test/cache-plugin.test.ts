@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { Plugin } from '../src'
-import { cachePlugin, clearCache, createClient } from '../src'
+import { cachePlugin, createClient } from '../src'
 
 function createJsonResponse(data: unknown): Response {
   return new Response(JSON.stringify(data), {
@@ -12,7 +12,6 @@ function createJsonResponse(data: unknown): Response {
 }
 
 afterEach(() => {
-  clearCache()
   vi.useRealTimers()
   vi.unstubAllGlobals()
 })

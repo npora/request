@@ -48,8 +48,6 @@ const DEFAULT_VARY_HEADERS = [
   'accept-language'
 ] as const
 
-let cacheGeneration = 0
-
 export function cachePlugin(
   options: CachePluginOptions = {}
 ): CachePlugin {
@@ -60,20 +58,16 @@ export function cachePlugin(
   )
   const varyHeaders =
     options.varyHeaders ?? DEFAULT_VARY_HEADERS
-  let localGeneration = cacheGeneration
 
   const plugin: CachePlugin = {
     name: 'cache',
 
     clear() {
       cacheStore.clear()
-      localGeneration = cacheGeneration
     },
 
     install(context) {
       context.hooks.onRequest(requestContext => {
-        syncGeneration()
-
         const cache = resolveExtensionConfig(
           requestContext.config,
           'cache'
@@ -114,8 +108,6 @@ export function cachePlugin(
       })
 
       context.hooks.onResponse(requestContext => {
-        syncGeneration()
-
         if (cacheHits.has(requestContext)) {
           return
         }
@@ -158,19 +150,6 @@ export function cachePlugin(
   }
 
   return plugin
-
-  function syncGeneration(): void {
-    if (localGeneration === cacheGeneration) {
-      return
-    }
-
-    cacheStore.clear()
-    localGeneration = cacheGeneration
-  }
-}
-
-export function clearCache(): void {
-  cacheGeneration += 1
 }
 
 function isCacheableRequest(
