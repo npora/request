@@ -457,7 +457,12 @@ const request = createClient().use(
     delay: 200,
     methods: ['GET', 'HEAD', 'OPTIONS', 'PUT', 'DELETE'],
     respectRetryAfter: true,
-    maxDelay: 60000
+    maxDelay: 60000,
+    jitter: true,
+    maxElapsedTime: 30000,
+    onRetry(event) {
+      metrics.recordRetry(event)
+    }
   })
 )
 ```
@@ -468,7 +473,17 @@ body are not retried because their body cannot be replayed safely.
 
 Retry delays are interrupted immediately when the request signal is aborted.
 Valid `Retry-After` response headers take precedence over the configured delay
-and are capped by `maxDelay`.
+and are capped by `maxDelay`. They are not randomized.
+
+Setting `jitter` to `true` applies full jitter between zero and the configured
+delay, reducing synchronized retry spikes. A custom jitter function can return
+an application-specific delay. `maxElapsedTime` stops retrying when the time
+already spent plus the next planned delay would exceed the request's total
+retry budget.
+
+`onRetry` receives a `RetryEvent` containing the one-based retry `attempt`,
+final `delay`, elapsed request time and error. Observer failures are isolated
+and do not change the request result.
 
 ## Cache
 

@@ -31,10 +31,57 @@ export interface RetryOptions {
    */
   maxDelay?: number
 
+  /**
+   * Randomize the configured retry delay.
+   *
+   * `true` applies full jitter between zero and the configured delay.
+   * A function receives the pending retry event and returns the final delay.
+   * Server-provided Retry-After delays are not jittered.
+   *
+   * @default false
+   */
+  jitter?:
+    | boolean
+    | ((event: RetryEvent) => number | Promise<number>)
+
+  /**
+   * Maximum elapsed time across the initial request, retries and planned
+   * retry delays.
+   *
+   * @default unlimited
+   */
+  maxElapsedTime?: number
+
   shouldRetry?: (
     error: unknown,
     attempt: number
   ) => boolean | Promise<boolean>
+
+  /**
+   * Observe a scheduled retry.
+   *
+   * Callback failures are isolated from the request lifecycle.
+   */
+  onRetry?: (event: RetryEvent) => void | Promise<void>
+}
+
+export interface RetryEvent {
+  /**
+   * One-based retry number.
+   */
+  attempt: number
+
+  /**
+   * Final delay before this retry in milliseconds.
+   */
+  delay: number
+
+  /**
+   * Time elapsed since the request started in milliseconds.
+   */
+  elapsedTime: number
+
+  error: unknown
 }
 
 export interface CacheOptions {

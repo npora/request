@@ -48,6 +48,7 @@ const publicExports = [
   'RequestLogger',
   'ResponseLogEntry',
   'ResponseType',
+  'RetryEvent',
   'RetryOptions',
   'UploadData',
   'UploadOptions',

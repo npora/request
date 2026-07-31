@@ -5,6 +5,7 @@ import type {
   Plugin,
   RequestLogger,
   RequestConfig,
+  RetryEvent,
   RetryOptions,
   UploadProgress
 } from '@npora/request'
@@ -24,7 +25,16 @@ declare module '@npora/request' {
 
 const retry: RetryOptions = {
   retries: 2,
-  delay: 100
+  delay: 100,
+  jitter(event) {
+    return event.delay / 2
+  },
+  maxElapsedTime: 5000,
+  onRetry(event) {
+    const retryEvent: RetryEvent = event
+
+    void retryEvent.attempt
+  }
 }
 
 const config: RequestConfig = {

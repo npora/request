@@ -123,7 +123,9 @@ const cache = cachePlugin()
 const request = createClient()
   .use(retryPlugin({
     retries: 2,
-    delay: 200
+    delay: 200,
+    jitter: true,
+    maxElapsedTime: 10000
   }))
   .use(cache)
   .use(authPlugin({

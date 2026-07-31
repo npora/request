@@ -28,6 +28,10 @@ package exceeds its budget. Do not raise a budget only to make CI pass:
 inspect the bundle change, remove accidental code first, and document any
 intentional product tradeoff.
 
+The declaration-file budget includes additional headroom for the public retry
+lifecycle types introduced in 1.2.0. Runtime JavaScript and complete-package
+budgets were not raised for that type-only API growth.
+
 `pnpm test:package` includes the size check, so release verification cannot
 publish a package that exceeds the checked-in budgets. CI also stores the JSON
 report for comparing changes over time.

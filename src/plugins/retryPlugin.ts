@@ -2,6 +2,7 @@ import { RequestError } from '../errors'
 import type {
   HttpMethod,
   RequestConfig,
+  RetryEvent,
   RetryOptions
 } from '../types'
 import type { Plugin } from './Plugin'
@@ -29,10 +30,16 @@ interface NormalizedRetryOptions {
 
   maxDelay: number
 
+  jitter: NonNullable<RetryOptions['jitter']>
+
+  maxElapsedTime: number
+
   shouldRetry: (
     error: unknown,
     attempt: number
   ) => boolean | Promise<boolean>
+
+  onRetry?: RetryOptions['onRetry']
 }
 
 export function retryPlugin(
@@ -84,13 +91,51 @@ export function retryPlugin(
         const retryAfter = retryOptions.respectRetryAfter
           ? parseRetryAfter(requestContext.error)
           : undefined
+        const baseDelay = normalizeRetryDelay(
+          retryAfter ?? configuredDelay,
+          retryOptions.maxDelay
+        )
+        const elapsedTime = Math.max(
+          0,
+          Date.now() - requestContext.startTime
+        )
+        const pendingEvent = {
+          attempt: attempt + 1,
+          delay: baseDelay,
+          elapsedTime,
+          error: requestContext.error
+        }
+        const jitteredDelay =
+          retryAfter === undefined
+            ? await applyJitter(
+                retryOptions.jitter,
+                pendingEvent
+              )
+            : baseDelay
+        const delay = normalizeRetryDelay(
+          jitteredDelay,
+          retryOptions.maxDelay
+        )
+        const event = {
+          ...pendingEvent,
+          delay
+        }
+
+        if (
+          exceedsElapsedTimeBudget(
+            elapsedTime,
+            delay,
+            retryOptions.maxElapsedTime
+          )
+        ) {
+          return undefined
+        }
+
+        notifyRetry(retryOptions.onRetry, event)
 
         return {
           retry: true,
-          delay: normalizeRetryDelay(
-            retryAfter ?? configuredDelay,
-            retryOptions.maxDelay
-          )
+          delay
         }
       })
     }
@@ -109,8 +154,13 @@ function normalizeRetryOptions(
       respectRetryAfter:
         defaults.respectRetryAfter ?? true,
       maxDelay: normalizeMaxDelay(defaults.maxDelay),
+      jitter: defaults.jitter ?? false,
+      maxElapsedTime: normalizeMaxElapsedTime(
+        defaults.maxElapsedTime
+      ),
       shouldRetry:
-        defaults.shouldRetry ?? defaultShouldRetry
+        defaults.shouldRetry ?? defaultShouldRetry,
+      onRetry: defaults.onRetry
     }
   }
 
@@ -131,10 +181,15 @@ function normalizeRetryOptions(
     maxDelay: normalizeMaxDelay(
       retry?.maxDelay ?? defaults.maxDelay
     ),
+    jitter: retry?.jitter ?? defaults.jitter ?? false,
+    maxElapsedTime: normalizeMaxElapsedTime(
+      retry?.maxElapsedTime ?? defaults.maxElapsedTime
+    ),
     shouldRetry:
       retry?.shouldRetry ??
       defaults.shouldRetry ??
-      defaultShouldRetry
+      defaultShouldRetry,
+    onRetry: retry?.onRetry ?? defaults.onRetry
   }
 }
 
@@ -164,6 +219,22 @@ function normalizeRetries(retries: number): number {
   return Math.max(0, Math.floor(retries))
 }
 
+function normalizeMaxElapsedTime(
+  maxElapsedTime?: number
+): number {
+  if (maxElapsedTime === undefined) {
+    return Number.POSITIVE_INFINITY
+  }
+
+  if (!Number.isFinite(maxElapsedTime)) {
+    return maxElapsedTime > 0
+      ? Number.POSITIVE_INFINITY
+      : 0
+  }
+
+  return Math.max(0, maxElapsedTime)
+}
+
 function normalizeDelay(
   delay?: RetryOptions['delay']
 ): NormalizedRetryOptions['delay'] {
@@ -186,6 +257,51 @@ function normalizeRetryDelay(delay: number, maxDelay: number): number {
   }
 
   return Math.min(Math.max(0, delay), maxDelay)
+}
+
+async function applyJitter(
+  jitter: NonNullable<RetryOptions['jitter']>,
+  event: Readonly<RetryEvent>
+): Promise<number> {
+  if (jitter === false) {
+    return event.delay
+  }
+
+  if (jitter === true) {
+    return Math.random() * event.delay
+  }
+
+  return jitter(event)
+}
+
+function exceedsElapsedTimeBudget(
+  elapsedTime: number,
+  delay: number,
+  maxElapsedTime: number
+): boolean {
+  return (
+    elapsedTime >= maxElapsedTime ||
+    elapsedTime + delay > maxElapsedTime
+  )
+}
+
+function notifyRetry(
+  onRetry: RetryOptions['onRetry'],
+  event: Readonly<RetryEvent>
+): void {
+  if (!onRetry) {
+    return
+  }
+
+  try {
+    void Promise.resolve(onRetry(event)).catch(ignoreRetryObserverError)
+  } catch {
+    // Retry observers must not change the request lifecycle.
+  }
+}
+
+function ignoreRetryObserverError(): void {
+  // Async observer failures are intentionally isolated.
 }
 
 function canRetryRequest(
