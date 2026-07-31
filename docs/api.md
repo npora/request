@@ -639,8 +639,13 @@ Retries and direct adapter calls use the regular method and validate again.
 
 # Stability
 
-Public APIs should remain stable.
+Starting with 1.0, the package follows Semantic Versioning. Package-root
+exports, their TypeScript declarations and the behavior documented in this
+contract are stable public API.
 
-Internal implementation may change.
+Breaking public API changes require a new major version. Additive,
+backward-compatible functionality may be released in minor versions, and
+backward-compatible fixes in patch versions.
 
-User-facing API should not change unless absolutely necessary.
+Internal modules that are not exported from the package root may change
+without notice.

@@ -314,6 +314,11 @@ Business
 
 ## v1.0
 
-Stable API
-
-Production Ready
+- [x] Stable SemVer API Contract
+- [x] Exact Runtime Export Contract
+- [x] Exact Type Export Contract
+- [x] Package Behavior Compatibility Suite
+- [x] Node.js 22 / 24 / 26 CI Matrix
+- [x] Chromium / WebKit Browser Matrix
+- [x] Automated npm Publishing
+- [x] Automated Git Tags and GitHub Releases

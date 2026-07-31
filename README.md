@@ -286,6 +286,22 @@ docs
 
 ---
 
+# Versioning
+
+Starting with 1.0, `@npora/request` follows Semantic Versioning.
+
+The stable public contract includes:
+
+- Package exports and their TypeScript declarations.
+- Documented client methods, configuration and response shapes.
+- Stable `RequestError` and `PluginError` codes.
+- Plugin lifecycle and extension configuration behavior.
+
+Breaking changes to this contract require a new major version. Internal modules
+that are not exported from the package root are not part of the public API.
+
+---
+
 # Browser Support
 
 Supported runtimes:
@@ -336,9 +352,12 @@ Business
 
 ## v1.0
 
-Stable API
-
-Production Ready
+- Stable SemVer API contract
+- Exact runtime and type export gates
+- Package-level behavior compatibility suite
+- Node.js 22, 24 and 26 verification
+- Chromium and WebKit verification
+- Automated npm, Git tag and GitHub Release publishing
 
 ---
 
