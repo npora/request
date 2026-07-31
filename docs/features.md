@@ -86,10 +86,7 @@ Core features should remain stable.
 - [x] Validated Header Handoff
 - [x] Data-only Response Clone Elision
 - [x] Allocation-aware Request Construction
-
-### Future
-
-- [ ] Node Adapter
+- [x] Node.js via Fetch Adapter
 - [x] Mock Adapter
 
 ---
@@ -252,6 +249,7 @@ Supported:
 - [x] Unit Tests
 - [x] Integration Tests
 - [x] Browser Tests
+- [x] Node.js 22/24/26 Runtime Matrix
 - [x] Coverage Regression Gate
 - [x] Request Pipeline Performance Benchmarks
 - [x] Machine-readable Benchmark Reports

@@ -87,11 +87,11 @@ Responsible for network communication.
 Contains:
 
 - Fetch Adapter
-
-Future:
-
-- Node Adapter
 - Mock Adapter
+
+The Fetch Adapter covers browsers, workers, and supported Node.js runtimes.
+A separate Node transport belongs here only when concrete proxy, dispatcher,
+HTTP/2, or connection-control requirements justify it.
 
 Rules:
 

@@ -293,12 +293,12 @@ Supported runtimes:
 - Chrome
 - Edge
 - Safari
-- Node.js
+- Node.js 22+
 - Web Workers
 
-Automated runtime coverage uses Node.js integration tests and Playwright
-browser tests for Chromium and WebKit. Firefox is outside the current
-verification scope.
+Automated runtime coverage uses Node.js 22, 24, and 26 integration and package
+tests plus Playwright browser tests for Chromium and WebKit. Firefox is
+outside the current verification scope.
 
 Internet Explorer is **not supported**.
 

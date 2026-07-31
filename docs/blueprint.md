@@ -106,9 +106,12 @@ Default implementation:
 
 - Fetch Adapter
 
-Future:
+The Fetch Adapter also serves supported Node.js runtimes through their stable
+standards-compatible Fetch implementation. A separate Node transport should
+only be introduced for concrete capabilities that Fetch cannot provide.
 
-- Node Adapter
+Built-in test adapter:
+
 - Mock Adapter
 
 Adapters should only communicate with the network.
@@ -209,7 +212,7 @@ Supported:
 - Chrome
 - Edge
 - Safari
-- Node.js 20+
+- Node.js 22+
 
 Internet Explorer is not supported.
 
