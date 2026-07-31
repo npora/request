@@ -1,24 +1,24 @@
 {
   "files": {
     "dist/index.js": {
-      "bytes": 76000,
-      "gzipBytes": 15500
+      "bytes": 86000,
+      "gzipBytes": 17500
     },
     "dist/index.cjs": {
-      "bytes": 78000,
-      "gzipBytes": 16000
+      "bytes": 88000,
+      "gzipBytes": 18000
     },
     "dist/index.d.ts": {
-      "bytes": 22000,
-      "gzipBytes": 5500
+      "bytes": 25000,
+      "gzipBytes": 6000
     },
     "dist/index.d.cts": {
-      "bytes": 22000,
-      "gzipBytes": 5500
+      "bytes": 25000,
+      "gzipBytes": 6000
     }
   },
   "package": {
-    "bytes": 46000,
-    "unpackedBytes": 210000
+    "bytes": 50000,
+    "unpackedBytes": 230000
   }
 }

@@ -200,6 +200,24 @@ api.interceptors.error.use(error => error)
 An optional numeric priority controls execution order. Higher priorities run
 first; equal priorities preserve registration order.
 
+## Request testing
+
+`MockAdapter` supports method-aware routes, dynamic or one-time responses,
+query/header matching, delay, timeout and network-error simulation, and request
+history:
+
+```ts
+const adapter = new MockAdapter()
+
+adapter
+  .onGet('/users/1')
+  .replyOnce(503, { message: 'busy' })
+  .onGet('/users/1')
+  .reply(200, { id: 1, name: 'Npora' })
+
+const api = createClient({ adapter })
+```
+
 ## Errors
 
 ```ts

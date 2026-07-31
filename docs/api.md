@@ -206,6 +206,91 @@ including when a custom adapter is used.
 
 ---
 
+# MockAdapter
+
+`MockAdapter` provides deterministic request tests without network I/O.
+Method-specific routes return the adapter after a reply is registered, so
+different routes can be chained:
+
+```ts
+const adapter = new MockAdapter()
+
+adapter
+  .onGet('/users/1')
+  .reply(200, { id: 1, name: 'Npora' })
+  .onPost('/users')
+  .reply(201, { id: 2 }, {
+    headers: {
+      location: '/users/2'
+    }
+  })
+
+const request = createClient({ adapter })
+```
+
+Available method matchers are `onGet`, `onPost`, `onPut`, `onPatch`,
+`onDelete`, `onHead`, `onOptions` and generic `onMethod`. URLs may be exact
+strings or regular expressions. Object matchers can additionally require an
+exact query and a subset of request headers:
+
+```ts
+adapter.onGet({
+  url: /^\/users\/\d+$/,
+  query: {
+    include: ['profile', 'roles']
+  },
+  headers: {
+    authorization: 'Bearer test-token'
+  }
+}).reply(config => ({
+  status: 200,
+  data: {
+    requested: config.url
+  }
+}))
+```
+
+Rules use registration order. Register one-time behavior before its persistent
+fallback:
+
+```ts
+adapter
+  .onGet('/unstable')
+  .replyOnce(503, { message: 'busy' })
+  .onGet('/unstable')
+  .reply(200, { ok: true })
+```
+
+Mock HTTP statuses follow `validateStatus` and produce the same `HTTP_ERROR`
+shape as Fetch responses. Network and timeout failures can be simulated
+directly:
+
+```ts
+adapter.onGet('/offline').networkError()
+adapter.onGet('/slow').timeout()
+adapter.onGet('/temporary').networkErrorOnce()
+```
+
+Configure a default delay on the adapter or a per-reply delay. Delays respect
+the request timeout and abort signal.
+
+```ts
+const adapter = new MockAdapter({
+  delay: 20
+})
+
+adapter.onGet('/slow').reply(200, { ok: true }, {
+  delay: 100
+})
+```
+
+`adapter.history` contains matched and unmatched request configurations.
+`resetHistory()` clears only history, `resetHandlers()` clears legacy handlers
+and routes, and `reset()` clears both. The legacy `on(url, handler)` API remains
+available for URL-only 200 responses.
+
+---
+
 # Interceptors
 
 ```ts

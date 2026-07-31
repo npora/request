@@ -33,6 +33,10 @@ lifecycle types introduced in 1.2.0. Version 1.3.0 then raised runtime and
 complete-package budgets for the intentional cache store, concurrent request
 coordination, and settled lifecycle implementation.
 
+Version 1.4.0 raised the runtime, declaration, and package budgets for the
+method-aware MockAdapter router and its deterministic delay, failure, matching,
+and history features. No runtime dependency was added.
+
 `pnpm test:package` includes the size check, so release verification cannot
 publish a package that exceeds the checked-in budgets. CI also stores the JSON
 report for comparing changes over time.

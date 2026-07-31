@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import {
   createClient,
+  MockAdapter,
   RequestError
 } from '@npora/request'
 
@@ -234,3 +235,42 @@ assert.equal(
   requestCount,
   'Invalid configuration must fail before the adapter runs.'
 )
+
+const mockAdapter = new MockAdapter()
+
+mockAdapter
+  .onGet('/mock-contract')
+  .replyOnce(503, {
+    message: 'busy'
+  })
+  .onGet('/mock-contract')
+  .reply(200, {
+    ok: true
+  }, {
+    headers: {
+      'x-mock-contract': 'stable'
+    }
+  })
+
+const mockClient = createClient({
+  adapter: mockAdapter
+})
+
+await assert.rejects(
+  mockClient.get('/mock-contract'),
+  error => {
+    assert.equal(error instanceof RequestError, true)
+    assert.equal(error.code, 'HTTP_ERROR')
+    assert.equal(error.status, 503)
+
+    return true
+  }
+)
+
+const mockResponse = await mockClient.getResponse('/mock-contract')
+
+assert.deepEqual(mockResponse.data, {
+  ok: true
+})
+assert.equal(mockResponse.headers.get('x-mock-contract'), 'stable')
+assert.equal(mockAdapter.history.length, 2)
