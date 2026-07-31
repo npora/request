@@ -94,19 +94,21 @@ const SENSITIVE_QUERY_KEYS = new Set([
 ])
 
 function redactURL(url: string): string {
-  const queryIndex = url.indexOf('?')
+  const safeURL = redactCredentials(url)
+  const queryIndex = safeURL.indexOf('?')
 
   if (queryIndex === -1) {
-    return url
+    return safeURL
   }
 
-  const hashIndex = url.indexOf('#', queryIndex)
-  const pathname = url.slice(0, queryIndex)
-  const query = url.slice(
+  const hashIndex = safeURL.indexOf('#', queryIndex)
+  const pathname = safeURL.slice(0, queryIndex)
+  const query = safeURL.slice(
     queryIndex + 1,
     hashIndex === -1 ? undefined : hashIndex
   )
-  const hash = hashIndex === -1 ? '' : url.slice(hashIndex)
+  const hash =
+    hashIndex === -1 ? '' : safeURL.slice(hashIndex)
   const params = new URLSearchParams(query)
 
   for (const key of [...params.keys()]) {
@@ -118,6 +120,56 @@ function redactURL(url: string): string {
   const redactedQuery = params.toString()
 
   return `${pathname}${redactedQuery ? `?${redactedQuery}` : ''}${hash}`
+}
+
+function redactCredentials(url: string): string {
+  const schemeIndex = url.indexOf('://')
+  const authorityStart =
+    schemeIndex === -1
+      ? (
+          url.startsWith('//')
+            ? 2
+            : -1
+        )
+      : schemeIndex + 3
+
+  if (authorityStart === -1) {
+    return url
+  }
+
+  const authorityEnd = findAuthorityEnd(url, authorityStart)
+  const credentialEnd = url.lastIndexOf(
+    '@',
+    authorityEnd - 1
+  )
+
+  if (credentialEnd < authorityStart) {
+    return url
+  }
+
+  return (
+    `${url.slice(0, authorityStart)}[REDACTED]@` +
+    url.slice(credentialEnd + 1)
+  )
+}
+
+function findAuthorityEnd(
+  url: string,
+  authorityStart: number
+): number {
+  for (let index = authorityStart; index < url.length; index += 1) {
+    const character = url[index]
+
+    if (
+      character === '/' ||
+      character === '?' ||
+      character === '#'
+    ) {
+      return index
+    }
+  }
+
+  return url.length
 }
 
 function createErrorLog(error: unknown): Record<string, unknown> {

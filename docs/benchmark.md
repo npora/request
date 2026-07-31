@@ -54,18 +54,6 @@ CI stores the JSON report as a build artifact. Correctness and resource
 cleanup remain enforced separately by unit, integration and browser stress
 tests.
 
-## Competitor Comparison
-
-The dated ecosystem evaluation and its limitations are documented in
-[`comparison.md`](comparison.md). Competitor packages are installed only for
-an evaluation run and removed afterward. They are deliberately absent from
-the project dependencies and CI.
-
-The checked-in benchmark remains focused on repeatable regressions in this
-library. Cross-library snapshots are observations rather than release
-thresholds because transport implementations, connection reuse, Node.js
-versions, and machine scheduling differ.
-
 ## Hot-path Design
 
 Interceptor and plugin-hook priority is recalculated only when registrations

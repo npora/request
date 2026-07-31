@@ -1,47 +1,25 @@
 # @npora/request
 
-> A modern, TypeScript-first HTTP client built on top of the Fetch API.
+A TypeScript-first HTTP client built on the standard Fetch API.
 
-Npora Request provides a consistent, extensible and production-ready request layer for modern JavaScript applications.
+Npora Request adds typed configuration, a predictable request lifecycle,
+interceptors, plugins, unified errors, retries, caching, authentication, and
+upload/download progress without adding runtime dependencies.
 
-It does **not** replace Fetch.
+## Install
 
-It builds on top of the Fetch API while keeping the native request model.
-
----
-
-# Features
-
-- Fetch First
-- TypeScript First
-- Lightweight
-- Extensible
-- Zero Runtime Dependency
-- Plugin Architecture
-- Typed Extension Configuration
-- Client Default Inheritance
-- Retry, Cache and Authentication
-- Custom Adapter
-- Unified Error Handling
-- Browser and Web Worker Support
-
----
-
-# Installation
-
-```bash
+```sh
 pnpm add @npora/request
 ```
 
-or
-
-```bash
+```sh
 npm install @npora/request
 ```
 
----
+Node.js 22 or newer is required. Modern Chromium, Edge, Safari, WebKit, and Web
+Workers are supported through their native Fetch implementations.
 
-# Quick Start
+## Quick start
 
 ```ts
 import { createClient } from '@npora/request'
@@ -51,98 +29,19 @@ interface User {
   name: string
 }
 
-const request = createClient({
-  baseURL: 'https://api.example.com'
-})
-
-const user = await request.get<User>('/users/1')
-
-console.log(user)
-```
-
----
-
-# Public API
-
-```ts
-const request = createClient(options)
-
-const childRequest = request.extend(options)
-
-request.request(config)
-
-request.requestResponse(config)
-
-request.get(url)
-
-request.getResponse(url)
-
-request.post(url)
-
-request.put(url)
-
-request.patch(url)
-
-request.delete(url)
-
-request.head(url)
-
-request.options(url)
-
-request.use(plugin)
-
-request.unuse(pluginName)
-
-request.hasPlugin(pluginName)
-
-request.interceptors.request.use()
-
-request.interceptors.response.use()
-
-request.interceptors.error.use()
-```
-
-Data-first methods return the parsed response body. Use `requestResponse()` or
-an HTTP `*Response()` method when status, headers or the native `Response` is
-needed.
-
----
-
-# Configuration
-
-```ts
 const api = createClient({
   baseURL: 'https://api.example.com',
   timeout: 5000,
   headers: {
     'x-app': 'dashboard'
-  },
-  query: {
-    locale: 'en'
-  },
-  fetchOptions: {
-    credentials: 'include'
   }
 })
 
-const adminApi = api.extend({
-  baseURL: 'https://api.example.com/admin',
-  headers: {
-    'x-role': 'admin'
-  }
-})
+const user = await api.get<User>('/users/1')
 ```
 
-`extend()` creates an isolated child client. It inherits configuration and the
-adapter, while plugins and interceptors remain instance-scoped.
-
-Request configuration overrides client defaults. Headers are merged
-case-insensitively, while query parameters, native Fetch options and extension
-configuration are merged by their documented rules.
-
----
-
-# Complete Responses
+Data-first methods return the parsed response body. Use a response method when
+status, headers, or the native `Response` is needed:
 
 ```ts
 const response = await api.getResponse<User>('/users/1')
@@ -153,25 +52,80 @@ console.log(response.headers)
 console.log(response.raw)
 ```
 
----
+## Request configuration
 
-# Plugins
+```ts
+await api.post('/users', {
+  query: {
+    notify: true
+  },
+  json: {
+    name: 'Npora'
+  },
+  fetchOptions: {
+    credentials: 'include'
+  }
+})
+```
+
+The body options `body`, `json`, `form`, and `formData` are mutually exclusive.
+`GET` and `HEAD` requests cannot contain a body. Invalid configuration throws a
+`RequestError` before the adapter sends a request.
+
+Create isolated clients with inherited defaults:
+
+```ts
+const adminApi = api.extend({
+  baseURL: 'https://api.example.com/admin',
+  headers: {
+    'x-role': 'admin'
+  }
+})
+```
+
+The adapter and configuration are inherited. Plugins and interceptors remain
+isolated to each client.
+
+## HTTP methods
+
+```ts
+api.request(config)
+api.requestResponse(config)
+
+api.get(url, config)
+api.post(url, config)
+api.put(url, config)
+api.patch(url, config)
+api.delete(url, config)
+api.head(url, config)
+api.options(url, config)
+
+api.getResponse(url, config)
+api.postResponse(url, config)
+api.putResponse(url, config)
+api.patchResponse(url, config)
+api.deleteResponse(url, config)
+api.headResponse(url, config)
+api.optionsResponse(url, config)
+```
+
+## Plugins
 
 ```ts
 import {
   authPlugin,
   cachePlugin,
+  createClient,
   retryPlugin
 } from '@npora/request'
 
-const request = createClient({
-  baseURL: 'https://api.example.com'
-})
+const cache = cachePlugin()
+const request = createClient()
   .use(retryPlugin({
     retries: 2,
     delay: 200
   }))
-  .use(cachePlugin())
+  .use(cache)
   .use(authPlugin({
     token: () => accessToken,
     refreshToken
@@ -185,182 +139,98 @@ const user = await request.get<User>('/users/1', {
     }
   }
 })
+
+cache.clear()
 ```
 
-Plugin configuration belongs under `extensions`. Top-level plugin fields are
-not part of `RequestConfig`.
+Built-in plugins:
 
----
+- `retryPlugin()`
+- `cachePlugin()`
+- `authPlugin()`
+- `loggerPlugin()`
+- `uploadPlugin()`
+- `downloadPlugin()`
 
-# Error Handling
+Plugin-owned request options belong under `extensions`. Third-party plugins can
+augment `RequestExtensions` through TypeScript module augmentation.
+
+## Interceptors
+
+```ts
+api.interceptors.request.use(config => config)
+api.interceptors.response.use(response => response)
+api.interceptors.error.use(error => error)
+```
+
+An optional numeric priority controls execution order. Higher priorities run
+first; equal priorities preserve registration order.
+
+## Errors
 
 ```ts
 import { RequestError } from '@npora/request'
 
 try {
-  await request.get('/users/missing')
+  await api.get('/users/missing')
 } catch (error) {
   if (error instanceof RequestError) {
     console.error(error.code)
     console.error(error.status)
     console.error(error.data)
-    console.error(error.response)
   }
 }
 ```
 
-Errors use stable codes including `CONFIG_ERROR`, `HTTP_ERROR`,
-`NETWORK_ERROR`, `TIMEOUT_ERROR`, `ABORT_ERROR` and `PARSER_ERROR`.
+Stable request error codes:
 
----
+- `CONFIG_ERROR`
+- `HTTP_ERROR`
+- `NETWORK_ERROR`
+- `TIMEOUT_ERROR`
+- `ABORT_ERROR`
+- `PARSER_ERROR`
 
-# Examples
+## Documentation
 
-See the `examples` directory.
+- [API reference](https://github.com/npora/request/blob/main/docs/api.md)
+- [Architecture](https://github.com/npora/request/blob/main/docs/architecture.md)
+- [Migration from 0.x](https://github.com/npora/request/blob/main/docs/migration.md)
+- [Security model](https://github.com/npora/request/blob/main/docs/security.md)
+- [Testing and release gates](https://github.com/npora/request/blob/main/docs/testing.md)
+- [Performance benchmarks](https://github.com/npora/request/blob/main/docs/benchmark.md)
+- [Package size budgets](https://github.com/npora/request/blob/main/docs/package-size.md)
+- [Changelog](https://github.com/npora/request/blob/main/CHANGELOG.md)
 
-```
-examples
-├── basic.ts
-├── custom-plugin.ts
-├── error-handling.ts
-└── plugins.ts
-```
+Project policies:
 
-Examples are typechecked in CI with `pnpm test:examples`.
+- [Contributing](https://github.com/npora/request/blob/main/CONTRIBUTING.md)
+- [Security reporting](https://github.com/npora/request/blob/main/SECURITY.md)
 
----
-
-# Performance
-
-Run the request-pipeline benchmark:
-
-```sh
-pnpm benchmark
-```
-
-It reports sequential and concurrent throughput, latency percentiles and heap
-movement for the adapter, client and plugin pipeline. CI stores a JSON report
-for comparisons between equivalent runners. See
-[`docs/benchmark.md`](docs/benchmark.md) for methodology and options.
-
-Verify the built entrypoint, declaration, gzip and npm tarball size budgets:
+## Development
 
 ```sh
+pnpm install --frozen-lockfile
+pnpm typecheck
+pnpm test:coverage
 pnpm build
-pnpm test:size
+pnpm test:package
+pnpm test:browser
 ```
 
-See [`docs/package-size.md`](docs/package-size.md) for the checked metrics and
-budget policy.
+See the
+[testing and release gates](https://github.com/npora/request/blob/main/docs/testing.md)
+for the complete matrix.
 
-The ecosystem evaluation covers Axios and nine representative GitHub request
-libraries with equivalent local HTTP workloads. Competitor packages were
-removed after measurement and are not project dependencies. See
-[`docs/comparison.md`](docs/comparison.md) for the snapshot and design
-decisions.
+## Versioning
 
----
+`@npora/request` follows Semantic Versioning. Package-root exports, their
+TypeScript declarations, documented behavior, stable error codes, and plugin
+lifecycle are public API. Breaking changes require a new major version.
 
-# Documentation
+Internal modules that are not exported from the package root are not public
+API.
 
-Project documentation is located in the `docs` directory.
-
-```
-docs
-├── benchmark.md
-├── blueprint.md
-├── comparison.md
-├── features.md
-├── package-size.md
-├── structure.md
-└── api.md
-```
-
-- **Blueprint** — Project vision and architecture
-- **Benchmark** — Performance measurement methodology
-- **Comparison** — Ten-library ecosystem evaluation
-- **Package Size** — Published asset budgets and regression checks
-- **Structure** — Directory responsibilities
-- **Features** — Product roadmap
-- **API** — Public API contract
-
----
-
-# Versioning
-
-Starting with 1.0, `@npora/request` follows Semantic Versioning.
-
-The stable public contract includes:
-
-- Package exports and their TypeScript declarations.
-- Documented client methods, configuration and response shapes.
-- Stable `RequestError` and `PluginError` codes.
-- Plugin lifecycle and extension configuration behavior.
-
-Breaking changes to this contract require a new major version. Internal modules
-that are not exported from the package root are not part of the public API.
-
----
-
-# Browser Support
-
-Supported runtimes:
-
-- Chrome
-- Edge
-- Safari
-- Node.js 22+
-- Web Workers
-
-Automated runtime coverage uses Node.js 22, 24, and 26 integration and package
-tests plus Playwright browser tests for Chromium and WebKit. Firefox is
-outside the current verification scope.
-
-Internet Explorer is **not supported**.
-
----
-
-# Roadmap
-
-## v0.1
-
-Core
-
-- Client
-- Config
-- Pipeline
-- Adapter
-- Error
-
-## v0.2
-
-Request
-
-- Timeout
-- Abort
-- Retry
-- Cache
-
-## v0.3
-
-Business
-
-- Auth
-- Logger
-- Upload
-- Download
-
-## v1.0
-
-- Stable SemVer API contract
-- Exact runtime and type export gates
-- Package-level behavior compatibility suite
-- Node.js 22, 24 and 26 verification
-- Chromium and WebKit verification
-- Automated npm, Git tag and GitHub Release publishing
-
----
-
-# License
+## License
 
 MIT © Npora Team

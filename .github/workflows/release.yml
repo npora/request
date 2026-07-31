@@ -46,7 +46,10 @@ jobs:
       - name: Verify
         run: |
           pnpm typecheck
+          pnpm test:docs
           pnpm test:coverage
+          pnpm audit:dependencies
+          pnpm audit:signatures
           pnpm build
           pnpm test:package
 

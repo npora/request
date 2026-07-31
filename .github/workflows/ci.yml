@@ -89,6 +89,9 @@ jobs:
       - name: Typecheck benchmarks
         run: pnpm benchmark:types
 
+      - name: Check documentation links
+        run: pnpm test:docs
+
       - name: Unit, integration and coverage tests
         run: pnpm test:coverage
 
