@@ -154,6 +154,18 @@ describe('downloadPlugin XMLHttpRequest fallback', () => {
 
   it('should automatically fall back when Fetch streams are unavailable', async () => {
     const fetchMock = vi.fn()
+    const NativeReadableStream = globalThis.ReadableStream
+
+    scenario = xhr => {
+      xhr.progress(5, 5)
+
+      // Node.js 22's native Response constructor reads the global
+      // ReadableStream constructor internally. Restore it after the plugin
+      // has selected XHR so the test isolates transport selection instead of
+      // breaking the runtime's Response implementation.
+      vi.stubGlobal('ReadableStream', NativeReadableStream)
+      xhr.load()
+    }
 
     vi.stubGlobal('fetch', fetchMock)
     vi.stubGlobal('ReadableStream', undefined)
