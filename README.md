@@ -115,6 +115,7 @@ api.optionsResponse(url, config)
 import {
   authPlugin,
   cachePlugin,
+  circuitBreakerPlugin,
   createClient,
   retryPlugin
 } from '@npora/request'
@@ -127,6 +128,7 @@ const request = createClient()
     jitter: true,
     maxElapsedTime: 10000
   }))
+  .use(circuitBreakerPlugin())
   .use(cache)
   .use(authPlugin({
     token: () => accessToken,
@@ -160,6 +162,7 @@ Built-in plugins:
 
 - `retryPlugin()`
 - `cachePlugin()`
+- `circuitBreakerPlugin()`
 - `authPlugin()`
 - `loggerPlugin()`
 - `uploadPlugin()`
@@ -167,6 +170,23 @@ Built-in plugins:
 
 Plugin-owned request options belong under `extensions`. Third-party plugins can
 augment `RequestExtensions` through TypeScript module augmentation.
+
+Protect a failing upstream after retries are exhausted:
+
+```ts
+const breaker = circuitBreakerPlugin({
+  failureThreshold: 5,
+  resetTimeout: 30000
+})
+
+const request = createClient()
+  .use(retryPlugin({ retries: 2 }))
+  .use(breaker)
+```
+
+Circuits are isolated by request origin by default. Open circuits reject with
+the stable `CIRCUIT_OPEN` error code and permit a bounded half-open probe after
+the recovery window.
 
 Inject a structured logger when request correlation and timing are needed:
 
@@ -242,6 +262,7 @@ Stable request error codes:
 - `TIMEOUT_ERROR`
 - `ABORT_ERROR`
 - `PARSER_ERROR`
+- `CIRCUIT_OPEN`
 
 ## Documentation
 

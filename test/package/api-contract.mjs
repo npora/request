@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import {
+  circuitBreakerPlugin,
   createClient,
   MockAdapter,
   RequestError
@@ -274,3 +275,27 @@ assert.deepEqual(mockResponse.data, {
 })
 assert.equal(mockResponse.headers.get('x-mock-contract'), 'stable')
 assert.equal(mockAdapter.history.length, 2)
+
+const breakerAdapter = new MockAdapter()
+const breaker = circuitBreakerPlugin({
+  failureThreshold: 1
+})
+const protectedClient = createClient({
+  adapter: breakerAdapter
+}).use(breaker)
+
+breakerAdapter.onGet('/breaker-contract').reply(503)
+
+await assert.rejects(
+  protectedClient.get('/breaker-contract'),
+  error => error instanceof RequestError && error.code === 'HTTP_ERROR'
+)
+await assert.rejects(
+  protectedClient.get('/breaker-contract'),
+  error => error instanceof RequestError && error.code === 'CIRCUIT_OPEN'
+)
+assert.equal(breakerAdapter.history.length, 1)
+assert.equal(breaker.getState('default'), 'open')
+
+breaker.reset('default')
+assert.equal(breaker.getState('default'), 'closed')

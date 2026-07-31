@@ -1,6 +1,7 @@
 import {
   authPlugin,
   cachePlugin,
+  circuitBreakerPlugin,
   createClient,
   loggerPlugin,
   retryPlugin,
@@ -31,6 +32,12 @@ const request = createClient({
     retryPlugin({
       retries: 2,
       delay: 300
+    })
+  )
+  .use(
+    circuitBreakerPlugin({
+      failureThreshold: 5,
+      resetTimeout: 30000
     })
   )
   .use(

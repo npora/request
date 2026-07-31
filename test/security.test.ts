@@ -13,6 +13,7 @@ import type {
 } from '../src'
 import {
   createClient,
+  circuitBreakerPlugin,
   loggerPlugin,
   RequestError
 } from '../src'
@@ -183,5 +184,42 @@ describe('security boundaries', () => {
         error.code === 'CONFIG_ERROR'
       )
     })
+  })
+
+  it('should not expose URL credentials or query values in circuit errors', async () => {
+    const adapter = {
+      async request(config: RequestConfig): Promise<NporaResponse> {
+        throw new RequestError('upstream failed', {
+          code: 'NETWORK_ERROR',
+          config
+        })
+      }
+    }
+    const request = createClient({ adapter }).use(
+      circuitBreakerPlugin({
+        failureThreshold: 1
+      })
+    )
+    const url = 'https://user:password@example.com/private?token=secret'
+
+    await expect(request.get(url)).rejects.toMatchObject({
+      code: 'NETWORK_ERROR'
+    })
+
+    let circuitError: unknown
+
+    try {
+      await request.get(url)
+    } catch (error) {
+      circuitError = error
+    }
+
+    expect(circuitError).toMatchObject({
+      code: 'CIRCUIT_OPEN'
+    })
+    expect(String(circuitError)).toContain('https://example.com')
+    expect(String(circuitError)).not.toContain('user')
+    expect(String(circuitError)).not.toContain('password')
+    expect(String(circuitError)).not.toContain('secret')
   })
 })

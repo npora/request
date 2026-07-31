@@ -2,6 +2,7 @@ import type { HttpMethod } from './method'
 import type {
   AuthOptions,
   CacheOptions,
+  CircuitBreakerOptions,
   DownloadOptions,
   LoggerOptions,
   RetryOptions,
@@ -39,6 +40,8 @@ export interface RequestExtensions {
   auth?: AuthOptions
 
   cache?: CacheOptions
+
+  circuitBreaker?: CircuitBreakerOptions
 
   download?: DownloadOptions
 

@@ -335,6 +335,7 @@ Official plugins:
 ```ts
 retryPlugin()
 cachePlugin()
+circuitBreakerPlugin()
 authPlugin()
 loggerPlugin()
 uploadPlugin()
@@ -493,9 +494,10 @@ await request.get('/user', {
 })
 ```
 
-The `retry`, `cache`, `auth`, `logger`, `upload` and `download` fields are
-accepted only inside `extensions`. Keeping plugin-owned options namespaced
-prevents third-party extensions from increasing the Core configuration surface.
+The `retry`, `cache`, `circuitBreaker`, `auth`, `logger`, `upload` and
+`download` fields are accepted only inside `extensions`. Keeping plugin-owned
+options namespaced prevents third-party extensions from increasing the Core
+configuration surface.
 
 Third-party plugins can add strongly typed configuration without modifying
 Npora Request core types:
@@ -569,6 +571,64 @@ retry budget.
 `onRetry` receives a `RetryEvent` containing the one-based retry `attempt`,
 final `delay`, elapsed request time and error. Observer failures are isolated
 and do not change the request result.
+
+## Circuit Breaker
+
+```ts
+const breaker = circuitBreakerPlugin({
+  failureThreshold: 5,
+  resetTimeout: 30000,
+  successThreshold: 1,
+  halfOpenMaxRequests: 1,
+  onStateChange(event) {
+    metrics.recordCircuitState(event)
+  }
+})
+
+const request = createClient()
+  .use(retryPlugin({ retries: 2 }))
+  .use(breaker)
+```
+
+The breaker counts final request outcomes, so exhausted retries contribute one
+failure rather than one failure per attempt. By default it counts network and
+timeout errors, HTTP `429`, and HTTP `5xx`. Successful requests reset the
+consecutive failure count. Configuration, cancellation, parsing and ordinary
+HTTP `4xx` errors do not open the circuit.
+
+After `failureThreshold` consecutive failures, the circuit opens and rejects
+new requests with `RequestError.code === 'CIRCUIT_OPEN'` before adapter I/O.
+After `resetTimeout`, it enters half-open state and admits at most
+`halfOpenMaxRequests` concurrent probes. `successThreshold` successful probes
+close it; a counted probe failure opens it again and restarts the recovery
+window.
+
+Circuits use the resolved request origin as their isolation key. Relative URLs
+without an absolute `baseURL` share the `default` key. Override the key or
+disable protection for one request:
+
+```ts
+await request.get('/health', {
+  extensions: {
+    circuitBreaker: {
+      key: 'inventory-primary'
+    }
+  }
+})
+
+await request.get('/diagnostics', {
+  extensions: {
+    circuitBreaker: {
+      enabled: false
+    }
+  }
+})
+```
+
+Use `createKey` and `shouldCountFailure` for application-specific isolation and
+failure policies. `onStateChange` failures are isolated from the request
+lifecycle. Inspect or manually clear state with
+`breaker.getState(key)`, `breaker.reset(key)`, or `breaker.reset()`.
 
 ## Cache
 
@@ -802,6 +862,7 @@ NETWORK_ERROR
 TIMEOUT_ERROR
 ABORT_ERROR
 PARSER_ERROR
+CIRCUIT_OPEN
 ```
 
 ---

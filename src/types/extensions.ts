@@ -1,5 +1,33 @@
 import type { HttpMethod } from './method'
 
+export type CircuitState = 'closed' | 'open' | 'half-open'
+
+export interface CircuitBreakerOptions {
+  /**
+   * Enable circuit-breaker protection for this request.
+   *
+   * @default true
+   */
+  enabled?: boolean
+
+  /**
+   * Override the isolation key for this request.
+   */
+  key?: string
+}
+
+export interface CircuitBreakerStateChange {
+  key: string
+
+  previousState: CircuitState
+
+  state: CircuitState
+
+  timestamp: number
+
+  failures: number
+}
+
 /**
  * Per-request retry configuration used by the retry extension.
  */

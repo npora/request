@@ -37,6 +37,11 @@ Version 1.4.0 raised the runtime, declaration, and package budgets for the
 method-aware MockAdapter router and its deterministic delay, failure, matching,
 and history features. No runtime dependency was added.
 
+Version 1.5.0 raised the same budgets for the official circuit-breaker state
+machine, bounded half-open concurrency, final-outcome accounting, public types,
+and lifecycle observers. The package continues to have zero runtime
+dependencies.
+
 `pnpm test:package` includes the size check, so release verification cannot
 publish a package that exceeds the checked-in budgets. CI also stores the JSON
 report for comparing changes over time.

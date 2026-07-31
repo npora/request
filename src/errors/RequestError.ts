@@ -10,6 +10,7 @@ export type RequestErrorCode =
   | 'TIMEOUT_ERROR'
   | 'ABORT_ERROR'
   | 'PARSER_ERROR'
+  | 'CIRCUIT_OPEN'
 
 export interface RequestErrorOptions<T = unknown> {
   /**

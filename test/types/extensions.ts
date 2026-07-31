@@ -1,6 +1,10 @@
 import type {
   Client,
   CacheStore,
+  CircuitBreakerPlugin,
+  CircuitBreakerPluginOptions,
+  CircuitBreakerStateChange,
+  CircuitState,
   DownloadPluginOptions,
   LoggerEntry,
   Plugin,
@@ -11,6 +15,7 @@ import type {
   UploadProgress
 } from '@npora/request'
 import {
+  circuitBreakerPlugin,
   downloadPlugin,
   MemoryCacheStore
 } from '@npora/request'
@@ -47,6 +52,9 @@ const config: RequestConfig = {
     retry,
     cache: {
       enabled: true
+    },
+    circuitBreaker: {
+      key: 'primary-api'
     },
     metrics: {
       enabled: true,
@@ -164,3 +172,26 @@ void cacheStore
 const memoryCacheStore: CacheStore = new MemoryCacheStore()
 
 void memoryCacheStore
+
+const circuitOptions: CircuitBreakerPluginOptions = {
+  failureThreshold: 3,
+  resetTimeout: 10000,
+  shouldCountFailure(error, requestConfig) {
+    void error
+    return requestConfig.method === 'GET'
+  },
+  onStateChange(event) {
+    const change: CircuitBreakerStateChange = event
+    const state: CircuitState = change.state
+
+    void state
+  }
+}
+
+const breaker: CircuitBreakerPlugin = circuitBreakerPlugin(circuitOptions)
+const circuitState: CircuitState = breaker.getState('primary-api')
+
+breaker.reset('primary-api')
+breaker.reset()
+
+void circuitState
