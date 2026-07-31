@@ -155,6 +155,27 @@ Built-in plugins:
 Plugin-owned request options belong under `extensions`. Third-party plugins can
 augment `RequestExtensions` through TypeScript module augmentation.
 
+Inject a structured logger when request correlation and timing are needed:
+
+```ts
+const request = createClient().use(
+  loggerPlugin({
+    logger: {
+      info(_message, entry) {
+        applicationLogger.info(entry)
+      },
+      error(_message, entry) {
+        applicationLogger.error(entry)
+      }
+    }
+  })
+)
+```
+
+Lifecycle entries include a request identifier and timestamp. Completed
+responses include total duration and attempt count; errors include the failed
+attempt number. The default logger continues to use `console`.
+
 ## Interceptors
 
 ```ts

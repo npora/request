@@ -1,7 +1,9 @@
 import type {
   Client,
   DownloadPluginOptions,
+  LoggerEntry,
   Plugin,
+  RequestLogger,
   RequestConfig,
   RetryOptions,
   UploadProgress
@@ -104,3 +106,31 @@ const uploadProgress = (progress: UploadProgress) => {
 }
 
 void uploadProgress
+
+const logger: RequestLogger = {
+  info(_message, entry) {
+    const lifecycle: LoggerEntry = entry
+
+    void lifecycle.requestId
+    void lifecycle.timestamp
+  },
+
+  error(_message, entry) {
+    const lifecycle: LoggerEntry = entry
+
+    void lifecycle.duration
+    void lifecycle.attempt
+  }
+}
+
+const loggerConfig: RequestConfig = {
+  url: '/observed',
+  extensions: {
+    logger: {
+      logger,
+      createRequestId: () => 'request-id'
+    }
+  }
+}
+
+void loggerConfig

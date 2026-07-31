@@ -11,6 +11,8 @@ export class RequestContext<T = unknown> {
 
   public endTime?: number
 
+  public attempt = 0
+
   constructor(config: RequestConfig) {
     this.config = config
     this.startTime = Date.now()

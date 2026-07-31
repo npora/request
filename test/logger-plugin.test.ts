@@ -1,9 +1,15 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { createClient, loggerPlugin } from '../src'
+import {
+  createClient,
+  loggerPlugin,
+  retryPlugin,
+  type RequestLogger
+} from '../src'
 
 afterEach(() => {
   vi.restoreAllMocks()
   vi.unstubAllGlobals()
+  vi.useRealTimers()
 })
 
 describe('loggerPlugin', () => {
@@ -223,5 +229,184 @@ describe('loggerPlugin', () => {
     expect(serializedLogs).not.toContain('header-secret')
     expect(serializedLogs).not.toContain('cookie-secret')
     expect(serializedLogs).not.toContain('config-secret')
+  })
+
+  it('should send structured lifecycle entries to a custom logger', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(1000)
+
+    const info = vi.fn<RequestLogger['info']>()
+    const error = vi.fn<RequestLogger['error']>()
+    const logger: RequestLogger = {
+      info,
+      error
+    }
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation(() => {
+        vi.setSystemTime(1250)
+
+        return Promise.resolve(
+          new Response(JSON.stringify({ ok: true }), {
+            status: 200,
+            headers: {
+              'content-type': 'application/json'
+            }
+          })
+        )
+      })
+    )
+
+    const request = createClient().use(
+      loggerPlugin({
+        logger,
+        createRequestId: () => 'request-id'
+      })
+    )
+
+    await request.get('/user')
+
+    expect(info).toHaveBeenCalledTimes(2)
+    expect(error).not.toHaveBeenCalled()
+    expect(info.mock.calls[0]?.[1]).toEqual({
+      type: 'request',
+      requestId: 'request-id',
+      timestamp: 1000,
+      method: 'GET',
+      url: '/user'
+    })
+    expect(info.mock.calls[1]?.[1]).toEqual({
+      type: 'response',
+      requestId: 'request-id',
+      timestamp: 1250,
+      duration: 250,
+      attempts: 1,
+      method: 'GET',
+      url: '/user',
+      status: 200
+    })
+  })
+
+  it('should correlate retry errors with the completed response', async () => {
+    const info = vi.fn<RequestLogger['info']>()
+    const error = vi.fn<RequestLogger['error']>()
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response('Unavailable', {
+          status: 503
+        })
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ ok: true }), {
+          status: 200,
+          headers: {
+            'content-type': 'application/json'
+          }
+        })
+      )
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient()
+      .use(
+        loggerPlugin({
+          logger: {
+            info,
+            error
+          },
+          createRequestId: () => 'retry-request'
+        })
+      )
+      .use(
+        retryPlugin({
+          retries: 1,
+          delay: 0
+        })
+      )
+
+    await request.get('/retry')
+
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    expect(error).toHaveBeenCalledWith(
+      '[Npora Request]',
+      expect.objectContaining({
+        type: 'error',
+        requestId: 'retry-request',
+        attempt: 1,
+        status: 503
+      })
+    )
+    expect(info).toHaveBeenLastCalledWith(
+      '[Npora Request]',
+      expect.objectContaining({
+        type: 'response',
+        requestId: 'retry-request',
+        attempts: 2,
+        status: 200
+      })
+    )
+  })
+
+  it('should log configuration errors with lifecycle metadata', async () => {
+    const info = vi.fn<RequestLogger['info']>()
+    const error = vi.fn<RequestLogger['error']>()
+    const request = createClient().use(
+      loggerPlugin({
+        logger: {
+          info,
+          error
+        },
+        createRequestId: () => 'config-request'
+      })
+    )
+
+    await expect(
+      request.get('/invalid', {
+        headers: {
+          'x-test': 'safe\r\ninjected: value'
+        }
+      })
+    ).rejects.toMatchObject({
+      code: 'CONFIG_ERROR'
+    })
+
+    expect(info).toHaveBeenCalledTimes(1)
+    expect(error).toHaveBeenCalledWith(
+      '[Npora Request]',
+      expect.objectContaining({
+        type: 'error',
+        requestId: 'config-request',
+        duration: expect.any(Number),
+        attempt: 1,
+        code: 'CONFIG_ERROR'
+      })
+    )
+  })
+
+  it('should isolate request failures from logger failures', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockRejectedValue(new Error('network down'))
+    )
+
+    const request = createClient().use(
+      loggerPlugin({
+        logger: {
+          info() {
+            throw new Error('logger info failed')
+          },
+          async error() {
+            throw new Error('logger error failed')
+          }
+        }
+      })
+    )
+
+    await expect(request.get('/error')).rejects.toMatchObject({
+      code: 'NETWORK_ERROR',
+      message: 'Network request failed'
+    })
   })
 })

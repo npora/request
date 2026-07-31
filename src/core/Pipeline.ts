@@ -109,6 +109,7 @@ export class Pipeline {
           context.error = undefined
           context.response = undefined
           attempt += 1
+          context.attempt = attempt
 
           try {
             await waitForRetry(

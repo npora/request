@@ -3,7 +3,8 @@ import {
   cachePlugin,
   createClient,
   loggerPlugin,
-  retryPlugin
+  retryPlugin,
+  type RequestLogger
 } from '../src'
 
 interface Todo {
@@ -11,6 +12,15 @@ interface Todo {
   id: number
   title: string
   completed: boolean
+}
+
+const logger: RequestLogger = {
+  info(_message, entry) {
+    console.log(JSON.stringify(entry))
+  },
+  error(_message, entry) {
+    console.error(JSON.stringify(entry))
+  }
 }
 
 const request = createClient({
@@ -32,7 +42,9 @@ const request = createClient({
     })
   )
   .use(
-    loggerPlugin()
+    loggerPlugin({
+      logger
+    })
   )
 
 const todo = await request.get<Todo>('/todos/1', {

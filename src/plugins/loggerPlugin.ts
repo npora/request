@@ -1,81 +1,168 @@
 import { RequestError } from '../errors'
-import type { LoggerOptions } from '../types'
+import type {
+  ErrorLogEntry,
+  LoggerOptions,
+  RequestLogger
+} from '../types'
 import type { Plugin } from './Plugin'
 import { resolveExtensionConfig } from './resolveExtensionConfig'
 
 export function loggerPlugin(defaultOptions: LoggerOptions = {}): Plugin {
+  let nextRequestId = 0
+  const states = new WeakMap<object, LoggerState>()
+
   return {
     name: 'logger',
 
     install(context) {
-      context.interceptors.request.use(config => {
-        const logger =
+      context.hooks.onRequest(requestContext => {
+        const options =
           resolveExtensionConfig(
-            config,
+            requestContext.config,
             'logger'
           ) ?? defaultOptions
 
-        if (logger.enabled === false) {
-          return config
+        if (options.enabled === false) {
+          return
         }
 
-        console.log('[Npora Request]', {
+        const state: LoggerState = {
+          requestId:
+            options.createRequestId?.() ??
+            `request-${++nextRequestId}`,
+          options
+        }
+
+        states.set(requestContext, state)
+
+        emitInfo(options, {
           type: 'request',
-          method: config.method ?? 'GET',
-          url: redactURL(config.url)
+          requestId: state.requestId,
+          timestamp: requestContext.startTime,
+          method: requestContext.config.method ?? 'GET',
+          url: redactURL(requestContext.config.url)
         })
-
-        return config
       })
 
-      context.interceptors.response.use(response => {
-        const logger =
-          resolveExtensionConfig(
-            response.config,
-            'logger'
-          ) ?? defaultOptions
+      context.hooks.onResponse(requestContext => {
+        const state = states.get(requestContext)
 
-        if (logger.enabled === false) {
-          return response
+        if (!state || !requestContext.response) {
+          return
         }
 
-        console.log('[Npora Request]', {
+        const timestamp = Date.now()
+
+        emitInfo(state.options, {
           type: 'response',
-          method: response.config.method ?? 'GET',
-          url: redactURL(response.config.url),
-          status: response.status
+          requestId: state.requestId,
+          timestamp,
+          duration: Math.max(0, timestamp - requestContext.startTime),
+          attempts: requestContext.attempt + 1,
+          method: requestContext.config.method ?? 'GET',
+          url: redactURL(requestContext.config.url),
+          status: requestContext.response.status
         })
-
-        return response
       })
 
-      context.interceptors.error.use(error => {
-        const config =
-          error instanceof RequestError
-            ? error.config
-            : undefined
-        const logger = config
-          ? (
-              resolveExtensionConfig(
-                config,
-                'logger'
-              ) ?? defaultOptions
-            )
-          : defaultOptions
+      context.hooks.onError(requestContext => {
+        let state = states.get(requestContext)
 
-        if (logger.enabled === false) {
-          return error
+        if (!state) {
+          const options =
+            resolveExtensionConfig(
+              requestContext.config,
+              'logger'
+            ) ?? defaultOptions
+
+          if (options.enabled === false) {
+            return
+          }
+
+          state = {
+            requestId:
+              options.createRequestId?.() ??
+              `request-${++nextRequestId}`,
+            options
+          }
+          states.set(requestContext, state)
+
+          emitInfo(options, {
+            type: 'request',
+            requestId: state.requestId,
+            timestamp: requestContext.startTime,
+            method: requestContext.config.method ?? 'GET',
+            url: redactURL(requestContext.config.url)
+          })
         }
 
-        console.error(
-          '[Npora Request]',
-          createErrorLog(error)
-        )
+        const timestamp = Date.now()
 
-        return error
+        emitError(
+          state.options,
+          createErrorLog(
+            requestContext.error,
+            state.requestId,
+            timestamp,
+            Math.max(0, timestamp - requestContext.startTime),
+            requestContext.attempt + 1,
+            requestContext.config.method ?? 'GET',
+            redactURL(requestContext.config.url)
+          )
+        )
       })
     }
   }
+}
+
+interface LoggerState {
+  requestId: string
+
+  options: LoggerOptions
+}
+
+const consoleLogger: RequestLogger = {
+  info(message, entry) {
+    console.log(message, entry)
+  },
+
+  error(message, entry) {
+    console.error(message, entry)
+  }
+}
+
+function resolveLogger(options: LoggerOptions): RequestLogger {
+  return options.logger ?? consoleLogger
+}
+
+function emitInfo(
+  options: LoggerOptions,
+  entry: Parameters<RequestLogger['info']>[1]
+): void {
+  try {
+    void Promise.resolve(
+      resolveLogger(options).info('[Npora Request]', entry)
+    ).catch(ignoreLoggerError)
+  } catch {
+    // Logging must not change the request lifecycle.
+  }
+}
+
+function emitError(
+  options: LoggerOptions,
+  entry: ErrorLogEntry
+): void {
+  try {
+    void Promise.resolve(
+      resolveLogger(options).error('[Npora Request]', entry)
+    ).catch(ignoreLoggerError)
+  } catch {
+    // Logging must not replace the original request error.
+  }
+}
+
+function ignoreLoggerError(): void {
+  // Async logger failures are isolated from the request lifecycle.
 }
 
 const SENSITIVE_QUERY_KEYS = new Set([
@@ -172,31 +259,46 @@ function findAuthorityEnd(
   return url.length
 }
 
-function createErrorLog(error: unknown): Record<string, unknown> {
+function createErrorLog(
+  error: unknown,
+  requestId: string,
+  timestamp: number,
+  duration: number,
+  attempt: number,
+  method: ErrorLogEntry['method'],
+  url: string
+): ErrorLogEntry {
+  const lifecycle = {
+    type: 'error' as const,
+    requestId,
+    timestamp,
+    duration,
+    attempt,
+    method,
+    url
+  }
+
   if (error instanceof RequestError) {
     return {
-      type: 'error',
+      ...lifecycle,
       name: error.name,
       message: error.message,
       code: error.code,
-      status: error.status,
-      method: error.config?.method ?? 'GET',
-      url: error.config
-        ? redactURL(error.config.url)
-        : undefined
+      status: error.status
     }
   }
 
   if (error instanceof Error) {
     return {
-      type: 'error',
+      ...lifecycle,
       name: error.name,
       message: error.message
     }
   }
 
   return {
-    type: 'error',
+    ...lifecycle,
+    name: 'UnknownError',
     message: String(error)
   }
 }

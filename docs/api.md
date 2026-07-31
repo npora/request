@@ -532,13 +532,52 @@ original request error and do not block later requests from trying again.
 const request = createClient().use(loggerPlugin())
 ```
 
-Request and response logs contain method, URL and status metadata. Error logs
-contain a safe summary instead of the complete `RequestError`, so request
-headers, auth extension values, response bodies and causes are not attached to
-the console entry. Common credential query parameters such as `access_token`,
-`refresh_token`, `api_key`, `password`, `secret` and `signature` are redacted.
-Setting `extensions.logger.enabled` to `false` disables request, response and
-error logs for that request.
+The default logger writes structured entries through `console.log` and
+`console.error`. Supply a logger to forward entries to an application logging
+or telemetry system:
+
+```ts
+import type { RequestLogger } from '@npora/request'
+
+const logger: RequestLogger = {
+  info(_message, entry) {
+    applicationLogger.info(entry)
+  },
+  error(_message, entry) {
+    applicationLogger.error(entry)
+  }
+}
+
+const request = createClient().use(
+  loggerPlugin({
+    logger,
+    createRequestId: () => crypto.randomUUID()
+  })
+)
+```
+
+All entries contain:
+
+- `type`
+- `requestId`
+- `timestamp`
+- `method`
+- redacted `url`
+
+Response entries also contain `status`, total `duration` in milliseconds, and
+`attempts`. Error entries contain the failed `attempt`, total `duration`, error
+name and message, and `code` or `status` when available. A retry therefore
+emits an error entry for the failed attempt and a response entry with the same
+`requestId` if a later attempt succeeds.
+
+Error logs contain a safe summary instead of the complete `RequestError`, so
+request headers, auth extension values, response bodies and causes are not
+attached to the entry. Common credential query parameters such as
+`access_token`, `refresh_token`, `api_key`, `password`, `secret` and
+`signature` are redacted. Setting `extensions.logger.enabled` to `false`
+disables all lifecycle logs for that request. Request-level logger options may
+also replace the plugin defaults. Logger methods may be synchronous or
+asynchronous; their failures are isolated and never change the request result.
 
 ---
 

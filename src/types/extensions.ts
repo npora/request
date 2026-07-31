@@ -53,6 +53,88 @@ export interface AuthOptions {
 
 export interface LoggerOptions {
   enabled?: boolean
+
+  /**
+   * Structured log destination.
+   *
+   * @default console
+   */
+  logger?: RequestLogger
+
+  /**
+   * Create the identifier shared by all lifecycle entries for a request.
+   *
+   * @default a plugin-local monotonic identifier
+   */
+  createRequestId?: () => string
+}
+
+export interface RequestLogEntry {
+  type: 'request'
+
+  requestId: string
+
+  timestamp: number
+
+  method: HttpMethod
+
+  url: string
+}
+
+export interface ResponseLogEntry {
+  type: 'response'
+
+  requestId: string
+
+  timestamp: number
+
+  duration: number
+
+  attempts: number
+
+  method: HttpMethod
+
+  url: string
+
+  status: number
+}
+
+export interface ErrorLogEntry {
+  type: 'error'
+
+  requestId: string
+
+  timestamp: number
+
+  duration: number
+
+  attempt: number
+
+  method: HttpMethod
+
+  url: string
+
+  name: string
+
+  message: string
+
+  code?: string
+
+  status?: number
+}
+
+export type LoggerEntry =
+  | RequestLogEntry
+  | ResponseLogEntry
+  | ErrorLogEntry
+
+export interface RequestLogger {
+  info(
+    message: string,
+    entry: RequestLogEntry | ResponseLogEntry
+  ): void | Promise<void>
+
+  error(message: string, entry: ErrorLogEntry): void | Promise<void>
 }
 
 export type UploadData = FormData | Record<string, unknown>
