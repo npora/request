@@ -1,5 +1,12 @@
 # @npora/request
 
+## 1.1.0
+
+### Minor Changes
+
+- 3c36295: Add injectable structured logging with request identifiers, timestamps,
+  durations, and retry attempt metadata.
+
 ## 1.0.1
 
 ### Patch Changes
