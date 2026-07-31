@@ -1,5 +1,12 @@
 # @npora/request
 
+## 1.4.0
+
+### Minor Changes
+
+- a141b47: Expand MockAdapter with method-aware matching, rich and one-time responses,
+  delay and error simulation, and request history controls.
+
 ## 1.3.0
 
 ### Minor Changes
