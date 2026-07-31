@@ -57,7 +57,7 @@
     "test:run": "vitest run",
     "test:types": "pnpm build && tsc -p test/types/tsconfig.json",
     "test:examples": "tsc -p examples/tsconfig.json",
-    "test:package": "node test/package/esm.mjs && node test/package/cjs.cjs && node test/package/api-exports.mjs && node test/package/npm-pack-result.test.mjs && node test/package/manifest.mjs && pnpm test:size",
+    "test:package": "node test/package/esm.mjs && node test/package/cjs.cjs && node test/package/api-exports.mjs && node test/package/api-contract.mjs && node test/package/npm-pack-result.test.mjs && node test/package/manifest.mjs && pnpm test:size",
     "test:size": "node test/package/size.mjs",
     "test:browser": "playwright test --config=browser/playwright.config.ts",
     "test:browser:ui": "playwright test --config=browser/playwright.config.ts --ui",
