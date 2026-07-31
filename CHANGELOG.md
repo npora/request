@@ -1,5 +1,12 @@
 # @npora/request
 
+## 1.2.0
+
+### Minor Changes
+
+- e10a4e5: Add retry jitter, total elapsed-time budgets, and structured retry lifecycle
+  callbacks.
+
 ## 1.1.0
 
 ### Minor Changes
