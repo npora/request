@@ -1,19 +1,58 @@
 import type {
   CacheOptions,
   HttpMethod,
+  NporaResponse,
   QueryParams,
   RequestConfig
 } from '../types'
+import { RequestError } from '../errors'
 import type { Plugin } from './Plugin'
 import { resolveExtensionConfig } from './resolveExtensionConfig'
 
-interface CacheRecord {
+type MaybePromise<T> = T | Promise<T>
+
+export interface CacheEntry {
   data: unknown
+
   expiresAt: number
+
   status: number
+
   statusText: string
-  headers: Headers
+
+  headers: Array<[string, string]>
+
   raw?: Response
+}
+
+export interface CacheStore {
+  get(key: string): MaybePromise<CacheEntry | undefined>
+
+  set(key: string, entry: CacheEntry): MaybePromise<void>
+
+  delete(key: string): MaybePromise<void>
+
+  clear(): MaybePromise<void>
+}
+
+export class MemoryCacheStore implements CacheStore {
+  private readonly entries = new Map<string, CacheEntry>()
+
+  get(key: string): CacheEntry | undefined {
+    return this.entries.get(key)
+  }
+
+  set(key: string, entry: CacheEntry): void {
+    this.entries.set(key, entry)
+  }
+
+  delete(key: string): void {
+    this.entries.delete(key)
+  }
+
+  clear(): void {
+    this.entries.clear()
+  }
 }
 
 export interface CachePluginOptions {
@@ -30,10 +69,24 @@ export interface CachePluginOptions {
    * @default authorization, cookie, accept and accept-language
    */
   varyHeaders?: readonly string[]
+
+  /**
+   * Cache storage shared by this plugin instance.
+   *
+   * @default an isolated MemoryCacheStore
+   */
+  store?: CacheStore
+
+  /**
+   * Share one network operation between concurrent equivalent requests.
+   *
+   * @default true
+   */
+  dedupe?: boolean
 }
 
 export interface CachePlugin extends Plugin {
-  clear(): void
+  clear(): MaybePromise<void>
 }
 
 const DEFAULT_CACHE_METHODS: readonly HttpMethod[] = [
@@ -51,8 +104,11 @@ const DEFAULT_VARY_HEADERS = [
 export function cachePlugin(
   options: CachePluginOptions = {}
 ): CachePlugin {
-  const cacheStore = new Map<string, CacheRecord>()
+  const store = options.store ?? new MemoryCacheStore()
   const cacheHits = new WeakSet<object>()
+  const leaders = new WeakMap<object, string>()
+  const completedRecords = new WeakMap<object, CacheEntry>()
+  const inFlight = new Map<string, InFlightRequest>()
   const methods = new Set(
     options.methods ?? DEFAULT_CACHE_METHODS
   )
@@ -63,11 +119,14 @@ export function cachePlugin(
     name: 'cache',
 
     clear() {
-      cacheStore.clear()
+      return store.clear()
     },
 
     install(context) {
-      context.hooks.onRequest(requestContext => {
+      const ownedLeaders = new Set<object>()
+      let active = true
+
+      context.hooks.onRequest(async requestContext => {
         const cache = resolveExtensionConfig(
           requestContext.config,
           'cache'
@@ -85,29 +144,62 @@ export function cachePlugin(
           cache,
           varyHeaders
         )
-        const record = cacheStore.get(key)
+        const record = await readStore(store, key)
 
-        if (!record) {
+        if (!active) {
           return
         }
 
-        if (Date.now() > record.expiresAt) {
-          cacheStore.delete(key)
+        if (record) {
+          if (
+            !Number.isFinite(record.expiresAt) ||
+            Date.now() > record.expiresAt
+          ) {
+            await deleteStore(store, key)
+          } else {
+            const cachedResponse = restoreCacheEntry(
+              record,
+              requestContext.config
+            )
+
+            if (cachedResponse) {
+              requestContext.response = cachedResponse
+              cacheHits.add(requestContext)
+              return
+            }
+
+            await deleteStore(store, key)
+          }
+        }
+
+        if (!(cache.dedupe ?? options.dedupe ?? true)) {
           return
         }
 
-        requestContext.response = {
-          data: cloneCacheValue(record.data),
-          status: record.status,
-          statusText: record.statusText,
-          headers: new Headers(record.headers),
-          config: requestContext.config,
-          raw: cloneRawResponse(record)
+        const pending = inFlight.get(key)
+
+        if (pending) {
+          const sharedRecord = await waitForSharedRecord(
+            pending.promise,
+            requestContext.config
+          )
+
+          requestContext.response = createCachedResponse(
+            sharedRecord,
+            requestContext.config
+          )
+          cacheHits.add(requestContext)
+          return
         }
-        cacheHits.add(requestContext)
+
+        const created = createInFlightRequest(requestContext)
+
+        inFlight.set(key, created)
+        leaders.set(requestContext, key)
+        ownedLeaders.add(requestContext)
       })
 
-      context.hooks.onResponse(requestContext => {
+      context.hooks.onResponse(async requestContext => {
         if (cacheHits.has(requestContext)) {
           return
         }
@@ -131,25 +223,262 @@ export function cachePlugin(
           varyHeaders
         )
         const ttl = cache.ttl ?? 30000
+        const record = createCacheEntry(
+          requestContext.response,
+          Date.now() + Math.max(0, ttl)
+        )
+
+        completedRecords.set(requestContext, record)
 
         if (ttl <= 0) {
-          cacheStore.delete(key)
+          await deleteStore(store, key)
           return
         }
 
-        cacheStore.set(key, {
-          data: cloneCacheValue(requestContext.response.data),
-          expiresAt: Date.now() + ttl,
-          status: requestContext.response.status,
-          statusText: requestContext.response.statusText,
-          headers: new Headers(requestContext.response.headers),
-          raw: cloneResponse(requestContext.response.raw)
-        })
+        await writeStore(store, key, record)
       })
+
+      context.hooks.onSettled(requestContext => {
+        const key = leaders.get(requestContext)
+
+        if (!key) {
+          return
+        }
+
+        leaders.delete(requestContext)
+        ownedLeaders.delete(requestContext)
+
+        const pending = inFlight.get(key)
+
+        if (!pending || pending.owner !== requestContext) {
+          return
+        }
+
+        inFlight.delete(key)
+
+        const record = completedRecords.get(requestContext)
+
+        completedRecords.delete(requestContext)
+
+        if (record && requestContext.response && !requestContext.error) {
+          pending.resolve(record)
+          return
+        }
+
+        pending.reject(
+          requestContext.error ??
+          new RequestError('Shared request failed', {
+            code: 'NETWORK_ERROR',
+            config: requestContext.config
+          })
+        )
+      })
+
+      return () => {
+        active = false
+
+        for (const owner of ownedLeaders) {
+          const key = leaders.get(owner)
+
+          leaders.delete(owner)
+
+          if (!key) {
+            continue
+          }
+
+          const pending = inFlight.get(key)
+
+          if (!pending || pending.owner !== owner) {
+            continue
+          }
+
+          inFlight.delete(key)
+          pending.reject(
+            new RequestError('Cache plugin removed during shared request', {
+              code: 'ABORT_ERROR'
+            })
+          )
+        }
+
+        ownedLeaders.clear()
+      }
     }
   }
 
   return plugin
+}
+
+interface InFlightRequest {
+  owner: object
+
+  promise: Promise<CacheEntry>
+
+  resolve(entry: CacheEntry): void
+
+  reject(error: unknown): void
+}
+
+function createInFlightRequest(owner: object): InFlightRequest {
+  let resolve!: (entry: CacheEntry) => void
+  let reject!: (error: unknown) => void
+  const promise = new Promise<CacheEntry>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise
+    reject = rejectPromise
+  })
+
+  void promise.catch(() => {})
+
+  return {
+    owner,
+    promise,
+    resolve,
+    reject
+  }
+}
+
+async function readStore(
+  store: CacheStore,
+  key: string
+): Promise<CacheEntry | undefined> {
+  try {
+    return await store.get(key)
+  } catch {
+    return undefined
+  }
+}
+
+async function writeStore(
+  store: CacheStore,
+  key: string,
+  entry: CacheEntry
+): Promise<void> {
+  try {
+    await store.set(key, entry)
+  } catch {
+    // Cache storage failures must not change the network response.
+  }
+}
+
+async function deleteStore(
+  store: CacheStore,
+  key: string
+): Promise<void> {
+  try {
+    await store.delete(key)
+  } catch {
+    // Expired or disabled cache entries can be ignored safely.
+  }
+}
+
+async function waitForSharedRecord(
+  promise: Promise<CacheEntry>,
+  config: RequestConfig
+): Promise<CacheEntry> {
+  const signal = config.signal
+
+  if (!signal) {
+    try {
+      return await promise
+    } catch (error) {
+      throw cloneSharedError(error, config)
+    }
+  }
+
+  if (signal.aborted) {
+    throw createSharedAbortError(signal.reason, config)
+  }
+
+  return new Promise((resolve, reject) => {
+    const cleanup = () => {
+      signal.removeEventListener('abort', onAbort)
+    }
+    const onAbort = () => {
+      cleanup()
+      reject(createSharedAbortError(signal.reason, config))
+    }
+
+    signal.addEventListener('abort', onAbort, {
+      once: true
+    })
+    promise.then(
+      entry => {
+        cleanup()
+        resolve(entry)
+      },
+      error => {
+        cleanup()
+        reject(cloneSharedError(error, config))
+      }
+    )
+  })
+}
+
+function createSharedAbortError(
+  reason: unknown,
+  config: RequestConfig
+): RequestError {
+  return new RequestError('Request aborted while waiting for shared response', {
+    code: 'ABORT_ERROR',
+    config,
+    cause: reason
+  })
+}
+
+function cloneSharedError(
+  error: unknown,
+  config: RequestConfig
+): unknown {
+  if (!(error instanceof RequestError)) {
+    return error
+  }
+
+  return new RequestError(error.message, {
+    code: error.code,
+    status: error.status,
+    data: error.data,
+    response: error.response,
+    config,
+    cause: error
+  })
+}
+
+function createCacheEntry(
+  response: NporaResponse,
+  expiresAt: number
+): CacheEntry {
+  return {
+    data: cloneCacheValue(response.data),
+    expiresAt,
+    status: response.status,
+    statusText: response.statusText,
+    headers: [...response.headers.entries()],
+    raw: cloneResponse(response.raw)
+  }
+}
+
+function createCachedResponse(
+  record: CacheEntry,
+  config: RequestConfig
+): NporaResponse {
+  return {
+    data: cloneCacheValue(record.data),
+    status: record.status,
+    statusText: record.statusText,
+    headers: new Headers(record.headers),
+    config,
+    raw: cloneRawResponse(record)
+  }
+}
+
+function restoreCacheEntry(
+  record: CacheEntry,
+  config: RequestConfig
+): NporaResponse | undefined {
+  try {
+    return createCachedResponse(record, config)
+  } catch {
+    return undefined
+  }
 }
 
 function isCacheableRequest(
@@ -224,7 +553,7 @@ function appendQueryValue(
   entries.push([key, String(value)])
 }
 
-function cloneRawResponse(record: CacheRecord): Response {
+function cloneRawResponse(record: CacheEntry): Response {
   if (record.raw) {
     const cloned = cloneResponse(record.raw)
 

@@ -123,6 +123,14 @@ export class Pipeline {
       }
     } finally {
       context.endTime = Date.now()
+
+      if (this.hooks.hasSettledHooks) {
+        try {
+          await this.hooks.runSettled(context)
+        } catch {
+          // Final observers must not replace the request result.
+        }
+      }
     }
   }
 

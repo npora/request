@@ -63,6 +63,11 @@ Plugins add retry, caching, authentication, logging, and transfer progress
 through scoped interceptors and hooks. A plugin may declare dependencies and
 conflicts, return cleanup logic, and be removed with `unuse()`.
 
+The final `onSettled` hook runs after response/error interceptors and all retry
+decisions. It is intended for terminal coordination such as releasing
+deduplicated cache followers. Settled observers are isolated: one observer
+cannot replace the request result or prevent later settled observers.
+
 Plugin request configuration belongs under `RequestConfig.extensions`.
 Third-party packages extend `RequestExtensions` instead of adding fields to the
 core configuration type.

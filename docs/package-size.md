@@ -29,8 +29,9 @@ inspect the bundle change, remove accidental code first, and document any
 intentional product tradeoff.
 
 The declaration-file budget includes additional headroom for the public retry
-lifecycle types introduced in 1.2.0. Runtime JavaScript and complete-package
-budgets were not raised for that type-only API growth.
+lifecycle types introduced in 1.2.0. Version 1.3.0 then raised runtime and
+complete-package budgets for the intentional cache store, concurrent request
+coordination, and settled lifecycle implementation.
 
 `pnpm test:package` includes the size check, so release verification cannot
 publish a package that exceeds the checked-in budgets. CI also stores the JSON

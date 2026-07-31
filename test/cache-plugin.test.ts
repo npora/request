@@ -1,6 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { Plugin } from '../src'
-import { cachePlugin, createClient } from '../src'
+import type { CacheStore, Plugin } from '../src'
+import {
+  cachePlugin,
+  createClient,
+  MemoryCacheStore,
+  retryPlugin
+} from '../src'
 
 function createJsonResponse(data: unknown): Response {
   return new Response(JSON.stringify(data), {
@@ -12,6 +17,7 @@ function createJsonResponse(data: unknown): Response {
 }
 
 afterEach(() => {
+  vi.restoreAllMocks()
   vi.useRealTimers()
   vi.unstubAllGlobals()
 })
@@ -499,5 +505,408 @@ describe('cachePlugin', () => {
       version: 2
     })
     expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('should deduplicate concurrent equivalent requests', async () => {
+    let resolveFetch!: (response: Response) => void
+    const fetchMock = vi.fn().mockImplementation(() => {
+      return new Promise<Response>(resolve => {
+        resolveFetch = resolve
+      })
+    })
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient().use(cachePlugin())
+    const config = {
+      extensions: {
+        cache: {
+          enabled: true
+        }
+      }
+    }
+    const first = request.get<{ value: number }>('/shared', config)
+
+    await vi.waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledTimes(1)
+    })
+
+    const second = request.get<{ value: number }>('/shared', config)
+
+    await Promise.resolve()
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+
+    resolveFetch(createJsonResponse({ value: 1 }))
+
+    const [firstData, secondData] = await Promise.all([
+      first,
+      second
+    ])
+
+    firstData.value = 2
+
+    expect(secondData).toEqual({
+      value: 1
+    })
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('should allow disabling request deduplication', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      createJsonResponse({
+        ok: true
+      })
+    )
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient().use(cachePlugin())
+    const config = {
+      extensions: {
+        cache: {
+          enabled: true,
+          dedupe: false
+        }
+      }
+    }
+
+    await Promise.all([
+      request.get('/shared', config),
+      request.get('/shared', config)
+    ])
+
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('should keep followers pending while the leader retries', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response('Busy', {
+          status: 503
+        })
+      )
+      .mockResolvedValueOnce(
+        createJsonResponse({
+          ok: true
+        })
+      )
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient()
+      .use(cachePlugin())
+      .use(
+        retryPlugin({
+          retries: 1,
+          delay: 0
+        })
+      )
+    const config = {
+      extensions: {
+        cache: {
+          enabled: true
+        }
+      }
+    }
+
+    const [first, second] = await Promise.all([
+      request.get('/retry-shared', config),
+      request.get('/retry-shared', config)
+    ])
+
+    expect(first).toEqual({
+      ok: true
+    })
+    expect(second).toEqual({
+      ok: true
+    })
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('should release followers with the final shared error', async () => {
+    const fetchMock = vi.fn().mockRejectedValue(
+      new Error('network down')
+    )
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient().use(cachePlugin())
+    const config = {
+      extensions: {
+        cache: {
+          enabled: true
+        }
+      }
+    }
+    const results = await Promise.allSettled([
+      request.get('/failed-shared', config),
+      request.get('/failed-shared', config)
+    ])
+
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(results).toHaveLength(2)
+
+    for (const result of results) {
+      expect(result.status).toBe('rejected')
+
+      if (result.status === 'rejected') {
+        expect(result.reason).toMatchObject({
+          code: 'NETWORK_ERROR',
+          message: 'Network request failed'
+        })
+      }
+    }
+  })
+
+  it('should abort one follower without cancelling the leader', async () => {
+    let resolveFetch!: (response: Response) => void
+    const fetchMock = vi.fn().mockImplementation(() => {
+      return new Promise<Response>(resolve => {
+        resolveFetch = resolve
+      })
+    })
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient().use(cachePlugin())
+    const cache = {
+      enabled: true
+    }
+    const leader = request.get('/abort-shared', {
+      extensions: {
+        cache
+      }
+    })
+
+    await vi.waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledTimes(1)
+    })
+
+    const controller = new AbortController()
+    const follower = request.get('/abort-shared', {
+      signal: controller.signal,
+      extensions: {
+        cache
+      }
+    })
+
+    controller.abort('follower cancelled')
+
+    await expect(follower).rejects.toMatchObject({
+      code: 'ABORT_ERROR'
+    })
+
+    resolveFetch(createJsonResponse({ ok: true }))
+
+    await expect(leader).resolves.toEqual({
+      ok: true
+    })
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('should share a custom cache store between plugin instances', async () => {
+    const store = new MemoryCacheStore()
+    const fetchMock = vi.fn().mockResolvedValue(
+      createJsonResponse({
+        shared: true
+      })
+    )
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const firstClient = createClient().use(
+      cachePlugin({
+        store
+      })
+    )
+    const secondClient = createClient().use(
+      cachePlugin({
+        store
+      })
+    )
+    const config = {
+      extensions: {
+        cache: {
+          enabled: true
+        }
+      }
+    }
+
+    await firstClient.get('/stored', config)
+
+    await expect(
+      secondClient.get('/stored', config)
+    ).resolves.toEqual({
+      shared: true
+    })
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('should isolate network requests from cache store failures', async () => {
+    const store: CacheStore = {
+      get: vi.fn().mockRejectedValue(new Error('get failed')),
+      set: vi.fn().mockRejectedValue(new Error('set failed')),
+      delete: vi.fn().mockRejectedValue(new Error('delete failed')),
+      clear: vi.fn()
+    }
+    const fetchMock = vi.fn().mockResolvedValue(
+      createJsonResponse({
+        ok: true
+      })
+    )
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient().use(
+      cachePlugin({
+        store
+      })
+    )
+
+    await expect(
+      request.get('/store-failure', {
+        extensions: {
+          cache: {
+            enabled: true
+          }
+        }
+      })
+    ).resolves.toEqual({
+      ok: true
+    })
+  })
+
+  it('should delete malformed external cache entries and fetch normally', async () => {
+    const remove = vi.fn()
+    const store: CacheStore = {
+      get() {
+        return {
+          data: {
+            stale: true
+          },
+          expiresAt: Date.now() + 1000,
+          status: 999,
+          statusText: 'Invalid',
+          headers: []
+        }
+      },
+      set() {},
+      delete: remove,
+      clear() {}
+    }
+    const fetchMock = vi.fn().mockResolvedValue(
+      createJsonResponse({
+        fresh: true
+      })
+    )
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient().use(
+      cachePlugin({
+        store
+      })
+    )
+
+    await expect(
+      request.get('/malformed', {
+        extensions: {
+          cache: {
+            enabled: true
+          }
+        }
+      })
+    ).resolves.toEqual({
+      fresh: true
+    })
+    expect(remove).toHaveBeenCalledTimes(1)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('should release followers when the cache plugin is removed', async () => {
+    const fetchMock = vi.fn().mockImplementation(() => {
+      return new Promise<Response>(() => {})
+    })
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const store = new MemoryCacheStore()
+    const read = vi.spyOn(store, 'get')
+    const cache = cachePlugin({
+      store
+    })
+    const request = createClient().use(cache)
+    const config = {
+      extensions: {
+        cache: {
+          enabled: true
+        }
+      }
+    }
+
+    void request.get('/removed-cache', config)
+
+    await vi.waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledTimes(1)
+    })
+
+    const follower = request.get('/removed-cache', config)
+
+    await vi.waitFor(() => {
+      expect(read).toHaveBeenCalledTimes(2)
+    })
+    await Promise.resolve()
+    request.unuse('cache')
+
+    await expect(follower).rejects.toMatchObject({
+      code: 'ABORT_ERROR',
+      message: 'Cache plugin removed during shared request'
+    })
+  })
+
+  it('should not create shared state after removal during an async read', async () => {
+    let resolveRead!: () => void
+    const store: CacheStore = {
+      get() {
+        return new Promise<undefined>(resolve => {
+          resolveRead = () => resolve(undefined)
+        })
+      },
+      set() {},
+      delete() {},
+      clear() {}
+    }
+    const fetchMock = vi.fn().mockResolvedValue(
+      createJsonResponse({
+        ok: true
+      })
+    )
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const cache = cachePlugin({
+      store
+    })
+    const request = createClient().use(cache)
+    const pending = request.get('/remove-during-read', {
+      extensions: {
+        cache: {
+          enabled: true
+        }
+      }
+    })
+
+    await vi.waitFor(() => {
+      expect(resolveRead).toBeTypeOf('function')
+    })
+
+    request.unuse('cache')
+    resolveRead()
+
+    await expect(pending).resolves.toEqual({
+      ok: true
+    })
+    expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 })

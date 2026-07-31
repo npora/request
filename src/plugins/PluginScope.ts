@@ -151,6 +151,13 @@ function createScopedHooks(
       )
     },
 
+    onSettled(hook, options) {
+      return trackHook(
+        hooks.onSettled(hook, withPriority(options, pluginPriority)),
+        cleanups
+      )
+    },
+
     onRetry(hook, options) {
       return trackHook(
         hooks.onRetry(hook, withPriority(options, pluginPriority)),

@@ -145,6 +145,17 @@ const user = await request.get<User>('/users/1', {
 cache.clear()
 ```
 
+Equivalent concurrent cache-enabled requests share one network operation by
+default. Pass a custom `CacheStore` to share cached entries across clients or
+connect an external storage system:
+
+```ts
+const cache = cachePlugin({
+  store: sharedStore,
+  dedupe: true
+})
+```
+
 Built-in plugins:
 
 - `retryPlugin()`

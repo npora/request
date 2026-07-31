@@ -1,5 +1,6 @@
 import type {
   Client,
+  CacheStore,
   DownloadPluginOptions,
   LoggerEntry,
   Plugin,
@@ -9,7 +10,10 @@ import type {
   RetryOptions,
   UploadProgress
 } from '@npora/request'
-import { downloadPlugin } from '@npora/request'
+import {
+  downloadPlugin,
+  MemoryCacheStore
+} from '@npora/request'
 
 interface MetricsOptions {
   enabled?: boolean
@@ -78,6 +82,7 @@ const plugin: Plugin = {
 
   install({ hooks }) {
     hooks.onRequest(() => {})
+    hooks.onSettled(() => {})
 
     return () => {}
   }
@@ -144,3 +149,18 @@ const loggerConfig: RequestConfig = {
 }
 
 void loggerConfig
+
+const cacheStore: CacheStore = {
+  async get(_key) {
+    return undefined
+  },
+  async set(_key, _entry) {},
+  async delete(_key) {},
+  async clear() {}
+}
+
+void cacheStore
+
+const memoryCacheStore: CacheStore = new MemoryCacheStore()
+
+void memoryCacheStore

@@ -35,6 +35,16 @@ export interface PluginHookManager {
     options?: HookOptions
   ): HookDisposer
 
+  /**
+   * Observe the final request outcome after retries and interceptors finish.
+   *
+   * Settled hook failures are isolated from the request result.
+   */
+  onSettled(
+    hook: RequestHook,
+    options?: HookOptions
+  ): HookDisposer
+
   onRetry(
     hook: RetryHook,
     options?: HookOptions

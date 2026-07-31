@@ -503,11 +503,71 @@ await request.get('/user', {
 cache.clear()
 ```
 
-Each cache plugin instance owns an isolated memory store. By default only
-`GET` and `HEAD` are cached. The generated cache key varies by
+Each cache plugin instance owns an isolated `MemoryCacheStore` by default.
+Only `GET` and `HEAD` are cached. The generated cache key varies by
 `authorization`, `cookie`, `accept` and `accept-language` headers. Query keys
-are normalized independently of object insertion order, and different response
-parsing types use separate cache entries.
+are normalized independently of object insertion order, and different
+response parsing types use separate cache entries.
+
+Concurrent equivalent requests share one network operation by default. Waiting
+requests remain attached while the leader retries, receive independent copies
+of the final response, and receive the final error if all retries fail. An
+individual waiting request can be aborted without cancelling the leader.
+
+Disable this behavior globally or for one request:
+
+```ts
+cachePlugin({
+  dedupe: false
+})
+
+await request.get('/user', {
+  extensions: {
+    cache: {
+      enabled: true,
+      dedupe: false
+    }
+  }
+})
+```
+
+Supply a `CacheStore` to share entries across plugin instances or connect an
+external cache:
+
+```ts
+import type { CacheStore } from '@npora/request'
+
+const store: CacheStore = {
+  async get(key) {
+    return database.get(key)
+  },
+  async set(key, entry) {
+    await database.set(key, entry)
+  },
+  async delete(key) {
+    await database.delete(key)
+  },
+  async clear() {
+    await database.clear()
+  }
+}
+
+const cache = cachePlugin({
+  store
+})
+
+await cache.clear()
+```
+
+Store methods may be synchronous or asynchronous. Read, write and expiration
+cleanup failures are treated as cache misses and do not change the network
+result. Explicit `cache.clear()` failures remain visible to the caller.
+`CacheEntry.raw` is optional so portable stores may persist parsed data and
+response metadata without serializing a native `Response`.
+
+The generated default key incorporates values from `varyHeaders`, including
+authorization and cookies. External stores must treat cache keys as sensitive
+or hash them before persistence and logging.
 
 Additional methods must be enabled explicitly:
 

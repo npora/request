@@ -264,6 +264,7 @@ describe('plugin', () => {
   it('should automatically clean plugin interceptors, hooks and resources', async () => {
     const cleanup = vi.fn()
     const hook = vi.fn()
+    const settledHook = vi.fn()
     const fetchMock = vi.fn().mockImplementation(() => {
       return Promise.resolve(
         new Response(JSON.stringify({ ok: true }), {
@@ -291,6 +292,7 @@ describe('plugin', () => {
         })
 
         hooks.onRequest(hook)
+        hooks.onSettled(settledHook)
 
         return cleanup
       }
@@ -312,7 +314,62 @@ describe('plugin', () => {
     expect(beforeHeaders.get('x-plugin')).toBe('installed')
     expect(afterHeaders.get('x-plugin')).toBe(null)
     expect(hook).toHaveBeenCalledTimes(1)
+    expect(settledHook).toHaveBeenCalledTimes(1)
     expect(cleanup).toHaveBeenCalledTimes(1)
+  })
+
+  it('should isolate settled hooks and expose the final outcome', async () => {
+    const settled = vi.fn()
+    const broken: Plugin = {
+      name: 'broken-settled',
+      priority: 10,
+      install({ hooks }) {
+        hooks.onSettled(() => {
+          throw new Error('settled observer failed')
+        })
+      }
+    }
+    const observer: Plugin = {
+      name: 'settled-observer',
+      install({ hooks }) {
+        hooks.onSettled(context => {
+          settled({
+            response: context.response?.data,
+            error: context.error,
+            startTime: context.startTime,
+            endTime: context.endTime
+          })
+        })
+      }
+    }
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ ok: true }), {
+          status: 200,
+          headers: {
+            'content-type': 'application/json'
+          }
+        })
+      )
+    )
+
+    const request = createClient()
+      .use(broken)
+      .use(observer)
+
+    await expect(request.get('/settled')).resolves.toEqual({
+      ok: true
+    })
+    expect(settled).toHaveBeenCalledWith({
+      response: {
+        ok: true
+      },
+      error: undefined,
+      startTime: expect.any(Number),
+      endTime: expect.any(Number)
+    })
   })
 
   it('should rollback scoped registrations when installation fails', async () => {

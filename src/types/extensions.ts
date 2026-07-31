@@ -90,6 +90,13 @@ export interface CacheOptions {
   ttl?: number
 
   key?: string
+
+  /**
+   * Share one network operation between concurrent equivalent requests.
+   *
+   * @default true
+   */
+  dedupe?: boolean
 }
 
 export interface AuthOptions {

@@ -38,6 +38,8 @@ export class PluginHooks {
 
   private readonly errorHooks = new HookRegistry<RequestHook>()
 
+  private readonly settledHooks = new HookRegistry<RequestHook>()
+
   private readonly retryHooks = new HookRegistry<RetryHook>()
 
   get hasRequestHooks(): boolean {
@@ -54,6 +56,10 @@ export class PluginHooks {
 
   get hasRetryHooks(): boolean {
     return this.retryHooks.active
+  }
+
+  get hasSettledHooks(): boolean {
+    return this.settledHooks.active
   }
 
   onRequest(
@@ -84,6 +90,13 @@ export class PluginHooks {
     return this.retryHooks.register(hook, options)
   }
 
+  onSettled(
+    hook: RequestHook,
+    options: HookOptions = {}
+  ): HookDisposer {
+    return this.settledHooks.register(hook, options)
+  }
+
   async runRequest(context: RequestContext<unknown>): Promise<void> {
     for (const hook of this.requestHooks.values()) {
       await hook(context)
@@ -99,6 +112,16 @@ export class PluginHooks {
   async runError(context: RequestContext<unknown>): Promise<void> {
     for (const hook of this.errorHooks.values()) {
       await hook(context)
+    }
+  }
+
+  async runSettled(context: RequestContext<unknown>): Promise<void> {
+    for (const hook of this.settledHooks.values()) {
+      try {
+        await hook(context)
+      } catch {
+        // Final observers are isolated from each other and the request result.
+      }
     }
   }
 
