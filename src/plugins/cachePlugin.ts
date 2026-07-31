@@ -35,14 +35,63 @@ export interface CacheStore {
   clear(): MaybePromise<void>
 }
 
+export interface MemoryCacheStoreOptions {
+  /**
+   * Maximum entries retained by the in-memory LRU store.
+   * Use `Infinity` for no practical limit.
+   *
+   * @default 1000
+   */
+  maxEntries?: number
+}
+
 export class MemoryCacheStore implements CacheStore {
   private readonly entries = new Map<string, CacheEntry>()
 
+  private readonly maxEntries: number
+
+  constructor(options: MemoryCacheStoreOptions = {}) {
+    this.maxEntries = normalizeMaxEntries(options.maxEntries)
+  }
+
   get(key: string): CacheEntry | undefined {
-    return this.entries.get(key)
+    const entry = this.entries.get(key)
+
+    if (!entry) {
+      return undefined
+    }
+
+    if (
+      !Number.isFinite(entry.expiresAt) ||
+      Date.now() > entry.expiresAt
+    ) {
+      this.entries.delete(key)
+      return undefined
+    }
+
+    this.entries.delete(key)
+    this.entries.set(key, entry)
+
+    return entry
   }
 
   set(key: string, entry: CacheEntry): void {
+    if (this.maxEntries === 0) {
+      return
+    }
+
+    this.entries.delete(key)
+
+    while (this.entries.size >= this.maxEntries) {
+      const oldestKey = this.entries.keys().next().value
+
+      if (oldestKey === undefined) {
+        break
+      }
+
+      this.entries.delete(oldestKey)
+    }
+
     this.entries.set(key, entry)
   }
 
@@ -78,6 +127,14 @@ export interface CachePluginOptions {
   store?: CacheStore
 
   /**
+   * Maximum entries retained by the default MemoryCacheStore.
+   * Ignored when `store` is provided.
+   *
+   * @default 1000
+   */
+  maxEntries?: number
+
+  /**
    * Share one network operation between concurrent equivalent requests.
    *
    * @default true
@@ -104,7 +161,9 @@ const DEFAULT_VARY_HEADERS = [
 export function cachePlugin(
   options: CachePluginOptions = {}
 ): CachePlugin {
-  const store = options.store ?? new MemoryCacheStore()
+  const store = options.store ?? new MemoryCacheStore({
+    maxEntries: options.maxEntries
+  })
   const cacheHits = new WeakSet<object>()
   const leaders = new WeakMap<object, string>()
   const completedRecords = new WeakMap<object, CacheEntry>()
@@ -587,4 +646,16 @@ function cloneCacheValue<T>(value: T): T {
   } catch {
     return value
   }
+}
+
+function normalizeMaxEntries(value?: number): number {
+  if (value === undefined) {
+    return 1000
+  }
+
+  if (!Number.isFinite(value)) {
+    return value > 0 ? Number.POSITIVE_INFINITY : 0
+  }
+
+  return Math.max(0, Math.floor(value))
 }

@@ -33,6 +33,7 @@ const publicExports = [
   'LoggerOptions',
   'LoggerEntry',
   'MemoryCacheStore',
+  'MemoryCacheStoreOptions',
   'MockAdapter',
   'MockAdapterOptions',
   'MockHandler',

@@ -580,6 +580,7 @@ const breaker = circuitBreakerPlugin({
   resetTimeout: 30000,
   successThreshold: 1,
   halfOpenMaxRequests: 1,
+  maxCircuits: 1000,
   onStateChange(event) {
     metrics.recordCircuitState(event)
   }
@@ -630,6 +631,12 @@ failure policies. `onStateChange` failures are isolated from the request
 lifecycle. Inspect or manually clear state with
 `breaker.getState(key)`, `breaker.reset(key)`, or `breaker.reset()`.
 
+The plugin retains at most 1,000 inactive circuit records by default and uses
+LRU eviction when another isolation key is created. Configure the bound with
+`maxCircuits`. Records with active requests are never evicted, so an extreme
+burst of unique concurrent keys may temporarily exceed the configured bound;
+the map is trimmed as requests settle.
+
 ## Cache
 
 ```ts
@@ -649,6 +656,11 @@ cache.clear()
 ```
 
 Each cache plugin instance owns an isolated `MemoryCacheStore` by default.
+It retains at most 1,000 entries with LRU eviction and removes expired entries
+when they are read. Configure the built-in store with `maxEntries`; `0` disables
+storage and `Infinity` explicitly removes the capacity bound. A custom `store`
+owns and enforces its own capacity, so `maxEntries` is ignored when one is
+provided.
 Only `GET` and `HEAD` are cached. The generated cache key varies by
 `authorization`, `cookie`, `accept` and `accept-language` headers. Query keys
 are normalized independently of object insertion order, and different

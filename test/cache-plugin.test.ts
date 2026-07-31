@@ -23,6 +23,63 @@ afterEach(() => {
 })
 
 describe('cachePlugin', () => {
+  it('should evict the least recently used memory entry at capacity', () => {
+    const store = new MemoryCacheStore({
+      maxEntries: 2
+    })
+    const createEntry = (value: string) => ({
+      data: value,
+      expiresAt: Date.now() + 1000,
+      status: 200,
+      statusText: 'OK',
+      headers: [] as [string, string][]
+    })
+
+    store.set('first', createEntry('first'))
+    store.set('second', createEntry('second'))
+    expect(store.get('first')?.data).toBe('first')
+
+    store.set('third', createEntry('third'))
+
+    expect(store.get('second')).toBeUndefined()
+    expect(store.get('first')?.data).toBe('first')
+    expect(store.get('third')?.data).toBe('third')
+  })
+
+  it('should remove expired memory entries when they are read', () => {
+    vi.useFakeTimers()
+
+    const store = new MemoryCacheStore()
+
+    store.set('temporary', {
+      data: true,
+      expiresAt: Date.now() + 100,
+      status: 200,
+      statusText: 'OK',
+      headers: []
+    })
+
+    vi.advanceTimersByTime(101)
+
+    expect(store.get('temporary')).toBeUndefined()
+  })
+
+  it('should allow the default memory cache to be disabled', () => {
+    const store = new MemoryCacheStore({
+      maxEntries: 0
+    })
+
+    store.set('ignored', {
+      data: true,
+      expiresAt: Date.now() + 1000,
+      status: 200,
+      statusText: 'OK',
+      headers: []
+    })
+
+    expect(store.get('ignored')).toBeUndefined()
+  })
+
   it('should cache response when cache is enabled', async () => {
     const fetchMock = vi.fn().mockResolvedValue(createJsonResponse({ name: 'Npora' }))
 
