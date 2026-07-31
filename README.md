@@ -187,8 +187,8 @@ const user = await request.get<User>('/users/1', {
 })
 ```
 
-Plugin configuration belongs under `extensions`. Legacy top-level plugin
-fields remain available during v0.x but are deprecated.
+Plugin configuration belongs under `extensions`. Top-level plugin fields are
+not part of `RequestConfig`.
 
 ---
 

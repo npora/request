@@ -22,10 +22,12 @@ describe('uploadPlugin', () => {
 
     const data = await request.request<{ ok: boolean }>({
       url: '/upload',
-      upload: {
-        data: {
-          name: 'Npora',
-          enabled: true
+      extensions: {
+        upload: {
+          data: {
+            name: 'Npora',
+            enabled: true
+          }
         }
       }
     })
@@ -86,9 +88,11 @@ describe('uploadPlugin', () => {
     await request.request({
       url: '/upload',
       method: 'PUT',
-      upload: {
-        data: {
-          name: 'Npora'
+      extensions: {
+        upload: {
+          data: {
+            name: 'Npora'
+          }
         }
       }
     })

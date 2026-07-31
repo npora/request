@@ -103,18 +103,22 @@ describe('request integration', () => {
     const first = await request.get<{
       count: number
     }>('/cache', {
-      cache: {
-        enabled: true,
-        ttl: 1000
+      extensions: {
+        cache: {
+          enabled: true,
+          ttl: 1000
+        }
       }
     })
 
     const second = await request.get<{
       count: number
     }>('/cache', {
-      cache: {
-        enabled: true,
-        ttl: 1000
+      extensions: {
+        cache: {
+          enabled: true,
+          ttl: 1000
+        }
       }
     })
 

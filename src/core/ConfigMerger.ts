@@ -64,53 +64,6 @@ export class ConfigMerger {
       )
     }
 
-    // Compatibility fields are supplied through built-in plugin module
-    // augmentation and remain supported during the v0.x migration.
-    if (
-      defaults.retry !== undefined ||
-      config.retry !== undefined
-    ) {
-      result.retry = this.mergeRetry(
-        defaults.retry,
-        config.retry
-      )
-    }
-
-    if (defaults.cache || config.cache) {
-      result.cache = this.mergeObject(
-        defaults.cache,
-        config.cache
-      )
-    }
-
-    if (defaults.auth || config.auth) {
-      result.auth = this.mergeObject(
-        defaults.auth,
-        config.auth
-      )
-    }
-
-    if (defaults.logger || config.logger) {
-      result.logger = this.mergeObject(
-        defaults.logger,
-        config.logger
-      )
-    }
-
-    if (defaults.upload || config.upload) {
-      result.upload = this.mergeObject(
-        defaults.upload,
-        config.upload
-      )
-    }
-
-    if (defaults.download || config.download) {
-      result.download = this.mergeObject(
-        defaults.download,
-        config.download
-      )
-    }
-
     if (
       this.hasBodyConfig(defaults) ||
       this.hasBodyConfig(config)
@@ -210,31 +163,6 @@ export class ConfigMerger {
       ...defaults,
       ...value
     } as T
-  }
-
-  private static mergeRetry(
-    defaults?: RequestConfig['retry'],
-    retry?: RequestConfig['retry']
-  ): RequestConfig['retry'] {
-    if (retry === undefined) {
-      return defaults
-    }
-
-    if (typeof retry === 'number') {
-      return retry
-    }
-
-    const normalizedDefaults =
-      typeof defaults === 'number'
-        ? {
-            retries: defaults
-          }
-        : defaults
-
-    return {
-      ...normalizedDefaults,
-      ...retry
-    }
   }
 
   private static mergeExtensions(

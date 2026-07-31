@@ -41,6 +41,23 @@ const config: RequestConfig = {
 
 void config
 
+type LegacyExtensionKey =
+  | 'auth'
+  | 'cache'
+  | 'download'
+  | 'logger'
+  | 'retry'
+  | 'upload'
+
+type HasNoLegacyExtensionKeys =
+  Extract<keyof RequestConfig, LegacyExtensionKey> extends never
+    ? true
+    : false
+
+const hasNoLegacyExtensionKeys: HasNoLegacyExtensionKeys = true
+
+void hasNoLegacyExtensionKeys
+
 const plugin: Plugin = {
   name: 'metrics',
   priority: 10,

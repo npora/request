@@ -4,14 +4,13 @@ import type {
 } from '../types'
 
 /**
- * Resolve namespaced plugin configuration with a legacy field fallback.
+ * Resolve namespaced plugin configuration.
  */
 export function resolveExtensionConfig<
   Key extends keyof RequestExtensions
 >(
   config: RequestConfig,
-  key: Key,
-  legacy?: RequestExtensions[Key]
+  key: Key
 ): RequestExtensions[Key] | undefined {
-  return config.extensions?.[key] ?? legacy
+  return config.extensions?.[key]
 }

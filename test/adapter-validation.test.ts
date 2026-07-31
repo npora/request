@@ -84,9 +84,11 @@ describe('adapter validation handoff', () => {
       headers: {
         'x-request': 'retry'
       },
-      retry: {
-        retries: 1,
-        delay: 0
+      extensions: {
+        retry: {
+          retries: 1,
+          delay: 0
+        }
       }
     })
 

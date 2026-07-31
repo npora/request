@@ -39,9 +39,11 @@ describe('downloadPlugin progress', () => {
     const request = createClient().use(downloadPlugin())
 
     const data = await request.get<Blob>('/download', {
-      download: {
-        filename: 'npora.txt',
-        onProgress
+      extensions: {
+        download: {
+          filename: 'npora.txt',
+          onProgress
+        }
       }
     })
 
@@ -90,8 +92,10 @@ describe('downloadPlugin progress', () => {
     const request = createClient().use(downloadPlugin())
 
     const data = await request.get<Blob>('/download', {
-      download: {
-        onProgress
+      extensions: {
+        download: {
+          onProgress
+        }
       }
     })
 
@@ -128,8 +132,10 @@ describe('downloadPlugin progress', () => {
 
     await request.get<Blob>('/download', {
       responseType: 'text',
-      download: {
-        onProgress: vi.fn()
+      extensions: {
+        download: {
+          onProgress: vi.fn()
+        }
       }
     })
 
@@ -161,9 +167,11 @@ describe('downloadPlugin progress', () => {
 
     await expect(
       request.get('/download', {
-        download: {
-          onProgress() {
-            throw callbackError
+        extensions: {
+          download: {
+            onProgress() {
+              throw callbackError
+            }
           }
         }
       })

@@ -68,8 +68,10 @@ describe('loggerPlugin', () => {
     const request = createClient().use(loggerPlugin())
 
     await request.get('/user', {
-      logger: {
-        enabled: false
+      extensions: {
+        logger: {
+          enabled: false
+        }
       }
     })
 

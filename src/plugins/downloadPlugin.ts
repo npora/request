@@ -33,8 +33,7 @@ export function downloadPlugin(
       context.interceptors.request.use(config => {
         const download = resolveExtensionConfig(
           config,
-          'download',
-          config.download
+          'download'
         )
 
         if (!download) {
@@ -60,8 +59,7 @@ export function downloadPlugin(
 
         const download = resolveExtensionConfig(
           requestContext.config,
-          'download',
-          requestContext.config.download
+          'download'
         )
         const onProgress = download?.onProgress
 
@@ -104,8 +102,7 @@ export function downloadPlugin(
 
         const download = resolveExtensionConfig(
           response.config,
-          'download',
-          response.config.download
+          'download'
         )
         const onProgress = download?.onProgress
 

@@ -172,8 +172,10 @@ describe('downloadPlugin XMLHttpRequest fallback', () => {
 
     const request = createClient().use(downloadPlugin())
     const data = await request.get<Blob>('/file', {
-      download: {
-        onProgress: vi.fn()
+      extensions: {
+        download: {
+          onProgress: vi.fn()
+        }
       }
     })
 
@@ -194,8 +196,10 @@ describe('downloadPlugin XMLHttpRequest fallback', () => {
       downloadPlugin({ transport: 'xhr' })
     )
     const config = {
-      download: {
-        onProgress: vi.fn()
+      extensions: {
+        download: {
+          onProgress: vi.fn()
+        }
       }
     }
 
@@ -229,8 +233,10 @@ describe('downloadPlugin XMLHttpRequest fallback', () => {
       downloadPlugin({ transport: 'xhr' })
     )
     const response = await request.getResponse<void>('/empty', {
-      download: {
-        onProgress: vi.fn()
+      extensions: {
+        download: {
+          onProgress: vi.fn()
+        }
       }
     })
 
@@ -248,8 +254,10 @@ describe('downloadPlugin XMLHttpRequest fallback', () => {
     const controller = new AbortController()
     const aborted = request.get('/abort', {
       signal: controller.signal,
-      download: {
-        onProgress: vi.fn()
+      extensions: {
+        download: {
+          onProgress: vi.fn()
+        }
       }
     })
     const abortedAssertion = expect(aborted).rejects.toMatchObject({
@@ -265,8 +273,10 @@ describe('downloadPlugin XMLHttpRequest fallback', () => {
 
     const timedOut = request.get('/timeout', {
       timeout: 25,
-      download: {
-        onProgress: vi.fn()
+      extensions: {
+        download: {
+          onProgress: vi.fn()
+        }
       }
     })
     const timeoutAssertion = expect(timedOut).rejects.toMatchObject({
@@ -291,9 +301,11 @@ describe('downloadPlugin XMLHttpRequest fallback', () => {
 
     await expect(
       request.get('/file', {
-        download: {
-          onProgress() {
-            throw callbackError
+        extensions: {
+          download: {
+            onProgress() {
+              throw callbackError
+            }
           }
         }
       })
@@ -326,8 +338,10 @@ describe('downloadPlugin XMLHttpRequest fallback', () => {
           query: {
             id
           },
-          download: {
-            onProgress: progress
+          extensions: {
+            download: {
+              onProgress: progress
+            }
           }
         })
 
@@ -352,8 +366,10 @@ describe('downloadPlugin XMLHttpRequest fallback', () => {
 
     await expect(
       request.get('/file', {
-        download: {
-          onProgress: vi.fn()
+        extensions: {
+          download: {
+            onProgress: vi.fn()
+          }
         }
       })
     ).rejects.toEqual(

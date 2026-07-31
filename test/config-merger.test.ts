@@ -107,47 +107,6 @@ describe('ConfigMerger', () => {
     })
   })
 
-  it('should merge nested extension options', () => {
-    const config = ConfigMerger.merge(
-      {
-        retry: 2,
-        cache: {
-          enabled: true,
-          ttl: 30000
-        },
-        auth: {
-          token: 'default-token',
-          scheme: 'Bearer'
-        }
-      },
-      {
-        url: '/user',
-        retry: {
-          delay: 0
-        },
-        cache: {
-          ttl: 1000
-        },
-        auth: {
-          token: 'request-token'
-        }
-      }
-    )
-
-    expect(config.retry).toMatchObject({
-      retries: 2,
-      delay: 0
-    })
-    expect(config.cache).toEqual({
-      enabled: true,
-      ttl: 1000
-    })
-    expect(config.auth).toEqual({
-      token: 'request-token',
-      scheme: 'Bearer'
-    })
-  })
-
   it('should merge namespaced extension options by plugin key', () => {
     const config = ConfigMerger.merge(
       {

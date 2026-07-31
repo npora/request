@@ -155,17 +155,19 @@ describe('uploadPlugin progress', () => {
     expect(xhr.upload.onprogress).toBeNull()
   })
 
-  it('should support legacy upload progress configuration', async () => {
+  it('should support namespaced upload progress configuration', async () => {
     const onProgress = vi.fn()
     const request = createClient().use(uploadPlugin())
 
     await request.request({
       url: '/upload',
-      upload: {
-        data: {
-          name: 'legacy'
-        },
-        onProgress
+      extensions: {
+        upload: {
+          data: {
+            name: 'report'
+          },
+          onProgress
+        }
       }
     })
 
@@ -179,12 +181,14 @@ describe('uploadPlugin progress', () => {
 
     await expect(
       request.post('/upload', {
-        upload: {
-          data: {
-            name: 'report'
-          },
-          onProgress() {
-            throw callbackError
+        extensions: {
+          upload: {
+            data: {
+              name: 'report'
+            },
+            onProgress() {
+              throw callbackError
+            }
           }
         }
       })
@@ -199,11 +203,13 @@ describe('uploadPlugin progress', () => {
     const request = createClient().use(uploadPlugin())
     const upload = request.post('/upload', {
       signal: controller.signal,
-      upload: {
-        data: {
-          name: 'report'
-        },
-        onProgress: vi.fn()
+      extensions: {
+        upload: {
+          data: {
+            name: 'report'
+          },
+          onProgress: vi.fn()
+        }
       }
     })
     const assertion = expect(upload).rejects.toMatchObject({
@@ -245,11 +251,13 @@ describe('uploadPlugin progress', () => {
           query: {
             id
           },
-          upload: {
-            data: {
-              id
-            },
-            onProgress
+          extensions: {
+            upload: {
+              data: {
+                id
+              },
+              onProgress
+            }
           }
         })
       })
@@ -272,11 +280,13 @@ describe('uploadPlugin progress', () => {
 
     await expect(
       request.post('/upload', {
-        upload: {
-          data: {
-            name: 'report'
-          },
-          onProgress: vi.fn()
+        extensions: {
+          upload: {
+            data: {
+              name: 'report'
+            },
+            onProgress: vi.fn()
+          }
         }
       })
     ).rejects.toMatchObject({

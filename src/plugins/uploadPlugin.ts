@@ -11,8 +11,7 @@ export function uploadPlugin(): Plugin {
       context.interceptors.request.use(config => {
         const upload = resolveExtensionConfig(
           config,
-          'upload',
-          config.upload
+          'upload'
         )
 
         if (!upload) {
@@ -33,8 +32,7 @@ export function uploadPlugin(): Plugin {
 
         const upload = resolveExtensionConfig(
           requestContext.config,
-          'upload',
-          requestContext.config.upload
+          'upload'
         )
 
         if (!upload?.onProgress) {

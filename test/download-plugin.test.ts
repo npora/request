@@ -18,8 +18,10 @@ describe('downloadPlugin', () => {
     const request = createClient().use(downloadPlugin())
 
     const data = await request.get<Blob>('/download', {
-      download: {
-        filename: 'npora.txt'
+      extensions: {
+        download: {
+          filename: 'npora.txt'
+        }
       }
     })
 
@@ -68,8 +70,10 @@ describe('downloadPlugin', () => {
 
     const data = await request.get<string>('/download', {
       responseType: 'text',
-      download: {
-        filename: 'npora.txt'
+      extensions: {
+        download: {
+          filename: 'npora.txt'
+        }
       }
     })
 

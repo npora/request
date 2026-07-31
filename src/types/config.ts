@@ -79,34 +79,4 @@ export interface RequestConfig {
   validateStatus?: (status: number) => boolean
 
   extensions?: RequestExtensions
-
-  /**
-   * @deprecated Use extensions.retry instead.
-   */
-  retry?: number | RetryOptions
-
-  /**
-   * @deprecated Use extensions.cache instead.
-   */
-  cache?: CacheOptions
-
-  /**
-   * @deprecated Use extensions.auth instead.
-   */
-  auth?: AuthOptions
-
-  /**
-   * @deprecated Use extensions.logger instead.
-   */
-  logger?: LoggerOptions
-
-  /**
-   * @deprecated Use extensions.upload instead.
-   */
-  upload?: UploadOptions
-
-  /**
-   * @deprecated Use extensions.download instead.
-   */
-  download?: DownloadOptions
 }

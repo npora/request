@@ -169,8 +169,7 @@ async function resolveAuthorization(
 ): Promise<ResolvedAuthorization> {
   const requestAuth = resolveExtensionConfig(
     config,
-    'auth',
-    config.auth
+    'auth'
   )
 
   const token =

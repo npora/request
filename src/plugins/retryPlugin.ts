@@ -50,8 +50,7 @@ export function retryPlugin(
         const retryOptions = normalizeRetryOptions(
           resolveExtensionConfig(
             requestContext.config,
-            'retry',
-            requestContext.config.retry
+            'retry'
           ),
           defaultOptions
         )

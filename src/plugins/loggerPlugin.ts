@@ -12,8 +12,7 @@ export function loggerPlugin(defaultOptions: LoggerOptions = {}): Plugin {
         const logger =
           resolveExtensionConfig(
             config,
-            'logger',
-            config.logger
+            'logger'
           ) ?? defaultOptions
 
         if (logger.enabled === false) {
@@ -33,8 +32,7 @@ export function loggerPlugin(defaultOptions: LoggerOptions = {}): Plugin {
         const logger =
           resolveExtensionConfig(
             response.config,
-            'logger',
-            response.config.logger
+            'logger'
           ) ?? defaultOptions
 
         if (logger.enabled === false) {
@@ -60,8 +58,7 @@ export function loggerPlugin(defaultOptions: LoggerOptions = {}): Plugin {
           ? (
               resolveExtensionConfig(
                 config,
-                'logger',
-                config.logger
+                'logger'
               ) ?? defaultOptions
             )
           : defaultOptions

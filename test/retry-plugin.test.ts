@@ -37,9 +37,11 @@ describe('retryPlugin', () => {
     const request = createClient().use(retryPlugin())
 
     const data = await request.get<{ ok: boolean }>('/retry', {
-      retry: {
-        retries: 1,
-        delay: 0
+      extensions: {
+        retry: {
+          retries: 1,
+          delay: 0
+        }
       }
     })
 
@@ -104,7 +106,9 @@ describe('retryPlugin', () => {
 
     await expect(
       request.get('/retry', {
-        retry: 0
+        extensions: {
+          retry: 0
+        }
       })
     ).rejects.toMatchObject({
       code: 'HTTP_ERROR',

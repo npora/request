@@ -26,9 +26,11 @@ describe('cachePlugin', () => {
     const request = createClient().use(cachePlugin())
 
     const config = {
-      cache: {
-        enabled: true,
-        ttl: 1000
+      extensions: {
+        cache: {
+          enabled: true,
+          ttl: 1000
+        }
       }
     }
 
@@ -94,9 +96,11 @@ describe('cachePlugin', () => {
     const request = createClient().use(cachePlugin())
 
     const config = {
-      cache: {
-        enabled: true,
-        ttl: 100
+      extensions: {
+        cache: {
+          enabled: true,
+          ttl: 100
+        }
       }
     }
 
@@ -123,9 +127,11 @@ describe('cachePlugin', () => {
 
     const request = createClient().use(cachePlugin())
     const config = {
-      cache: {
-        enabled: true,
-        ttl: 100
+      extensions: {
+        cache: {
+          enabled: true,
+          ttl: 100
+        }
       }
     }
 
@@ -155,16 +161,20 @@ describe('cachePlugin', () => {
     const request = createClient().use(cachePlugin())
 
     await request.get('/user/1', {
-      cache: {
-        enabled: true,
-        key: 'user'
+      extensions: {
+        cache: {
+          enabled: true,
+          key: 'user'
+        }
       }
     })
 
     await request.get('/user/2', {
-      cache: {
-        enabled: true,
-        key: 'user'
+      extensions: {
+        cache: {
+          enabled: true,
+          key: 'user'
+        }
       }
     })
 
@@ -186,14 +196,18 @@ describe('cachePlugin', () => {
     }
 
     await request.get('/search', {
-      cache,
+      extensions: {
+        cache
+      },
       query: {
         page: 1,
         keyword: 'npora'
       }
     })
     await request.get('/search', {
-      cache,
+      extensions: {
+        cache
+      },
       query: {
         keyword: 'npora',
         page: 1
@@ -230,11 +244,15 @@ describe('cachePlugin', () => {
       enabled: true
     }
     const text = await request.get<string>('/document', {
-      cache,
+      extensions: {
+        cache
+      },
       responseType: 'text'
     })
     const buffer = await request.get<ArrayBuffer>('/document', {
-      cache,
+      extensions: {
+        cache
+      },
       responseType: 'arrayBuffer'
     })
 
@@ -254,8 +272,10 @@ describe('cachePlugin', () => {
     const firstClient = createClient().use(cachePlugin())
     const secondClient = createClient().use(cachePlugin())
     const config = {
-      cache: {
-        enabled: true
+      extensions: {
+        cache: {
+          enabled: true
+        }
       }
     }
 
@@ -284,7 +304,9 @@ describe('cachePlugin', () => {
 
     await expect(
       request.get('/profile', {
-        cache,
+        extensions: {
+          cache
+        },
         headers: {
           authorization: 'Bearer token-1'
         }
@@ -295,7 +317,9 @@ describe('cachePlugin', () => {
 
     await expect(
       request.get('/profile', {
-        cache,
+        extensions: {
+          cache
+        },
         headers: {
           authorization: 'Bearer token-2'
         }
@@ -317,8 +341,10 @@ describe('cachePlugin', () => {
 
     const request = createClient().use(cachePlugin())
     const config = {
-      cache: {
-        enabled: true
+      extensions: {
+        cache: {
+          enabled: true
+        }
       },
       json: {
         item: 'book'
@@ -348,8 +374,10 @@ describe('cachePlugin', () => {
 
     const request = createClient().use(cachePlugin())
     const config = {
-      cache: {
-        enabled: true
+      extensions: {
+        cache: {
+          enabled: true
+        }
       }
     }
 
@@ -394,8 +422,10 @@ describe('cachePlugin', () => {
 
     const request = createClient().use(cachePlugin())
     const config = {
-      cache: {
-        enabled: true
+      extensions: {
+        cache: {
+          enabled: true
+        }
       }
     }
 
@@ -431,8 +461,10 @@ describe('cachePlugin', () => {
       .use(cachePlugin())
       .use(observer)
     const config = {
-      cache: {
-        enabled: true
+      extensions: {
+        cache: {
+          enabled: true
+        }
       }
     }
 
@@ -454,8 +486,10 @@ describe('cachePlugin', () => {
     const plugin = cachePlugin()
     const request = createClient().use(plugin)
     const config = {
-      cache: {
-        enabled: true
+      extensions: {
+        cache: {
+          enabled: true
+        }
       }
     }
 

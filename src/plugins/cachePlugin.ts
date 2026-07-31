@@ -76,8 +76,7 @@ export function cachePlugin(
 
         const cache = resolveExtensionConfig(
           requestContext.config,
-          'cache',
-          requestContext.config.cache
+          'cache'
         )
 
         if (
@@ -123,8 +122,7 @@ export function cachePlugin(
 
         const cache = resolveExtensionConfig(
           requestContext.config,
-          'cache',
-          requestContext.config.cache
+          'cache'
         )
 
         if (

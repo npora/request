@@ -408,9 +408,9 @@ await request.get('/user', {
 })
 ```
 
-The previous top-level `retry`, `cache`, `auth`, `logger`, `upload` and
-`download` fields remain available during v0.x, but are deprecated in favor of
-their namespaced equivalents.
+The `retry`, `cache`, `auth`, `logger`, `upload` and `download` fields are
+accepted only inside `extensions`. Keeping plugin-owned options namespaced
+prevents third-party extensions from increasing the Core configuration surface.
 
 Third-party plugins can add strongly typed configuration without modifying
 Npora Request core types:
