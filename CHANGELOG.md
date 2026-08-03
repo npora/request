@@ -1,5 +1,13 @@
 # @npora/request
 
+## 1.7.0
+
+### Minor Changes
+
+- 87eb63d: Add an origin-isolated concurrency plugin with FIFO queueing, bounded active,
+  queued and retained state, per-request queue timeouts and cancellation-aware
+  cleanup.
+
 ## 1.6.0
 
 ### Minor Changes
