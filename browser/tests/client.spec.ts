@@ -355,6 +355,41 @@ test(
 )
 
 test(
+  'should enforce concurrency limits in the browser',
+  async ({ page }) => {
+    await openFixture(page)
+
+    const result = await page.evaluate(async () => {
+      const moduleURL = `${location.origin}/dist/index.js`
+      const {
+        concurrencyPlugin,
+        createClient
+      } = await import(moduleURL)
+      const request = createClient({
+        baseURL: '/api'
+      }).use(concurrencyPlugin({
+        maxConcurrent: 1,
+        maxQueue: 0
+      }))
+      const first = request.get('/slow')
+      let code: string | undefined
+
+      try {
+        await request.get('/user')
+      } catch (error) {
+        code = (error as { code?: string }).code
+      }
+
+      await first
+
+      return code
+    })
+
+    expect(result).toBe('CONCURRENCY_LIMIT')
+  }
+)
+
+test(
   'should send HEAD and OPTIONS requests in the browser',
   async ({ page }) => {
     await openFixture(page)

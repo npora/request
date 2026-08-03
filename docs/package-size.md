@@ -42,6 +42,11 @@ machine, bounded half-open concurrency, final-outcome accounting, public types,
 and lifecycle observers. The package continues to have zero runtime
 dependencies.
 
+Version 1.7.0 raised the ESM, CommonJS, and unpacked-package budgets for the
+official concurrency plugin's origin isolation, FIFO queue, cancellation and
+timeout cleanup, bounded key retention, public types, and stable overload error
+code. Compressed entrypoint and tarball budgets remain unchanged.
+
 `pnpm test:package` includes the size check, so release verification cannot
 publish a package that exceeds the checked-in budgets. CI also stores the JSON
 report for comparing changes over time.

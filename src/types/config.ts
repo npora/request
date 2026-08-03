@@ -3,6 +3,7 @@ import type {
   AuthOptions,
   CacheOptions,
   CircuitBreakerOptions,
+  ConcurrencyOptions,
   DownloadOptions,
   LoggerOptions,
   RetryOptions,
@@ -42,6 +43,8 @@ export interface RequestExtensions {
   cache?: CacheOptions
 
   circuitBreaker?: CircuitBreakerOptions
+
+  concurrency?: ConcurrencyOptions
 
   download?: DownloadOptions
 

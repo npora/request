@@ -336,6 +336,7 @@ Official plugins:
 retryPlugin()
 cachePlugin()
 circuitBreakerPlugin()
+concurrencyPlugin()
 authPlugin()
 loggerPlugin()
 uploadPlugin()
@@ -494,10 +495,10 @@ await request.get('/user', {
 })
 ```
 
-The `retry`, `cache`, `circuitBreaker`, `auth`, `logger`, `upload` and
-`download` fields are accepted only inside `extensions`. Keeping plugin-owned
-options namespaced prevents third-party extensions from increasing the Core
-configuration surface.
+The `retry`, `cache`, `circuitBreaker`, `concurrency`, `auth`, `logger`,
+`upload` and `download` fields are accepted only inside `extensions`. Keeping
+plugin-owned options namespaced prevents third-party extensions from
+increasing the Core configuration surface.
 
 Third-party plugins can add strongly typed configuration without modifying
 Npora Request core types:
@@ -636,6 +637,58 @@ LRU eviction when another isolation key is created. Configure the bound with
 `maxCircuits`. Records with active requests are never evicted, so an extreme
 burst of unique concurrent keys may temporarily exceed the configured bound;
 the map is trimmed as requests settle.
+
+## Concurrency Limiting
+
+```ts
+const concurrency = concurrencyPlugin({
+  maxConcurrent: 20,
+  maxQueue: 200,
+  queueTimeout: 5000,
+  maxKeys: 1000
+})
+
+const request = createClient().use(concurrency)
+```
+
+The plugin admits at most `maxConcurrent` logical requests for each isolation
+key. Additional requests wait in FIFO order up to `maxQueue`; a full queue or
+an expired `queueTimeout` rejects before adapter I/O with
+`RequestError.code === 'CONCURRENCY_LIMIT'`. A logical request keeps its permit
+across retry attempts and retry delays, then releases it after the final
+settled lifecycle.
+
+Keys use the resolved request origin by default. Relative URLs without an
+absolute `baseURL` share the `default` key. Override the key, queue timeout, or
+disable limiting for one request:
+
+```ts
+await request.get('/inventory', {
+  extensions: {
+    concurrency: {
+      key: 'inventory-primary',
+      queueTimeout: 1000
+    }
+  }
+})
+
+await request.get('/diagnostics', {
+  extensions: {
+    concurrency: {
+      enabled: false
+    }
+  }
+})
+```
+
+Queued requests observe their `AbortSignal`. Removing the plugin rejects all
+queued requests with `ABORT_ERROR` and releases its state. Inspect a key with
+`concurrency.getState(key)`, which reports active and queued counts.
+
+The plugin retains at most `maxKeys` inactive key records using LRU eviction.
+Records with active or queued requests are never evicted, so a burst of unique
+concurrent keys may temporarily exceed the configured bound; records are
+trimmed as requests settle.
 
 ## Cache
 
@@ -875,6 +928,7 @@ TIMEOUT_ERROR
 ABORT_ERROR
 PARSER_ERROR
 CIRCUIT_OPEN
+CONCURRENCY_LIMIT
 ```
 
 ---
