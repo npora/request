@@ -20,9 +20,11 @@ application.
   delegated to application-provided storage.
 - Circuit-breaker isolation defaults to URL origins, excluding credentials,
   paths, queries, and request bodies from generated keys and rejection errors.
-- Default cache and circuit-breaker state is capacity-bounded with LRU
-  eviction; circuit records serving active requests are retained until those
-  requests settle.
+- Concurrency isolation also defaults to URL origins; queue-limit errors do not
+  include the generated key.
+- Default cache, circuit-breaker and concurrency state is capacity-bounded
+  with LRU eviction; state serving active or queued requests is retained until
+  those requests settle.
 - Timeout, abort, stream, XHR, hook, and plugin resources are cleaned up when a
   request settles.
 - The published package has zero runtime dependencies and an exact tarball

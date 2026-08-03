@@ -116,6 +116,7 @@ import {
   authPlugin,
   cachePlugin,
   circuitBreakerPlugin,
+  concurrencyPlugin,
   createClient,
   retryPlugin
 } from '@npora/request'
@@ -129,6 +130,7 @@ const request = createClient()
     maxElapsedTime: 10000
   }))
   .use(circuitBreakerPlugin())
+  .use(concurrencyPlugin({ maxConcurrent: 20 }))
   .use(cache)
   .use(authPlugin({
     token: () => accessToken,
@@ -167,6 +169,7 @@ Built-in plugins:
 - `retryPlugin()`
 - `cachePlugin()`
 - `circuitBreakerPlugin()`
+- `concurrencyPlugin()`
 - `authPlugin()`
 - `loggerPlugin()`
 - `uploadPlugin()`
@@ -193,6 +196,22 @@ Circuits are isolated by request origin by default. Open circuits reject with
 the stable `CIRCUIT_OPEN` error code and permit a bounded half-open probe after
 the recovery window. Inactive circuit state is retained with LRU eviction;
 active requests are never evicted and can temporarily exceed `maxCircuits`.
+
+Bound concurrent logical requests and queue short bursts before adapter I/O:
+
+```ts
+const concurrency = concurrencyPlugin({
+  maxConcurrent: 20,
+  maxQueue: 200,
+  queueTimeout: 5000
+})
+
+const request = createClient().use(concurrency)
+```
+
+Limits are isolated by resolved request origin. Queued requests are admitted
+in FIFO order and remain abortable through their request signal. Full queues
+and expired queue waits reject with the stable `CONCURRENCY_LIMIT` error code.
 
 Inject a structured logger when request correlation and timing are needed:
 
@@ -269,6 +288,7 @@ Stable request error codes:
 - `ABORT_ERROR`
 - `PARSER_ERROR`
 - `CIRCUIT_OPEN`
+- `CONCURRENCY_LIMIT`
 
 ## Documentation
 

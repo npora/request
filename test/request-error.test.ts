@@ -67,7 +67,9 @@ describe('RequestError', () => {
     'NETWORK_ERROR',
     'TIMEOUT_ERROR',
     'ABORT_ERROR',
-    'PARSER_ERROR'
+    'PARSER_ERROR',
+    'CIRCUIT_OPEN',
+    'CONCURRENCY_LIMIT'
   ] as const)('should support %s', code => {
     const error = new RequestError('Request failed', {
       code

@@ -11,6 +11,7 @@ export type RequestErrorCode =
   | 'ABORT_ERROR'
   | 'PARSER_ERROR'
   | 'CIRCUIT_OPEN'
+  | 'CONCURRENCY_LIMIT'
 
 export interface RequestErrorOptions<T = unknown> {
   /**

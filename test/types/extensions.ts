@@ -5,6 +5,9 @@ import type {
   CircuitBreakerPluginOptions,
   CircuitBreakerStateChange,
   CircuitState,
+  ConcurrencyPlugin,
+  ConcurrencyPluginOptions,
+  ConcurrencyState,
   DownloadPluginOptions,
   LoggerEntry,
   MemoryCacheStoreOptions,
@@ -17,6 +20,7 @@ import type {
 } from '@npora/request'
 import {
   circuitBreakerPlugin,
+  concurrencyPlugin,
   downloadPlugin,
   MemoryCacheStore
 } from '@npora/request'
@@ -56,6 +60,10 @@ const config: RequestConfig = {
     },
     circuitBreaker: {
       key: 'primary-api'
+    },
+    concurrency: {
+      key: 'primary-api',
+      queueTimeout: 1000
     },
     metrics: {
       enabled: true,
@@ -200,3 +208,20 @@ breaker.reset('primary-api')
 breaker.reset()
 
 void circuitState
+
+const concurrencyOptions: ConcurrencyPluginOptions = {
+  maxConcurrent: 10,
+  maxQueue: 100,
+  queueTimeout: 5000,
+  maxKeys: 1000,
+  createKey(requestConfig) {
+    return requestConfig.baseURL ?? 'default'
+  }
+}
+const concurrency: ConcurrencyPlugin = concurrencyPlugin(
+  concurrencyOptions
+)
+const concurrencyState: Readonly<ConcurrencyState> =
+  concurrency.getState('primary-api')
+
+void concurrencyState

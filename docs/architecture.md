@@ -59,9 +59,10 @@ execution order.
 
 ### Plugins
 
-Plugins add retry, caching, authentication, logging, and transfer progress
-through scoped interceptors and hooks. A plugin may declare dependencies and
-conflicts, return cleanup logic, and be removed with `unuse()`.
+Plugins add retry, caching, concurrency limiting, circuit breaking,
+authentication, logging, and transfer progress through scoped interceptors
+and hooks. A plugin may declare dependencies and conflicts, return cleanup
+logic, and be removed with `unuse()`.
 
 The final `onSettled` hook runs after response/error interceptors and all retry
 decisions. It is intended for terminal coordination such as releasing

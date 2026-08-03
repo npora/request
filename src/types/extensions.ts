@@ -127,6 +127,27 @@ export interface CacheOptions {
   dedupe?: boolean
 }
 
+export interface ConcurrencyOptions {
+  /**
+   * Enable concurrency limiting for this request.
+   *
+   * @default true
+   */
+  enabled?: boolean
+
+  /**
+   * Override the isolation key for this request.
+   */
+  key?: string
+
+  /**
+   * Maximum time in milliseconds this request may wait for a permit.
+   *
+   * @default the plugin-level queueTimeout
+   */
+  queueTimeout?: number
+}
+
 export interface AuthOptions {
   token?: string | (() => string | Promise<string>)
 
