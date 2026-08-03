@@ -37,8 +37,10 @@ jobs:
           registry-url: https://registry.npmjs.org
           package-manager-cache: false
 
-      - name: Update npm
-        run: npm install --global npm@latest
+      - name: Setup npm
+        run: |
+          npm install --global npm@11
+          npm --version
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
