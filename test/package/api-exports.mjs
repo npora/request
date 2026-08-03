@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { fileURLToPath } from 'node:url'
-import ts from 'typescript'
+import ts from 'typescript-api'
 
 const publicExports = [
   'Adapter',
