@@ -46,7 +46,12 @@ jobs:
           package-manager-cache: false
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: Reject known malicious dependencies
+        run: pnpm audit:malware
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
 
       - name: Run unit and integration tests
         run: pnpm test:run
@@ -78,7 +83,12 @@ jobs:
           package-manager-cache: false
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: Reject known malicious dependencies
+        run: pnpm audit:malware
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
 
       - name: Typecheck
         run: pnpm typecheck
@@ -142,7 +152,12 @@ jobs:
           package-manager-cache: false
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: Reject known malicious dependencies
+        run: pnpm audit:malware
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
 
       - name: Install Playwright browsers
         run: pnpm exec playwright install --with-deps chromium webkit

@@ -39,19 +39,25 @@ jobs:
 
       - name: Setup npm
         run: |
-          npm install --global npm@11
+          npm install --global npm@11.16.0 --ignore-scripts
           npm --version
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: Verify dependencies
+        run: |
+          pnpm audit:malware
+          pnpm audit:dependencies
+          pnpm audit:signatures
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
 
       - name: Verify
         run: |
           pnpm typecheck
           pnpm test:docs
           pnpm test:coverage
-          pnpm audit:dependencies
-          pnpm audit:signatures
           pnpm build
           pnpm test:package
 

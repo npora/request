@@ -39,7 +39,12 @@ jobs:
           package-manager-cache: false
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: Reject known malicious dependencies
+        run: pnpm audit:malware
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
 
       - name: Audit high-severity advisories
         run: pnpm audit:dependencies

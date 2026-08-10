@@ -66,6 +66,7 @@
     "test:browser:ui": "playwright test --config=browser/playwright.config.ts --ui",
     "test:browser:report": "playwright show-report playwright-report",
     "audit:dependencies": "pnpm audit --audit-level high",
+    "audit:malware": "node scripts/audit-malware.mjs",
     "audit:signatures": "pnpm audit signatures",
     "benchmark": "tsx benchmark/request.ts",
     "benchmark:types": "tsc -p benchmark/tsconfig.json"
