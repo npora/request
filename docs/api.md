@@ -199,9 +199,50 @@ exceeds the limit fails with `RESPONSE_TOO_LARGE`; a trustworthy
     | 'stream'
     | 'sse'
     | 'ndjson'
+  schema?: StandardSchemaV1
   validateStatus?: (status: number) => boolean
 }
 ```
+
+`schema` accepts any Standard Schema v1 compatible validator. It validates the
+parsed value for successful responses after plugin response hooks and before
+application response interceptors run. This lets transport plugins cache the
+original parsed value while every consuming request applies its own schema.
+Both synchronous and asynchronous validators are supported, successful schema
+transformations replace `response.data`, and the schema output type is inferred
+by data-only and complete-response methods.
+
+Schemas are endpoint-specific request configuration and are intentionally not
+accepted as client or `extend()` defaults, preventing one endpoint's contract
+from being inherited by unrelated requests.
+
+```ts
+import { z } from 'zod'
+
+const userSchema = z.object({
+  id: z.number(),
+  name: z.string()
+})
+
+const user = await request.get('/users/1', {
+  schema: userSchema
+})
+
+const response = await request.getResponse('/users/1', {
+  schema: userSchema
+})
+```
+
+Failed validation throws `SchemaValidationError`, which extends
+`RequestError`, uses `SCHEMA_ERROR`, and exposes `issues`, `schemaVendor`, the
+parsed data, and response metadata. If the validator throws, its error is
+preserved as `cause`. Schemas run only for successful HTTP responses; HTTP
+error bodies continue to use `HTTP_ERROR` without invoking the success schema.
+
+The schema validates the parsed response value once. It does not validate each
+record inside SSE or NDJSON async iterables. Schema validators are
+application-provided code and should be reviewed like interceptors and
+plugins.
 
 Data-only methods parse successful Fetch responses directly when no response
 hooks or interceptors are installed. Complete response methods, response
@@ -992,6 +1033,7 @@ NETWORK_ERROR
 TIMEOUT_ERROR
 ABORT_ERROR
 PARSER_ERROR
+SCHEMA_ERROR
 RESPONSE_TOO_LARGE
 CIRCUIT_OPEN
 CONCURRENCY_LIMIT

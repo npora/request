@@ -21,6 +21,9 @@ application.
 - Cache keys include all explicitly configured request headers so custom
   response `Vary` dimensions cannot reuse another header variant.
 - Parsed and streamed responses can be bounded with `maxResponseSize`.
+- Successful parsed responses can be validated and transformed with a
+  Standard Schema v1 compatible validator before application response
+  interceptors run.
 - FormData array flattening rejects circular references and limits nesting to
   32 levels by default.
 - Authentication refresh is deduplicated per client and token persistence is
@@ -43,12 +46,13 @@ application.
 Applications must still:
 
 - Allowlist trusted origins when request URLs can be influenced by users.
-- Treat server responses as untrusted and validate them before use.
+- Treat server responses as untrusted and configure an appropriate response
+  schema before use when runtime validation is required.
 - Store credentials using controls appropriate to the runtime.
 - Avoid placing secrets in URLs, thrown error messages, or application logs.
 - Configure CORS, TLS, cookies, redirects, and content security policy at the
   application and server layers.
-- Review custom adapters, plugins, interceptors, cache keys, and
+- Review custom adapters, plugins, interceptors, schemas, cache keys, and
   `validateStatus` callbacks as application code.
 
 The client intentionally does not block private network addresses or arbitrary

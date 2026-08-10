@@ -47,6 +47,7 @@ interface BrowserRequestConfig {
   query?: Record<string, string | number>
   timeout?: number
   maxResponseSize?: number
+  schema?: BrowserStandardSchema
   responseType?:
     | 'json'
     | 'text'
@@ -55,6 +56,16 @@ interface BrowserRequestConfig {
     | 'stream'
     | 'sse'
     | 'ndjson'
+}
+
+interface BrowserStandardSchema {
+  readonly '~standard': {
+    readonly version: 1
+    readonly vendor: string
+    readonly validate: (value: unknown) =>
+      | { value: unknown }
+      | { issues: ReadonlyArray<{ message: string }> }
+  }
 }
 
 interface BrowserWindow extends Window {
@@ -110,6 +121,45 @@ test(
     expect(user).toEqual({
       id: 1,
       name: 'Npora'
+    })
+  }
+)
+
+test(
+  'should validate and transform a response in the browser',
+  async ({ page }) => {
+    await openFixture(page)
+
+    const user = await page.evaluate(async () => {
+      const request = (window as BrowserWindow).nporaRequest
+
+      if (!request) {
+        throw new Error('Npora request client is unavailable')
+      }
+
+      return request.get<User>('/user', {
+        schema: {
+          '~standard': {
+            version: 1,
+            vendor: 'browser-test',
+            validate(value) {
+              const record = value as User
+
+              return {
+                value: {
+                  id: record.id,
+                  name: record.name.toUpperCase()
+                }
+              }
+            }
+          }
+        }
+      })
+    })
+
+    expect(user).toEqual({
+      id: 1,
+      name: 'NPORA'
     })
   }
 )

@@ -5,7 +5,7 @@ import type { RequestConfig } from './config'
  * Client creation options.
  */
 export interface ClientOptions
-  extends Partial<Omit<RequestConfig, 'url' | 'method'>> {
+  extends Partial<Omit<RequestConfig, 'url' | 'method' | 'schema'>> {
   /**
    * Request adapter.
    *

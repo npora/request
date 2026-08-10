@@ -15,10 +15,48 @@ export function validateRequestConfig(config: RequestConfig): Headers {
   validateURL(config)
   validateTimeout(config)
   validateLimits(config)
+  validateSchema(config)
   const headers = validateHeaders(config)
   validateBody(config)
 
   return headers
+}
+
+function validateSchema(config: RequestConfig): void {
+  if (config.schema === undefined) {
+    return
+  }
+
+  try {
+    const candidate = config.schema as unknown
+
+    if (
+      (typeof candidate !== 'object' && typeof candidate !== 'function') ||
+      candidate === null
+    ) {
+      throw new TypeError('Schema must be an object or function')
+    }
+
+    const standard = (candidate as {
+      '~standard'?: unknown
+    })['~standard']
+
+    if (
+      typeof standard !== 'object' ||
+      standard === null ||
+      (standard as { version?: unknown }).version !== 1 ||
+      typeof (standard as { vendor?: unknown }).vendor !== 'string' ||
+      typeof (standard as { validate?: unknown }).validate !== 'function'
+    ) {
+      throw new TypeError('Schema does not implement Standard Schema v1')
+    }
+  } catch (error) {
+    throw configError(
+      'Request schema must implement Standard Schema v1',
+      config,
+      error
+    )
+  }
 }
 
 function validateLimits(config: RequestConfig): void {

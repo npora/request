@@ -1,4 +1,5 @@
 import type { HttpMethod } from './method'
+import type { StandardSchemaV1 } from './standardSchema'
 import type {
   AuthOptions,
   CacheOptions,
@@ -97,6 +98,13 @@ export interface RequestConfig {
   maxFormDataDepth?: number
 
   responseType?: ResponseType
+
+  /**
+   * Validate and optionally transform the parsed response value.
+   *
+   * Accepts any Standard Schema v1 compatible validator.
+   */
+  schema?: StandardSchemaV1
 
   validateStatus?: (status: number) => boolean
 

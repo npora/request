@@ -3,7 +3,8 @@ import {
   circuitBreakerPlugin,
   createClient,
   MockAdapter,
-  RequestError
+  RequestError,
+  SchemaValidationError
 } from '@npora/request'
 
 const requests = []
@@ -71,6 +72,44 @@ assert.deepEqual(response.data, {
   method: 'GET',
   url: '/response'
 })
+
+const validated = await client.get('/validated', {
+  schema: {
+    '~standard': {
+      version: 1,
+      vendor: 'package-contract',
+      validate(value) {
+        return {
+          value: value.url
+        }
+      }
+    }
+  }
+})
+
+assert.equal(validated, '/validated')
+
+await assert.rejects(
+  client.get('/schema-failure', {
+    schema: {
+      '~standard': {
+        version: 1,
+        vendor: 'package-contract',
+        validate() {
+          return {
+            issues: [{ message: 'Rejected by package contract' }]
+          }
+        }
+      }
+    }
+  }),
+  error => (
+    error instanceof SchemaValidationError &&
+    error instanceof RequestError &&
+    error.code === 'SCHEMA_ERROR' &&
+    error.issues[0].message === 'Rejected by package contract'
+  )
+)
 
 const methods = [
   ['get', 'GET'],

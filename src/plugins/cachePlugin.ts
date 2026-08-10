@@ -340,7 +340,14 @@ export function cachePlugin(
 
         completedRecords.delete(requestContext)
 
-        if (record && requestContext.response && !requestContext.error) {
+        if (
+          record &&
+          requestContext.response &&
+          (
+            !requestContext.error ||
+            isSchemaValidationFailure(requestContext.error)
+          )
+        ) {
           pending.resolve(record)
           return
         }
@@ -579,6 +586,10 @@ function isAsyncIterable(value: unknown): value is AsyncIterable<unknown> {
   return typeof value === 'object' &&
     value !== null &&
     Symbol.asyncIterator in value
+}
+
+function isSchemaValidationFailure(error: unknown): boolean {
+  return error instanceof RequestError && error.code === 'SCHEMA_ERROR'
 }
 
 function allowsPersistentCaching(response: NporaResponse): boolean {

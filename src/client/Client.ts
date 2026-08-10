@@ -13,8 +13,18 @@ import type {
   ClientOptions,
   NporaResponse,
   RequestConfig,
-  ServerSentEvent
+  ServerSentEvent,
+  StandardSchemaV1
 } from '../types'
+
+type MethodConfig = Omit<RequestConfig, 'url' | 'method'>
+
+type SchemaMethodConfig<Schema extends StandardSchemaV1> = Omit<
+  MethodConfig,
+  'schema'
+> & {
+  schema: Schema
+}
 
 export class Client {
   private readonly defaults: Partial<RequestConfig>
@@ -133,6 +143,12 @@ export class Client {
     return this.installedPlugins.has(pluginName)
   }
 
+  request<Schema extends StandardSchemaV1>(
+    config: RequestConfig & { schema: Schema }
+  ): Promise<StandardSchemaV1.InferOutput<Schema>>
+
+  request<T = unknown>(config: RequestConfig): Promise<T>
+
   async request<T = unknown>(config: RequestConfig): Promise<T> {
     const mergedConfig = ConfigMerger.merge(
       this.defaults,
@@ -146,6 +162,14 @@ export class Client {
     return response.data
   }
 
+  requestResponse<Schema extends StandardSchemaV1>(
+    config: RequestConfig & { schema: Schema }
+  ): Promise<NporaResponse<StandardSchemaV1.InferOutput<Schema>>>
+
+  requestResponse<T = unknown>(
+    config: RequestConfig
+  ): Promise<NporaResponse<T>>
+
   async requestResponse<T = unknown>(
     config: RequestConfig
   ): Promise<NporaResponse<T>> {
@@ -153,9 +177,19 @@ export class Client {
     return this.pipeline.execute<T>(mergedConfig)
   }
 
+  get<Schema extends StandardSchemaV1>(
+    url: string,
+    config: SchemaMethodConfig<Schema>
+  ): Promise<StandardSchemaV1.InferOutput<Schema>>
+
   get<T = unknown>(
     url: string,
-    config: Omit<RequestConfig, 'url' | 'method'> = {}
+    config?: MethodConfig
+  ): Promise<T>
+
+  get<T = unknown>(
+    url: string,
+    config: MethodConfig = {}
   ): Promise<T> {
     return this.request<T>({
       ...config,
@@ -163,10 +197,20 @@ export class Client {
       method: 'GET'
     })
   }
+
+  getResponse<Schema extends StandardSchemaV1>(
+    url: string,
+    config: SchemaMethodConfig<Schema>
+  ): Promise<NporaResponse<StandardSchemaV1.InferOutput<Schema>>>
 
   getResponse<T = unknown>(
     url: string,
-    config: Omit<RequestConfig, 'url' | 'method'> = {}
+    config?: MethodConfig
+  ): Promise<NporaResponse<T>>
+
+  getResponse<T = unknown>(
+    url: string,
+    config: MethodConfig = {}
   ): Promise<NporaResponse<T>> {
     return this.requestResponse<T>({
       ...config,
@@ -175,9 +219,19 @@ export class Client {
     })
   }
 
+  post<Schema extends StandardSchemaV1>(
+    url: string,
+    config: SchemaMethodConfig<Schema>
+  ): Promise<StandardSchemaV1.InferOutput<Schema>>
+
   post<T = unknown>(
     url: string,
-    config: Omit<RequestConfig, 'url' | 'method'> = {}
+    config?: MethodConfig
+  ): Promise<T>
+
+  post<T = unknown>(
+    url: string,
+    config: MethodConfig = {}
   ): Promise<T> {
     return this.request<T>({
       ...config,
@@ -185,10 +239,20 @@ export class Client {
       method: 'POST'
     })
   }
+
+  postResponse<Schema extends StandardSchemaV1>(
+    url: string,
+    config: SchemaMethodConfig<Schema>
+  ): Promise<NporaResponse<StandardSchemaV1.InferOutput<Schema>>>
 
   postResponse<T = unknown>(
     url: string,
-    config: Omit<RequestConfig, 'url' | 'method'> = {}
+    config?: MethodConfig
+  ): Promise<NporaResponse<T>>
+
+  postResponse<T = unknown>(
+    url: string,
+    config: MethodConfig = {}
   ): Promise<NporaResponse<T>> {
     return this.requestResponse<T>({
       ...config,
@@ -197,9 +261,19 @@ export class Client {
     })
   }
 
+  put<Schema extends StandardSchemaV1>(
+    url: string,
+    config: SchemaMethodConfig<Schema>
+  ): Promise<StandardSchemaV1.InferOutput<Schema>>
+
   put<T = unknown>(
     url: string,
-    config: Omit<RequestConfig, 'url' | 'method'> = {}
+    config?: MethodConfig
+  ): Promise<T>
+
+  put<T = unknown>(
+    url: string,
+    config: MethodConfig = {}
   ): Promise<T> {
     return this.request<T>({
       ...config,
@@ -207,10 +281,20 @@ export class Client {
       method: 'PUT'
     })
   }
+
+  putResponse<Schema extends StandardSchemaV1>(
+    url: string,
+    config: SchemaMethodConfig<Schema>
+  ): Promise<NporaResponse<StandardSchemaV1.InferOutput<Schema>>>
 
   putResponse<T = unknown>(
     url: string,
-    config: Omit<RequestConfig, 'url' | 'method'> = {}
+    config?: MethodConfig
+  ): Promise<NporaResponse<T>>
+
+  putResponse<T = unknown>(
+    url: string,
+    config: MethodConfig = {}
   ): Promise<NporaResponse<T>> {
     return this.requestResponse<T>({
       ...config,
@@ -219,9 +303,19 @@ export class Client {
     })
   }
 
+  patch<Schema extends StandardSchemaV1>(
+    url: string,
+    config: SchemaMethodConfig<Schema>
+  ): Promise<StandardSchemaV1.InferOutput<Schema>>
+
   patch<T = unknown>(
     url: string,
-    config: Omit<RequestConfig, 'url' | 'method'> = {}
+    config?: MethodConfig
+  ): Promise<T>
+
+  patch<T = unknown>(
+    url: string,
+    config: MethodConfig = {}
   ): Promise<T> {
     return this.request<T>({
       ...config,
@@ -230,9 +324,19 @@ export class Client {
     })
   }
 
+  patchResponse<Schema extends StandardSchemaV1>(
+    url: string,
+    config: SchemaMethodConfig<Schema>
+  ): Promise<NporaResponse<StandardSchemaV1.InferOutput<Schema>>>
+
   patchResponse<T = unknown>(
     url: string,
-    config: Omit<RequestConfig, 'url' | 'method'> = {}
+    config?: MethodConfig
+  ): Promise<NporaResponse<T>>
+
+  patchResponse<T = unknown>(
+    url: string,
+    config: MethodConfig = {}
   ): Promise<NporaResponse<T>> {
     return this.requestResponse<T>({
       ...config,
@@ -241,9 +345,19 @@ export class Client {
     })
   }
 
+  delete<Schema extends StandardSchemaV1>(
+    url: string,
+    config: SchemaMethodConfig<Schema>
+  ): Promise<StandardSchemaV1.InferOutput<Schema>>
+
   delete<T = unknown>(
     url: string,
-    config: Omit<RequestConfig, 'url' | 'method'> = {}
+    config?: MethodConfig
+  ): Promise<T>
+
+  delete<T = unknown>(
+    url: string,
+    config: MethodConfig = {}
   ): Promise<T> {
     return this.request<T>({
       ...config,
@@ -252,9 +366,19 @@ export class Client {
     })
   }
 
+  deleteResponse<Schema extends StandardSchemaV1>(
+    url: string,
+    config: SchemaMethodConfig<Schema>
+  ): Promise<NporaResponse<StandardSchemaV1.InferOutput<Schema>>>
+
   deleteResponse<T = unknown>(
     url: string,
-    config: Omit<RequestConfig, 'url' | 'method'> = {}
+    config?: MethodConfig
+  ): Promise<NporaResponse<T>>
+
+  deleteResponse<T = unknown>(
+    url: string,
+    config: MethodConfig = {}
   ): Promise<NporaResponse<T>> {
     return this.requestResponse<T>({
       ...config,
@@ -265,7 +389,7 @@ export class Client {
 
   head(
     url: string,
-    config: Omit<RequestConfig, 'url' | 'method'> = {}
+    config: Omit<MethodConfig, 'schema'> = {}
   ): Promise<void> {
     return this.request<void>({
       ...config,
@@ -276,7 +400,7 @@ export class Client {
 
   headResponse(
     url: string,
-    config: Omit<RequestConfig, 'url' | 'method'> = {}
+    config: Omit<MethodConfig, 'schema'> = {}
   ): Promise<NporaResponse<void>> {
     return this.requestResponse<void>({
       ...config,
@@ -285,9 +409,19 @@ export class Client {
     })
   }
 
+  options<Schema extends StandardSchemaV1>(
+    url: string,
+    config: SchemaMethodConfig<Schema>
+  ): Promise<StandardSchemaV1.InferOutput<Schema>>
+
   options<T = unknown>(
     url: string,
-    config: Omit<RequestConfig, 'url' | 'method'> = {}
+    config?: MethodConfig
+  ): Promise<T>
+
+  options<T = unknown>(
+    url: string,
+    config: MethodConfig = {}
   ): Promise<T> {
     return this.request<T>({
       ...config,
@@ -296,9 +430,19 @@ export class Client {
     })
   }
 
+  optionsResponse<Schema extends StandardSchemaV1>(
+    url: string,
+    config: SchemaMethodConfig<Schema>
+  ): Promise<NporaResponse<StandardSchemaV1.InferOutput<Schema>>>
+
   optionsResponse<T = unknown>(
     url: string,
-    config: Omit<RequestConfig, 'url' | 'method'> = {}
+    config?: MethodConfig
+  ): Promise<NporaResponse<T>>
+
+  optionsResponse<T = unknown>(
+    url: string,
+    config: MethodConfig = {}
   ): Promise<NporaResponse<T>> {
     return this.requestResponse<T>({
       ...config,
@@ -312,7 +456,10 @@ export class Client {
    */
   sse(
     url: string,
-    config: Omit<RequestConfig, 'url' | 'method' | 'responseType'> = {}
+    config: Omit<
+      RequestConfig,
+      'url' | 'method' | 'responseType' | 'schema'
+    > = {}
   ): Promise<AsyncIterable<ServerSentEvent>> {
     return this.get<AsyncIterable<ServerSentEvent>>(url, {
       ...config,
@@ -325,7 +472,10 @@ export class Client {
    */
   sseResponse(
     url: string,
-    config: Omit<RequestConfig, 'url' | 'method' | 'responseType'> = {}
+    config: Omit<
+      RequestConfig,
+      'url' | 'method' | 'responseType' | 'schema'
+    > = {}
   ): Promise<NporaResponse<AsyncIterable<ServerSentEvent>>> {
     return this.getResponse<AsyncIterable<ServerSentEvent>>(url, {
       ...config,
@@ -338,7 +488,10 @@ export class Client {
    */
   ndjson<T = unknown>(
     url: string,
-    config: Omit<RequestConfig, 'url' | 'method' | 'responseType'> = {}
+    config: Omit<
+      RequestConfig,
+      'url' | 'method' | 'responseType' | 'schema'
+    > = {}
   ): Promise<AsyncIterable<T>> {
     return this.get<AsyncIterable<T>>(url, {
       ...config,
@@ -351,7 +504,10 @@ export class Client {
    */
   ndjsonResponse<T = unknown>(
     url: string,
-    config: Omit<RequestConfig, 'url' | 'method' | 'responseType'> = {}
+    config: Omit<
+      RequestConfig,
+      'url' | 'method' | 'responseType' | 'schema'
+    > = {}
   ): Promise<NporaResponse<AsyncIterable<T>>> {
     return this.getResponse<AsyncIterable<T>>(url, {
       ...config,
