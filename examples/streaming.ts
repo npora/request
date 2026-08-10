@@ -1,7 +1,7 @@
 import {
   createClient,
   type ServerSentEvent
-} from '@npora/request'
+} from '../src'
 
 interface AuditRecord {
   id: number
