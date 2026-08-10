@@ -126,6 +126,8 @@ api.patch(url, config)
 api.delete(url, config)
 api.head(url, config)
 api.options(url, config)
+api.sse(url, config)
+api.ndjson(url, config)
 
 api.getResponse(url, config)
 api.postResponse(url, config)
@@ -134,6 +136,8 @@ api.patchResponse(url, config)
 api.deleteResponse(url, config)
 api.headResponse(url, config)
 api.optionsResponse(url, config)
+api.sseResponse(url, config)
+api.ndjsonResponse(url, config)
 ```
 
 ## Plugins

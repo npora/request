@@ -32,8 +32,9 @@ application.
 - Default cache, circuit-breaker and concurrency state is capacity-bounded
   with LRU eviction; state serving active or queued requests is retained until
   those requests settle.
-- Timeout, abort, stream, XHR, hook, and plugin resources are cleaned up when a
-  request settles.
+- Timeout, abort, XHR, hook, and plugin resources are cleaned up when a buffered
+  request settles. Streaming resources remain active only until the response
+  body completes, is cancelled, or errors.
 - The published package has zero runtime dependencies and an exact tarball
   allowlist.
 
