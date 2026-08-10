@@ -727,6 +727,50 @@ describe('cachePlugin', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 
+  it('should not cache or share automatically detected streaming responses', async () => {
+    let version = 0
+    const fetchMock = vi.fn().mockImplementation(() => {
+      version += 1
+
+      return Promise.resolve(
+        new Response(`{"version":${version}}\n`, {
+          headers: {
+            'content-type': 'application/x-ndjson'
+          }
+        })
+      )
+    })
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient().use(cachePlugin())
+    const config = {
+      extensions: {
+        cache: {
+          enabled: true
+        }
+      }
+    }
+    const [first, second] = await Promise.all([
+      request.get<AsyncIterable<{ version: number }>>('/stream', config),
+      request.get<AsyncIterable<{ version: number }>>('/stream', config)
+    ])
+    const firstValues = []
+    const secondValues = []
+
+    for await (const value of first) {
+      firstValues.push(value)
+    }
+
+    for await (const value of second) {
+      secondValues.push(value)
+    }
+
+    expect(firstValues).toEqual([{ version: 1 }])
+    expect(secondValues).toEqual([{ version: 2 }])
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
   it('should allow disabling request deduplication', async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       createJsonResponse({

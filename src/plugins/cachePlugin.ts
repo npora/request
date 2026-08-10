@@ -168,6 +168,7 @@ export function cachePlugin(
   const cacheHits = new WeakSet<object>()
   const leaders = new WeakMap<object, string>()
   const completedRecords = new WeakMap<object, CacheEntry>()
+  const uncacheableLeaders = new WeakSet<object>()
   const inFlight = new Map<string, InFlightRequest>()
   const methods = new Set(
     options.methods ?? DEFAULT_CACHE_METHODS
@@ -244,6 +245,10 @@ export function cachePlugin(
             requestContext.config
           )
 
+          if (!sharedRecord) {
+            return
+          }
+
           requestContext.response = createCachedResponse(
             sharedRecord,
             requestContext.config
@@ -282,6 +287,13 @@ export function cachePlugin(
           cache,
           varyHeaders
         )
+
+        if (isAsyncIterable(requestContext.response.data)) {
+          uncacheableLeaders.add(requestContext)
+          await deleteStore(store, key)
+          return
+        }
+
         const ttl = cache.ttl ?? 30000
         const record = createCacheEntry(
           requestContext.response,
@@ -318,6 +330,11 @@ export function cachePlugin(
         }
 
         inFlight.delete(key)
+
+        if (uncacheableLeaders.delete(requestContext)) {
+          pending.resolve(undefined)
+          return
+        }
 
         const record = completedRecords.get(requestContext)
 
@@ -374,20 +391,22 @@ export function cachePlugin(
 interface InFlightRequest {
   owner: object
 
-  promise: Promise<CacheEntry>
+  promise: Promise<CacheEntry | undefined>
 
-  resolve(entry: CacheEntry): void
+  resolve(entry: CacheEntry | undefined): void
 
   reject(error: unknown): void
 }
 
 function createInFlightRequest(owner: object): InFlightRequest {
-  let resolve!: (entry: CacheEntry) => void
+  let resolve!: (entry: CacheEntry | undefined) => void
   let reject!: (error: unknown) => void
-  const promise = new Promise<CacheEntry>((resolvePromise, rejectPromise) => {
-    resolve = resolvePromise
-    reject = rejectPromise
-  })
+  const promise = new Promise<CacheEntry | undefined>(
+    (resolvePromise, rejectPromise) => {
+      resolve = resolvePromise
+      reject = rejectPromise
+    }
+  )
 
   void promise.catch(() => {})
 
@@ -434,9 +453,9 @@ async function deleteStore(
 }
 
 async function waitForSharedRecord(
-  promise: Promise<CacheEntry>,
+  promise: Promise<CacheEntry | undefined>,
   config: RequestConfig
-): Promise<CacheEntry> {
+): Promise<CacheEntry | undefined> {
   const signal = config.signal
 
   if (!signal) {
@@ -550,8 +569,16 @@ function isCacheableRequest(
 ): boolean {
   return (
     methods.has(config.method ?? 'GET') &&
-    config.responseType !== 'stream'
+    config.responseType !== 'stream' &&
+    config.responseType !== 'sse' &&
+    config.responseType !== 'ndjson'
   )
+}
+
+function isAsyncIterable(value: unknown): value is AsyncIterable<unknown> {
+  return typeof value === 'object' &&
+    value !== null &&
+    Symbol.asyncIterator in value
 }
 
 function allowsPersistentCaching(response: NporaResponse): boolean {

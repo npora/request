@@ -91,6 +91,8 @@ request.patch<T>(url, config?)
 request.delete<T>(url, config?)
 request.head(url, config?)
 request.options<T>(url, config?)
+request.sse(url, config?)
+request.ndjson<T>(url, config?)
 
 request.getResponse<T>(url, config?)
 request.postResponse<T>(url, config?)
@@ -99,6 +101,8 @@ request.patchResponse<T>(url, config?)
 request.deleteResponse<T>(url, config?)
 request.headResponse(url, config?)
 request.optionsResponse<T>(url, config?)
+request.sseResponse(url, config?)
+request.ndjsonResponse<T>(url, config?)
 ```
 
 Example:
@@ -187,7 +191,14 @@ exceeds the limit fails with `RESPONSE_TOO_LARGE`; a trustworthy
 
 ```ts
 {
-  responseType?: 'json' | 'text' | 'blob' | 'arrayBuffer' | 'stream'
+  responseType?:
+    | 'json'
+    | 'text'
+    | 'blob'
+    | 'arrayBuffer'
+    | 'stream'
+    | 'sse'
+    | 'ndjson'
   validateStatus?: (status: number) => boolean
 }
 ```
@@ -195,12 +206,46 @@ exceeds the limit fails with `RESPONSE_TOO_LARGE`; a trustworthy
 Data-only methods parse successful Fetch responses directly when no response
 hooks or interceptors are installed. Complete response methods, response
 lifecycle extensions and HTTP errors preserve a separately readable `raw`
-Response.
+Response for buffered response types. Streaming response types deliberately do
+not clone the body because an unread clone could buffer an unbounded stream;
+their `raw` response refers to the same body consumed by the async iterable.
 
-Streaming responses expose the native `ReadableStream`, including
-`text/event-stream` responses. Applications parse SSE framing themselves or
-pass the stream to an SSE parser. Transport interruptions reject subsequent
-reader operations and response-size limits continue to apply while streaming.
+`stream` exposes the native `ReadableStream`. `sse` and `ndjson` return lazy
+`AsyncIterable` values that decode records without buffering the complete
+response. The response content type selects `sse` automatically for
+`text/event-stream` and `ndjson` for `application/x-ndjson`,
+`application/ndjson`, and structured `+ndjson` types.
+
+```ts
+import type { ServerSentEvent } from '@npora/request'
+
+const events = await request.sse('/events')
+
+for await (const event of events) {
+  console.log(event.event, event.data, event.id, event.retry)
+}
+
+const records = await request.ndjson<User>('/users.ndjson')
+
+for await (const user of records) {
+  console.log(user)
+}
+```
+
+SSE parsing follows the event-stream field rules: repeated `data` fields are
+joined with newlines, event identifiers and valid retry delays persist, comment
+lines are ignored, and the default event type is `message`. NDJSON ignores
+blank lines and reports malformed JSON with its one-based line number.
+
+Breaking out of either iterator cancels the underlying response reader.
+Transport interruptions reject the next iterator operation with
+`PARSER_ERROR`; request timeouts, external cancellation, and response-size
+limits continue to apply while streaming. Long-lived SSE connections should
+omit `timeout` unless a total connection lifetime is desired.
+
+The cache plugin bypasses explicit streaming response types. Automatically
+detected streaming responses are neither persisted nor shared between
+concurrent consumers.
 
 ## Config Merge Rules
 

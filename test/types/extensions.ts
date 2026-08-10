@@ -14,6 +14,7 @@ import type {
   Plugin,
   RequestLogger,
   RequestConfig,
+  ServerSentEvent,
   RetryEvent,
   RetryOptions,
   UploadProgress
@@ -166,6 +167,16 @@ const loggerConfig: RequestConfig = {
 }
 
 void loggerConfig
+
+const eventStream: Promise<AsyncIterable<ServerSentEvent>> = client.sse(
+  '/events'
+)
+const jsonLines: Promise<AsyncIterable<{ id: number }>> = client.ndjson<{
+  id: number
+}>('/records')
+
+void eventStream
+void jsonLines
 
 const cacheStore: CacheStore = {
   async get(_key) {

@@ -1,5 +1,9 @@
 import { RequestError } from '../errors'
 import type { RequestConfig, ResponseType } from '../types'
+import {
+  parseNdjson,
+  parseServerSentEvents
+} from './parseStreamingResponse'
 
 /**
  * Bound a Fetch response before it can be cloned into multiple body branches.
@@ -45,6 +49,116 @@ export function limitResponseSize(
 }
 
 /**
+ * Keep request cancellation resources alive until a streaming response body
+ * settles instead of releasing them as soon as response headers arrive.
+ */
+export function finalizeStreamingResponse(
+  response: Response,
+  signal: AbortSignal | null | undefined,
+  config: RequestConfig,
+  finalize: () => void
+): Response {
+  if (!response.body) {
+    finalize()
+    return response
+  }
+
+  const reader = response.body.getReader()
+  let settled = false
+  let pendingAbortError: unknown
+  let onAbort: (() => void) | undefined
+
+  const settle = () => {
+    if (settled) {
+      return
+    }
+
+    settled = true
+    if (onAbort) {
+      signal?.removeEventListener('abort', onAbort)
+      onAbort = undefined
+    }
+    reader.releaseLock()
+    finalize()
+  }
+  const stream = new ReadableStream<Uint8Array>({
+    start(controller) {
+      onAbort = () => {
+        const error = streamingReadError(signal?.reason, signal, config)
+
+        pendingAbortError = error
+        void reader.cancel(error).catch(() => {
+          // Preserve the stable cancellation error.
+        }).finally(() => {
+          if (!settled) {
+            settle()
+            controller.error(error)
+          }
+        })
+      }
+
+      if (signal?.aborted) {
+        onAbort()
+      } else {
+        signal?.addEventListener('abort', onAbort, {
+          once: true
+        })
+      }
+    },
+
+    async pull(controller) {
+      try {
+        const result = await reader.read()
+
+        if (pendingAbortError) {
+          const error = pendingAbortError
+
+          settle()
+          controller.error(error)
+          return
+        }
+
+        if (settled) {
+          return
+        }
+
+        if (result.done) {
+          settle()
+          controller.close()
+          return
+        }
+
+        controller.enqueue(result.value)
+      } catch (error) {
+        if (settled) {
+          return
+        }
+
+        settle()
+        controller.error(streamingReadError(error, signal, config))
+      }
+    },
+
+    async cancel(reason) {
+      try {
+        await reader.cancel(reason)
+      } finally {
+        settle()
+      }
+    }
+  })
+  const wrapped = new Response(stream, {
+    status: response.status,
+    statusText: response.statusText,
+    headers: response.headers
+  })
+
+  copyResponseMetadata(response, wrapped)
+
+  return wrapped
+}
+
+/**
  * Parse a Fetch response according to the request configuration.
  */
 export async function parseResponse<T = unknown>(
@@ -59,16 +173,21 @@ export async function parseResponse<T = unknown>(
     return undefined as T
   }
 
-  const responseType =
-    config.responseType ?? detectResponseType(response)
+  const responseType = resolveResponseType(response, config)
   const maxSize = config.maxResponseSize
 
   try {
     if (maxSize !== undefined && Number.isFinite(maxSize)) {
       await rejectOversizedContentLength(response, maxSize, config)
 
-      if (responseType === 'stream') {
-        return limitResponseStream(response, maxSize, config) as T
+      if (isStreamingResponseType(responseType)) {
+        const stream = limitResponseStream(response, maxSize, config)
+
+        return parseStreamingResponse<T>(
+          new Response(stream, response),
+          responseType,
+          config
+        )
       }
 
       const bytes = await readLimitedBody(response, maxSize, config)
@@ -91,6 +210,12 @@ export async function parseResponse<T = unknown>(
 
       case 'stream':
         return response.body as T
+
+      case 'sse':
+        return parseServerSentEvents(response, config) as T
+
+      case 'ndjson':
+        return parseNdjson(response, config) as T
 
       default:
         return (await response.text()) as T
@@ -180,7 +305,7 @@ async function readLimitedBody(
 
 function parseBufferedResponse<T>(
   bytes: Uint8Array,
-  responseType: Exclude<ResponseType, 'stream'>,
+  responseType: Exclude<ResponseType, 'stream' | 'sse' | 'ndjson'>,
   response: Response
 ): T {
   switch (responseType) {
@@ -201,6 +326,38 @@ function parseBufferedResponse<T>(
     default:
       return new TextDecoder().decode(bytes) as T
   }
+}
+
+function parseStreamingResponse<T>(
+  response: Response,
+  responseType: Extract<ResponseType, 'stream' | 'sse' | 'ndjson'>,
+  config: RequestConfig
+): T {
+  switch (responseType) {
+    case 'sse':
+      return parseServerSentEvents(response, config) as T
+
+    case 'ndjson':
+      return parseNdjson(response, config) as T
+
+    default:
+      return response.body as T
+  }
+}
+
+export function isStreamingResponseType(
+  responseType: ResponseType | undefined
+): responseType is Extract<ResponseType, 'stream' | 'sse' | 'ndjson'> {
+  return responseType === 'stream' ||
+    responseType === 'sse' ||
+    responseType === 'ndjson'
+}
+
+export function resolveResponseType(
+  response: Response,
+  config: RequestConfig
+): ResponseType {
+  return config.responseType ?? detectResponseType(response)
 }
 
 function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
@@ -304,6 +461,33 @@ function createSizeError(
   )
 }
 
+function streamingReadError(
+  error: unknown,
+  signal: AbortSignal | null | undefined,
+  config: RequestConfig
+): unknown {
+  if (!signal?.aborted) {
+    return error
+  }
+
+  if (signal.reason instanceof RequestError) {
+    return new RequestError(signal.reason.message, {
+      code: signal.reason.code,
+      status: signal.reason.status,
+      data: signal.reason.data,
+      response: signal.reason.response,
+      config,
+      cause: signal.reason
+    })
+  }
+
+  return new RequestError('Request aborted while consuming response', {
+    code: 'ABORT_ERROR',
+    config,
+    cause: signal.reason ?? error
+  })
+}
+
 function copyResponseMetadata(source: Response, target: Response): void {
   for (const key of ['url', 'redirected', 'type'] as const) {
     try {
@@ -319,6 +503,18 @@ function copyResponseMetadata(source: Response, target: Response): void {
 
 function detectResponseType(response: Response): ResponseType {
   const contentType = response.headers.get('content-type') ?? ''
+
+  if (contentType.includes('text/event-stream')) {
+    return 'sse'
+  }
+
+  if (
+    contentType.includes('application/x-ndjson') ||
+    contentType.includes('application/ndjson') ||
+    contentType.includes('+ndjson')
+  ) {
+    return 'ndjson'
+  }
 
   if (
     contentType.includes('application/json') ||

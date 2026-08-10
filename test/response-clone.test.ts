@@ -145,6 +145,33 @@ describe('Fetch response cloning', () => {
       message: 'invalid'
     })
   })
+
+  it('should not clone an automatically detected streaming response', async () => {
+    const response = new Response('{"id":1}\n', {
+      headers: {
+        'content-type': 'application/x-ndjson'
+      }
+    })
+    const clone = vi.spyOn(response, 'clone')
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(response)
+    )
+
+    const complete = await createClient().ndjsonResponse<{ id: number }>(
+      '/records'
+    )
+    const values = []
+
+    for await (const value of complete.data) {
+      values.push(value)
+    }
+
+    expect(values).toEqual([{ id: 1 }])
+    expect(clone).not.toHaveBeenCalled()
+    expect(complete.raw.bodyUsed).toBe(true)
+  })
 })
 
 function jsonResponse(

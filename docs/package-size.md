@@ -52,6 +52,12 @@ browser response-size enforcement, bounded stream wrappers, and FormData
 nesting protection. Raw entrypoint, declaration, tarball, and unpacked-package
 budgets remain unchanged.
 
+Version 1.9.0 raised the compressed entrypoint, declaration, and tarball
+budgets for the first-party SSE and NDJSON incremental parsers, async iterator
+cancellation, streaming error normalization, public event type, and client
+convenience methods. Raw JavaScript and unpacked-package budgets remain
+unchanged, and the package still has zero runtime dependencies.
+
 `pnpm test:package` includes the size check, so release verification cannot
 publish a package that exceeds the checked-in budgets. CI also stores the JSON
 report for comparing changes over time.
