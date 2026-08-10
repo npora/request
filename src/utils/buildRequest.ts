@@ -160,7 +160,10 @@ function buildBody(
   }
 
   if (config.formData !== undefined) {
-    return buildFormData(config.formData)
+    return buildFormData(
+      config.formData,
+      config.maxFormDataDepth
+    )
   }
 
   if (config.body === null || config.body === undefined) {
@@ -196,19 +199,28 @@ function buildURLSearchParams(
 }
 
 function buildFormData(
-  input: FormData | Record<string, unknown>
+  input: FormData | Record<string, unknown>,
+  maxDepth = 32
 ): FormData {
   if (input instanceof FormData) {
     return input
   }
 
   const formData = new FormData()
+  const ancestors = new WeakSet<object>()
 
   for (const key in input) {
     if (
       Object.prototype.hasOwnProperty.call(input, key)
     ) {
-      appendFormDataValue(formData, key, input[key])
+      appendFormDataValue(
+        formData,
+        key,
+        input[key],
+        0,
+        maxDepth,
+        ancestors
+      )
     }
   }
 
@@ -218,15 +230,45 @@ function buildFormData(
 function appendFormDataValue(
   formData: FormData,
   key: string,
-  value: unknown
+  value: unknown,
+  depth: number,
+  maxDepth: number,
+  ancestors: WeakSet<object>
 ): void {
   if (value === null || value === undefined) {
     return
   }
 
   if (Array.isArray(value)) {
-    for (const item of value) {
-      appendFormDataValue(formData, key, item)
+    if (ancestors.has(value)) {
+      throw new TypeError(
+        'FormData arrays cannot contain circular references'
+      )
+    }
+
+    const nextDepth = depth + 1
+
+    if (nextDepth > maxDepth) {
+      throw new RangeError(
+        `FormData array depth exceeds maxFormDataDepth ${maxDepth}`
+      )
+    }
+
+    ancestors.add(value)
+
+    try {
+      for (const item of value) {
+        appendFormDataValue(
+          formData,
+          key,
+          item,
+          nextDepth,
+          maxDepth,
+          ancestors
+        )
+      }
+    } finally {
+      ancestors.delete(value)
     }
 
     return

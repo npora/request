@@ -2,6 +2,7 @@ import { RequestError } from '../errors'
 import type { Adapter, NporaResponse, RequestConfig } from '../types'
 import {
   type BuiltRequest,
+  limitResponseSize,
   parseResponse,
   validateRequestConfig
 } from '../utils'
@@ -39,7 +40,10 @@ export class FetchAdapter implements Adapter {
 
     try {
       request = buildRequestWithHeaders(config, headers)
-      const response = await fetch(request.url, request.init)
+      const response = limitResponseSize(
+        await fetch(request.url, request.init),
+        config
+      )
       const validateStatus = config.validateStatus ?? defaultValidateStatus
       const validStatus = validateStatus(response.status)
       const parseTarget =

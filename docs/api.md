@@ -154,8 +154,14 @@ await request.get('/account', {
   json?: Record<string, unknown> | unknown[]
   form?: URLSearchParams | Record<string, QueryValue | QueryValue[]>
   formData?: FormData | Record<string, unknown>
+  maxFormDataDepth?: number
 }
 ```
+
+Nested FormData arrays are flattened up to `maxFormDataDepth`, which defaults
+to 32. Circular arrays and values deeper than the configured limit fail with a
+`CONFIG_ERROR` before Fetch or XMLHttpRequest sends data. Use `Infinity` only
+when the FormData structure is fully trusted.
 
 ---
 
@@ -165,11 +171,15 @@ await request.get('/account', {
 {
   timeout?: number
   signal?: AbortSignal
+  maxResponseSize?: number
 }
 ```
 
 Timeout timers and composed abort listeners are released when a request
-settles, times out or is externally aborted.
+settles, times out or is externally aborted. `maxResponseSize` limits parsed
+and streamed response bytes and defaults to `Infinity`. A response that
+exceeds the limit fails with `RESPONSE_TOO_LARGE`; a trustworthy
+`Content-Length` can reject it before the body is consumed.
 
 ---
 
@@ -186,6 +196,11 @@ Data-only methods parse successful Fetch responses directly when no response
 hooks or interceptors are installed. Complete response methods, response
 lifecycle extensions and HTTP errors preserve a separately readable `raw`
 Response.
+
+Streaming responses expose the native `ReadableStream`, including
+`text/event-stream` responses. Applications parse SSE framing themselves or
+pass the stream to an SSE parser. Transport interruptions reject subsequent
+reader operations and response-size limits continue to apply while streaming.
 
 ## Config Merge Rules
 
@@ -714,10 +729,14 @@ when they are read. Configure the built-in store with `maxEntries`; `0` disables
 storage and `Infinity` explicitly removes the capacity bound. A custom `store`
 owns and enforces its own capacity, so `maxEntries` is ignored when one is
 provided.
-Only `GET` and `HEAD` are cached. The generated cache key varies by
-`authorization`, `cookie`, `accept` and `accept-language` headers. Query keys
-are normalized independently of object insertion order, and different
-response parsing types use separate cache entries.
+Only `GET` and `HEAD` are cached. The generated cache key includes every
+explicitly configured request header and guarantees variation by
+`authorization`, `cookie`, `accept` and `accept-language`. This conservatively
+isolates responses that name custom request headers in `Vary`. Query keys are
+normalized independently of object insertion order, and different response
+parsing types use separate cache entries. Responses marked with
+`Cache-Control: no-store` or `Vary: *` may still be shared by equivalent
+concurrent requests, but are never persisted in the cache store.
 
 Concurrent equivalent requests share one network operation by default. Waiting
 requests remain attached while the leader retries, receive independent copies
@@ -777,7 +796,8 @@ response metadata without serializing a native `Response`.
 
 The generated default key incorporates values from `varyHeaders`, including
 authorization and cookies. External stores must treat cache keys as sensitive
-or hash them before persistence and logging.
+or hash them before persistence and logging. They must also be isolated per
+application or tenant when browser-private responses can reach a shared store.
 
 Additional methods must be enabled explicitly:
 
@@ -927,6 +947,7 @@ NETWORK_ERROR
 TIMEOUT_ERROR
 ABORT_ERROR
 PARSER_ERROR
+RESPONSE_TOO_LARGE
 CIRCUIT_OPEN
 CONCURRENCY_LIMIT
 ```

@@ -113,7 +113,8 @@ export interface CachePluginOptions {
   methods?: readonly HttpMethod[]
 
   /**
-   * Request headers included in the default cache key.
+   * Additional request headers included in the default cache key.
+   * All explicitly configured request headers are included automatically.
    *
    * @default authorization, cookie, accept and accept-language
    */
@@ -289,7 +290,10 @@ export function cachePlugin(
 
         completedRecords.set(requestContext, record)
 
-        if (ttl <= 0) {
+        if (
+          ttl <= 0 ||
+          !allowsPersistentCaching(requestContext.response)
+        ) {
           await deleteStore(store, key)
           return
         }
@@ -550,6 +554,23 @@ function isCacheableRequest(
   )
 }
 
+function allowsPersistentCaching(response: NporaResponse): boolean {
+  const cacheControl = response.headers.get('cache-control')
+
+  if (
+    cacheControl
+      ?.split(',')
+      .some(directive => directive.trim().toLowerCase() === 'no-store')
+  ) {
+    return false
+  }
+
+  return !response.headers
+    .get('vary')
+    ?.split(',')
+    .some(name => name.trim() === '*')
+}
+
 function createCacheKey(
   config: RequestConfig,
   cache: CacheOptions,
@@ -567,12 +588,30 @@ function createCacheKey(
     url: config.url,
     query: normalizeQuery(config.query),
     responseType: config.responseType ?? 'auto',
-    headers: Object.fromEntries(
-      varyHeaders.map(name => [
-        name.toLowerCase(),
-        headers.get(name)
-      ])
-    )
+    headers: normalizeCacheHeaders(headers, varyHeaders)
+  })
+}
+
+function normalizeCacheHeaders(
+  headers: Headers,
+  varyHeaders: readonly string[]
+): Array<[string, string | null]> {
+  const values = new Map<string, string | null>()
+
+  headers.forEach((value, name) => {
+    values.set(name.toLowerCase(), value)
+  })
+
+  for (const name of varyHeaders) {
+    const normalizedName = name.toLowerCase()
+
+    if (!values.has(normalizedName)) {
+      values.set(normalizedName, headers.get(name))
+    }
+  }
+
+  return [...values.entries()].sort(([first], [second]) => {
+    return first.localeCompare(second)
   })
 }
 

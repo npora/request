@@ -2,11 +2,11 @@
   "files": {
     "dist/index.js": {
       "bytes": 98000,
-      "gzipBytes": 19000
+      "gzipBytes": 19500
     },
     "dist/index.cjs": {
       "bytes": 99000,
-      "gzipBytes": 19500
+      "gzipBytes": 20000
     },
     "dist/index.d.ts": {
       "bytes": 27000,

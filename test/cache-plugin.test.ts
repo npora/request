@@ -104,6 +104,76 @@ describe('cachePlugin', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 
+  it('should not persist responses marked as no-store', async () => {
+    const createResponse = (version: number) => {
+      return new Response(JSON.stringify({ version }), {
+        status: 200,
+        headers: {
+          'cache-control': 'public, no-store',
+          'content-type': 'application/json'
+        }
+      })
+    }
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(createResponse(1))
+      .mockResolvedValueOnce(createResponse(2))
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient().use(cachePlugin())
+    const config = {
+      extensions: {
+        cache: {
+          enabled: true
+        }
+      }
+    }
+
+    await expect(request.get('/version', config)).resolves.toEqual({
+      version: 1
+    })
+    await expect(request.get('/version', config)).resolves.toEqual({
+      version: 2
+    })
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('should not persist responses with a wildcard vary header', async () => {
+    const createResponse = (version: number) => {
+      return new Response(JSON.stringify({ version }), {
+        status: 200,
+        headers: {
+          'content-type': 'application/json',
+          vary: '*'
+        }
+      })
+    }
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(createResponse(1))
+      .mockResolvedValueOnce(createResponse(2))
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient().use(cachePlugin())
+    const config = {
+      extensions: {
+        cache: {
+          enabled: true
+        }
+      }
+    }
+
+    await expect(request.get('/version', config)).resolves.toEqual({
+      version: 1
+    })
+    await expect(request.get('/version', config)).resolves.toEqual({
+      version: 2
+    })
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
   it('should read cache options from extensions', async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       createJsonResponse({
@@ -389,6 +459,55 @@ describe('cachePlugin', () => {
     ).resolves.toEqual({
       user: 2
     })
+
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('should vary cached responses by configured request headers', async () => {
+    const createResponse = (tenant: number) => {
+      return new Response(JSON.stringify({ tenant }), {
+        headers: {
+          'content-type': 'application/json',
+          vary: 'x-tenant'
+        }
+      })
+    }
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(createResponse(1))
+      .mockResolvedValueOnce(createResponse(2))
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient().use(cachePlugin())
+    const cache = {
+      enabled: true
+    }
+
+    await expect(
+      request.get('/profile', {
+        extensions: { cache },
+        headers: {
+          'x-tenant': 'tenant-1'
+        }
+      })
+    ).resolves.toEqual({ tenant: 1 })
+    await expect(
+      request.get('/profile', {
+        extensions: { cache },
+        headers: {
+          'x-tenant': 'tenant-2'
+        }
+      })
+    ).resolves.toEqual({ tenant: 2 })
+    await expect(
+      request.get('/profile', {
+        extensions: { cache },
+        headers: {
+          'x-tenant': 'tenant-1'
+        }
+      })
+    ).resolves.toEqual({ tenant: 1 })
 
     expect(fetchMock).toHaveBeenCalledTimes(2)
   })

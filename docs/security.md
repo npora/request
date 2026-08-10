@@ -16,6 +16,13 @@ application.
   causes, URL credentials, and sensitive query values.
 - Default cache keys vary by authorization, cookie, accept, and language
   headers to prevent cross-session cache reuse.
+- Responses marked `Cache-Control: no-store` or `Vary: *` are not persisted
+  by the cache plugin.
+- Cache keys include all explicitly configured request headers so custom
+  response `Vary` dimensions cannot reuse another header variant.
+- Parsed and streamed responses can be bounded with `maxResponseSize`.
+- FormData array flattening rejects circular references and limits nesting to
+  32 levels by default.
 - Authentication refresh is deduplicated per client and token persistence is
   delegated to application-provided storage.
 - Circuit-breaker isolation defaults to URL origins, excluding credentials,

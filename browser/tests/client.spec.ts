@@ -46,6 +46,8 @@ interface BrowserRequestConfig {
   json?: Record<string, unknown>
   query?: Record<string, string | number>
   timeout?: number
+  maxResponseSize?: number
+  responseType?: 'json' | 'text' | 'blob' | 'arrayBuffer' | 'stream'
 }
 
 interface BrowserWindow extends Window {
@@ -321,7 +323,8 @@ test(
         },
         query: {
           key,
-          page: 1
+          page: 1,
+          cache: 'enabled'
         }
       }
       const secondConfig = {
@@ -333,7 +336,8 @@ test(
         },
         query: {
           page: 1,
-          key
+          key,
+          cache: 'enabled'
         }
       }
 
@@ -351,6 +355,157 @@ test(
         count: 1
       }
     })
+  }
+)
+
+test(
+  'should not persist no-store responses in the browser cache plugin',
+  async ({ page }) => {
+    await openFixture(page)
+
+    const result = await page.evaluate(async () => {
+      const moduleURL = `${location.origin}/dist/index.js`
+      const {
+        cachePlugin,
+        createClient
+      } = await import(moduleURL)
+      const request = createClient({
+        baseURL: '/api'
+      }).use(cachePlugin())
+      const key = crypto.randomUUID()
+      const config = {
+        extensions: {
+          cache: {
+            enabled: true,
+            ttl: 1000
+          }
+        },
+        query: {
+          key
+        }
+      }
+
+      return {
+        first: await request.get('/count', config),
+        second: await request.get('/count', config)
+      }
+    })
+
+    expect(result).toEqual({
+      first: {
+        count: 1
+      },
+      second: {
+        count: 2
+      }
+    })
+  }
+)
+
+test(
+  'should enforce the browser response size limit',
+  async ({ page }) => {
+    await openFixture(page)
+
+    const code = await page.evaluate(async () => {
+      const request = (window as BrowserWindow).nporaRequest
+
+      if (!request) {
+        throw new Error('Npora request client is unavailable')
+      }
+
+      try {
+        await request.get('/download', {
+          maxResponseSize: 1024,
+          responseType: 'arrayBuffer'
+        })
+      } catch (error) {
+        return (error as { code?: string }).code
+      }
+
+      return undefined
+    })
+
+    expect(code).toBe('RESPONSE_TOO_LARGE')
+  }
+)
+
+test(
+  'should consume server-sent events as a browser stream',
+  async ({ page }) => {
+    await openFixture(page)
+
+    const content = await page.evaluate(async () => {
+      const request = (window as BrowserWindow).nporaRequest
+
+      if (!request) {
+        throw new Error('Npora request client is unavailable')
+      }
+
+      const stream = await request.get<ReadableStream<Uint8Array>>(
+        '/events',
+        {
+          responseType: 'stream'
+        }
+      )
+      const reader = stream.getReader()
+      const decoder = new TextDecoder()
+      let content = ''
+
+      while (true) {
+        const result = await reader.read()
+
+        if (result.done) {
+          break
+        }
+
+        content += decoder.decode(result.value, {
+          stream: true
+        })
+      }
+
+      return content + decoder.decode()
+    })
+
+    expect(content).toContain('event: ready')
+    expect(content).toContain('data: {"step":1}')
+    expect(content).toContain('event: done')
+    expect(content).toContain('data: {"step":2}')
+  }
+)
+
+test(
+  'should surface an interrupted browser response stream',
+  async ({ page }) => {
+    await openFixture(page)
+
+    const failed = await page.evaluate(async () => {
+      const request = (window as BrowserWindow).nporaRequest
+
+      if (!request) {
+        throw new Error('Npora request client is unavailable')
+      }
+
+      try {
+        const stream = await request.get<ReadableStream<Uint8Array>>(
+          '/stream-error',
+          {
+            responseType: 'stream'
+          }
+        )
+        const reader = stream.getReader()
+
+        while (!(await reader.read()).done) {
+          // Consume until the transport reports the interruption.
+        }
+
+        return false
+      } catch {
+        return true
+      }
+    })
+
+    expect(failed).toBe(true)
   }
 )
 
