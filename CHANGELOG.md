@@ -1,5 +1,14 @@
 # @npora/request
 
+## 1.9.1
+
+### Patch Changes
+
+- 8ccc6c5: Normalize response media types case-insensitively and require exact or
+  structured-suffix matches before selecting JSON, SSE, or NDJSON parsing. This
+  also completes the README streaming-method inventory and clarifies streaming
+  resource lifetime.
+
 ## 1.9.0
 
 ### Minor Changes
