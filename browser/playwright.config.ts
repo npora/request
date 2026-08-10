@@ -31,7 +31,7 @@ export default defineConfig({
 
   use: {
     baseURL:
-      'http://127.0.0.1:4173',
+      'http://localhost:4173',
 
     trace: 'on-first-retry',
 
@@ -50,6 +50,14 @@ export default defineConfig({
     },
 
     {
+      name: 'firefox',
+
+      use: {
+        ...devices['Desktop Firefox']
+      }
+    },
+
+    {
       name: 'webkit',
 
       use: {
@@ -63,7 +71,7 @@ export default defineConfig({
       'pnpm --dir .. build && node server.mjs',
 
     url:
-      'http://127.0.0.1:4173',
+      'http://localhost:4173',
 
     reuseExistingServer:
       !process.env.CI,

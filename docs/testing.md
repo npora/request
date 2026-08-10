@@ -66,13 +66,13 @@ Node.js 22, 24, and 26.
 ## Browser checks
 
 ```sh
-pnpm exec playwright install chromium webkit
+pnpm exec playwright install chromium firefox webkit
 pnpm test:browser
 ```
 
-Playwright validates Chromium and WebKit, including Fetch requests, Web
-Workers, plugin lifecycle, HEAD/OPTIONS, and concurrent XHR upload/download
-progress.
+Playwright validates Chromium, Firefox, and WebKit, including Fetch requests,
+Web Workers, plugin lifecycle, HEAD/OPTIONS, and concurrent XHR
+upload/download progress.
 
 ## Performance checks
 

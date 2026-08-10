@@ -16,8 +16,9 @@ pnpm add @npora/request
 npm install @npora/request
 ```
 
-Node.js 22 or newer is required. Modern Chromium, Edge, Safari, WebKit, and Web
-Workers are supported through their native Fetch implementations.
+Node.js 22 or newer is required. Modern Chromium-based browsers, Firefox,
+Safari/WebKit, and Web Workers are supported through their native Fetch
+implementations.
 
 ## Quick start
 
