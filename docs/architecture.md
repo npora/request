@@ -24,6 +24,9 @@ Client defaults + request config
         response hooks
               │
               ▼
+      response schema
+              │
+              ▼
      response interceptors
 ```
 
@@ -41,7 +44,8 @@ are intentionally not copied.
 
 ### Core
 
-The core merges configuration, validates it, owns request context, and
+The core merges configuration, validates it, owns request context, validates
+successful parsed responses when a Standard Schema is configured, and
 coordinates the pipeline. Business features do not belong in this layer.
 
 ### Adapters

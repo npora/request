@@ -53,6 +53,32 @@ console.log(response.headers)
 console.log(response.raw)
 ```
 
+## Response validation
+
+Validate untrusted response data with any Standard Schema v1 compatible
+library, including Zod 3.24+, Valibot, or ArkType. The schema output type is
+inferred automatically and schemas may transform the parsed value:
+
+```ts
+import { z } from 'zod'
+
+const userSchema = z.object({
+  id: z.number(),
+  name: z.string()
+})
+
+const user = await api.get('/users/1', {
+  schema: userSchema
+})
+
+console.log(user.name)
+```
+
+Validation failures throw `SchemaValidationError` with the stable
+`SCHEMA_ERROR` code, validation issues, schema vendor, parsed response data,
+and complete response metadata. Standard Schema support adds no runtime
+dependency to Npora Request.
+
 ## Streaming responses
 
 SSE and NDJSON responses are decoded incrementally as async iterables. The
@@ -318,6 +344,7 @@ Stable request error codes:
 - `TIMEOUT_ERROR`
 - `ABORT_ERROR`
 - `PARSER_ERROR`
+- `SCHEMA_ERROR`
 - `RESPONSE_TOO_LARGE`
 - `CIRCUIT_OPEN`
 - `CONCURRENCY_LIMIT`

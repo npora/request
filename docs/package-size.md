@@ -58,6 +58,12 @@ cancellation, streaming error normalization, public event type, and client
 convenience methods. Raw JavaScript and unpacked-package budgets remain
 unchanged, and the package still has zero runtime dependencies.
 
+Version 1.10.0 raised the raw and compressed entrypoint, declaration, tarball,
+and unpacked-package budgets for the copied Standard Schema v1 protocol types,
+schema-aware client overloads, response validation pipeline, and unified
+validation error metadata. The feature adds no runtime dependency; the new
+limits retain measured headroom without hiding larger future growth.
+
 `pnpm test:package` includes the size check, so release verification cannot
 publish a package that exceeds the checked-in budgets. CI also stores the JSON
 report for comparing changes over time.
