@@ -3,8 +3,21 @@
 A TypeScript-first HTTP client built on the standard Fetch API.
 
 Npora Request adds typed configuration, a predictable request lifecycle,
-interceptors, plugins, unified errors, retries, caching, authentication, and
+runtime response validation, streaming, interceptors, plugins, unified errors,
+retries, caching, concurrency control, circuit breaking, authentication, and
 upload/download progress without adding runtime dependencies.
+
+## Features
+
+- Data-first and complete-response APIs with TypeScript inference.
+- Standard Schema v1 validation and transformation for untrusted responses.
+- Incremental SSE and NDJSON async iterables with cancellation and size limits.
+- Unified errors across Fetch, XHR, parsing, validation, timeouts, and aborts.
+- Request/response/error interceptors with deterministic priority ordering.
+- Official retry, cache, circuit-breaker, concurrency, authentication, logger,
+  upload, and download plugins.
+- Method-aware `MockAdapter` routing, matching, delays, failures, and history.
+- Browser, Web Worker, ESM, and CommonJS support with zero runtime dependencies.
 
 ## Install
 
@@ -19,6 +32,18 @@ npm install @npora/request
 Node.js 22 or newer is required. Modern Chromium-based browsers, Firefox,
 Safari/WebKit, and Web Workers are supported through their native Fetch
 implementations.
+
+## Version support
+
+| Version | Status | Guidance |
+| --- | --- | --- |
+| `latest` | Current | Recommended for all new and existing applications. |
+| Earlier releases `>=1.0.0` | Historical stable | Upgrade to `latest` for current fixes and security hardening. |
+| `<1.0.0` | Deprecated and unsupported | Upgrade immediately; 0.x receives no fixes or security updates. |
+
+All published releases before `1.0.0` are deprecated by project policy. Do not
+use a 0.x release in production, documentation examples, dependency templates,
+or new lockfiles.
 
 ## Quick start
 
@@ -77,7 +102,8 @@ console.log(user.name)
 Validation failures throw `SchemaValidationError` with the stable
 `SCHEMA_ERROR` code, validation issues, schema vendor, parsed response data,
 and complete response metadata. Standard Schema support adds no runtime
-dependency to Npora Request.
+dependency to Npora Request. Schemas are configured per endpoint so one
+endpoint contract cannot be inherited by unrelated requests.
 
 ## Streaming responses
 
@@ -103,7 +129,8 @@ for await (const user of records) {
 
 Iteration is lazy and does not buffer the complete response. Breaking out of
 the loop cancels the response reader. `maxResponseSize` remains enforced while
-the stream is consumed.
+the stream is consumed. A response schema validates the parsed response value
+once; it does not validate individual SSE events or NDJSON records.
 
 ## Request configuration
 
@@ -348,6 +375,18 @@ Stable request error codes:
 - `RESPONSE_TOO_LARGE`
 - `CIRCUIT_OPEN`
 - `CONCURRENCY_LIMIT`
+
+`SchemaValidationError` extends `RequestError`, so applications can handle all
+request failures through the unified base class while still inspecting schema
+issues when `error.code === 'SCHEMA_ERROR'`.
+
+## Supply-chain verification
+
+The published package contains only the built `dist` artifacts, has no runtime
+dependencies, and is released through npm trusted publishing with provenance.
+Repository release gates verify the exact dependency tree against malware
+advisories, npm registry signatures, known vulnerabilities, the package file
+allowlist, and size budgets.
 
 ## Documentation
 

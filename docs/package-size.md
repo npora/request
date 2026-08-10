@@ -62,7 +62,9 @@ Version 1.10.0 raised the raw and compressed entrypoint, declaration, tarball,
 and unpacked-package budgets for the copied Standard Schema v1 protocol types,
 schema-aware client overloads, response validation pipeline, and unified
 validation error metadata. The feature adds no runtime dependency; the new
-limits retain measured headroom without hiding larger future growth.
+limits also account for the synchronized feature, support-policy, and
+supply-chain README while retaining measured headroom without hiding larger
+future growth.
 
 `pnpm test:package` includes the size check, so release verification cannot
 publish a package that exceeds the checked-in budgets. CI also stores the JSON
