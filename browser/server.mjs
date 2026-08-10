@@ -104,6 +104,33 @@ const server = createServer(
         return
       }
 
+      if (url.pathname === '/api/events') {
+        response.writeHead(200, {
+          'content-type': 'text/event-stream; charset=utf-8',
+          'cache-control': 'no-store',
+          'access-control-allow-origin': '*'
+        })
+        response.write('event: ready\ndata: {"step":1}\n\n')
+        await delay(10)
+        response.end('event: done\ndata: {"step":2}\n\n')
+
+        return
+      }
+
+      if (url.pathname === '/api/stream-error') {
+        response.writeHead(200, {
+          'content-type': 'application/octet-stream',
+          'content-length': '1024',
+          'cache-control': 'no-store',
+          'access-control-allow-origin': '*'
+        })
+        response.write('partial-stream')
+        await delay(10)
+        response.destroy(new Error('Intentional stream interruption'))
+
+        return
+      }
+
       if (url.pathname === '/api/upload') {
         const body = await readRequestBuffer(request)
 
@@ -119,11 +146,22 @@ const server = createServer(
       if (url.pathname === '/api/count') {
         const key = url.searchParams.get('key') ?? 'default'
         const count = (requestCounts.get(key) ?? 0) + 1
+        const cacheControl =
+          url.searchParams.get('cache') === 'enabled'
+            ? 'max-age=60'
+            : 'no-store'
 
         requestCounts.set(key, count)
-        sendJson(response, 200, {
-          count
-        })
+        sendJson(
+          response,
+          200,
+          {
+            count
+          },
+          {
+            'cache-control': cacheControl
+          }
+        )
 
         return
       }
@@ -271,7 +309,8 @@ async function sendFile(
 function sendJson(
   response,
   statusCode,
-  data
+  data,
+  headers = {}
 ) {
   const content = Buffer.from(
     JSON.stringify(data),
@@ -287,7 +326,9 @@ function sendJson(
 
     'cache-control': 'no-store',
 
-    'access-control-allow-origin': '*'
+    'access-control-allow-origin': '*',
+
+    ...headers
   })
 
   response.end(content)

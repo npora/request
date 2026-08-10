@@ -47,6 +47,11 @@ official concurrency plugin's origin isolation, FIFO queue, cancellation and
 timeout cleanup, bounded key retention, public types, and stable overload error
 code. Compressed entrypoint and tarball budgets remain unchanged.
 
+Version 1.8.0 raised the compressed ESM and CommonJS budgets for intentional
+browser response-size enforcement, bounded stream wrappers, and FormData
+nesting protection. Raw entrypoint, declaration, tarball, and unpacked-package
+budgets remain unchanged.
+
 `pnpm test:package` includes the size check, so release verification cannot
 publish a package that exceeds the checked-in budgets. CI also stores the JSON
 report for comparing changes over time.

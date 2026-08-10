@@ -179,6 +179,72 @@ describe('request config', () => {
     ])
   })
 
+  it('should reject circular FormData arrays before fetch', async () => {
+    const fetchMock = vi.fn()
+    const values: unknown[] = []
+
+    values.push(values)
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(
+      createClient().post('/form-data', {
+        formData: {
+          values
+        }
+      })
+    ).rejects.toMatchObject({
+      code: 'CONFIG_ERROR',
+      cause: {
+        message: 'FormData arrays cannot contain circular references'
+      }
+    })
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('should enforce maxFormDataDepth before fetch', async () => {
+    const fetchMock = vi.fn()
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(
+      createClient().post('/form-data', {
+        formData: {
+          values: [[['too-deep']]]
+        },
+        maxFormDataDepth: 2
+      })
+    ).rejects.toMatchObject({
+      code: 'CONFIG_ERROR',
+      cause: {
+        message: 'FormData array depth exceeds maxFormDataDepth 2'
+      }
+    })
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    ['maxResponseSize', -1],
+    ['maxResponseSize', 1.5],
+    ['maxFormDataDepth', -1],
+    ['maxFormDataDepth', 1.5]
+  ] as const)(
+    'should reject invalid %s values',
+    async (field, value) => {
+      const fetchMock = vi.fn()
+
+      vi.stubGlobal('fetch', fetchMock)
+
+      await expect(
+        createClient().get('/invalid-limit', {
+          [field]: value
+        })
+      ).rejects.toMatchObject({
+        code: 'CONFIG_ERROR'
+      })
+      expect(fetchMock).not.toHaveBeenCalled()
+    }
+  )
+
   it('should reject mutually exclusive body options', async () => {
     const fetchMock = vi.fn()
 

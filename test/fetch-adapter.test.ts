@@ -180,6 +180,62 @@ describe('FetchAdapter', () => {
     expect(response.data).toBeUndefined()
   })
 
+  it('should reject a response larger than maxResponseSize', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response('response-too-large', {
+          headers: {
+            'content-type': 'text/plain'
+          }
+        })
+      )
+    )
+
+    const adapter = new FetchAdapter()
+
+    await expect(
+      adapter.request({
+        url: 'https://api.example.com/large',
+        maxResponseSize: 8,
+        responseType: 'text'
+      })
+    ).rejects.toMatchObject({
+      code: 'RESPONSE_TOO_LARGE',
+      status: 200
+    })
+  })
+
+  it('should enforce maxResponseSize while a stream is consumed', async () => {
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode('first'))
+        controller.enqueue(new TextEncoder().encode('second'))
+        controller.close()
+      }
+    })
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(new Response(stream))
+    )
+
+    const adapter = new FetchAdapter()
+    const response = await adapter.request<ReadableStream<Uint8Array>>({
+      url: 'https://api.example.com/stream',
+      maxResponseSize: 6,
+      responseType: 'stream'
+    })
+    const reader = response.data.getReader()
+
+    await expect(reader.read()).resolves.toMatchObject({
+      done: false
+    })
+    await expect(reader.read()).rejects.toMatchObject({
+      code: 'RESPONSE_TOO_LARGE'
+    })
+  })
+
   it('should not parse a HEAD response body', async () => {
     vi.stubGlobal(
       'fetch',

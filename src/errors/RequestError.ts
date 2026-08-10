@@ -10,6 +10,7 @@ export type RequestErrorCode =
   | 'TIMEOUT_ERROR'
   | 'ABORT_ERROR'
   | 'PARSER_ERROR'
+  | 'RESPONSE_TOO_LARGE'
   | 'CIRCUIT_OPEN'
   | 'CONCURRENCY_LIMIT'
 

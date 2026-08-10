@@ -14,10 +14,41 @@ const BODY_FIELDS = [
 export function validateRequestConfig(config: RequestConfig): Headers {
   validateURL(config)
   validateTimeout(config)
+  validateLimits(config)
   const headers = validateHeaders(config)
   validateBody(config)
 
   return headers
+}
+
+function validateLimits(config: RequestConfig): void {
+  validateLimit(
+    config.maxResponseSize,
+    'Request maxResponseSize',
+    config
+  )
+  validateLimit(
+    config.maxFormDataDepth,
+    'Request maxFormDataDepth',
+    config
+  )
+}
+
+function validateLimit(
+  value: number | undefined,
+  name: string,
+  config: RequestConfig
+): void {
+  if (value === undefined || value === Number.POSITIVE_INFINITY) {
+    return
+  }
+
+  if (!Number.isSafeInteger(value) || value < 0) {
+    throw configError(
+      `${name} must be a non-negative safe integer or Infinity`,
+      config
+    )
+  }
 }
 
 function validateURL(config: RequestConfig): void {

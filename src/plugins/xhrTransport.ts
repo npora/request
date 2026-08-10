@@ -107,7 +107,9 @@ export function xhrRequest<T>(
     }
     xhr.onprogress = createProgressHandler(
       options.onDownloadProgress,
-      abortWith
+      abortWith,
+      config.maxResponseSize,
+      config
     )
 
     if (xhr.upload) {
@@ -251,13 +253,35 @@ async function processResponse<T>(
 
 function createProgressHandler(
   callback: ((progress: TransferProgress) => void) | undefined,
-  abortWith: (error: unknown) => void
+  abortWith: (error: unknown) => void,
+  maxResponseSize?: number,
+  config?: RequestConfig
 ): ((event: ProgressEvent<EventTarget>) => void) | null {
-  if (!callback) {
+  if (!callback && !Number.isFinite(maxResponseSize)) {
     return null
   }
 
   return event => {
+    if (
+      Number.isFinite(maxResponseSize) &&
+      event.loaded > (maxResponseSize ?? Number.POSITIVE_INFINITY)
+    ) {
+      abortWith(
+        new RequestError(
+          `Response body exceeds maxResponseSize ${maxResponseSize}`,
+          {
+            code: 'RESPONSE_TOO_LARGE',
+            config
+          }
+        )
+      )
+      return
+    }
+
+    if (!callback) {
+      return
+    }
+
     try {
       callback(
         createProgress(

@@ -184,6 +184,30 @@ describe('downloadPlugin XMLHttpRequest fallback', () => {
     expect(FakeXMLHttpRequest.instances).toHaveLength(1)
   })
 
+  it('should abort XHR when the response size limit is exceeded', async () => {
+    scenario = xhr => {
+      xhr.progress(6, 10)
+    }
+
+    const request = createClient().use(
+      downloadPlugin({ transport: 'xhr' })
+    )
+
+    await expect(
+      request.get('/large-file', {
+        maxResponseSize: 5,
+        extensions: {
+          download: {
+            onProgress: vi.fn()
+          }
+        }
+      })
+    ).rejects.toMatchObject({
+      code: 'RESPONSE_TOO_LARGE'
+    })
+    expect(FakeXMLHttpRequest.instances[0]?.aborted).toBe(true)
+  })
+
   it('should expose HTTP and network failures as RequestError', async () => {
     scenario = xhr => {
       xhr.status = 404

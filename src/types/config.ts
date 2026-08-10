@@ -80,6 +80,20 @@ export interface RequestConfig {
 
   signal?: AbortSignal
 
+  /**
+   * Maximum parsed response body size in bytes.
+   *
+   * @default unlimited
+   */
+  maxResponseSize?: number
+
+  /**
+   * Maximum nested array depth accepted while building FormData.
+   *
+   * @default 32
+   */
+  maxFormDataDepth?: number
+
   responseType?: ResponseType
 
   validateStatus?: (status: number) => boolean
