@@ -31,7 +31,11 @@ describe('streaming response parsing', () => {
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue(
-        chunkedResponse(source, 'text/event-stream', [1, 7, 15, 22, 31])
+        chunkedResponse(
+          source,
+          'Text/Event-Stream; Charset=UTF-8',
+          [1, 7, 15, 22, 31]
+        )
       )
     )
 
@@ -105,7 +109,11 @@ describe('streaming response parsing', () => {
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue(
-        chunkedResponse(source, 'application/x-ndjson', [2, 11, 18, 25])
+        chunkedResponse(
+          source,
+          'Application/Vnd.Npora+NDJSON; Charset=UTF-8',
+          [2, 11, 18, 25]
+        )
       )
     )
 
@@ -117,6 +125,19 @@ describe('streaming response parsing', () => {
       { id: 1, name: '你好' },
       { id: 2, name: 'world' }
     ])
+  })
+
+  it('should not detect a stream from a malformed media type substring', async () => {
+    const source = 'data: untrusted\n\n'
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        chunkedResponse(source, 'text/event-stream-malformed')
+      )
+    )
+
+    await expect(createClient().get<string>('/events')).resolves.toBe(source)
   })
 
   it('should report the invalid NDJSON line', async () => {

@@ -56,6 +56,52 @@ describe('FetchAdapter', () => {
     })
   })
 
+  it('should normalize media types before detecting json', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ message: 'Invalid request' }), {
+          status: 200,
+          headers: {
+            'content-type': 'Application/Problem+JSON; Charset=UTF-8'
+          }
+        })
+      )
+    )
+
+    const response = await new FetchAdapter().request<{
+      message: string
+    }>({
+      url: 'https://api.example.com/problem'
+    })
+
+    expect(response.data).toEqual({
+      message: 'Invalid request'
+    })
+  })
+
+  it('should not detect json from a malformed media type substring', async () => {
+    const source = JSON.stringify({ trusted: false })
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(source, {
+          status: 200,
+          headers: {
+            'content-type': 'application/json-malformed'
+          }
+        })
+      )
+    )
+
+    const response = await new FetchAdapter().request<string>({
+      url: 'https://api.example.com/untrusted'
+    })
+
+    expect(response.data).toBe(source)
+  })
+
   it('should throw HTTP_ERROR when status is invalid', async () => {
     vi.stubGlobal(
       'fetch',

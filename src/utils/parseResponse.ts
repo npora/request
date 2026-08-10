@@ -503,25 +503,38 @@ function copyResponseMetadata(source: Response, target: Response): void {
 
 function detectResponseType(response: Response): ResponseType {
   const contentType = response.headers.get('content-type') ?? ''
+  const parameterStart = contentType.indexOf(';')
+  const mediaType = contentType
+    .slice(0, parameterStart === -1 ? undefined : parameterStart)
+    .trim()
+    .toLowerCase()
 
-  if (contentType.includes('text/event-stream')) {
+  if (mediaType === 'text/event-stream') {
     return 'sse'
   }
 
   if (
-    contentType.includes('application/x-ndjson') ||
-    contentType.includes('application/ndjson') ||
-    contentType.includes('+ndjson')
+    mediaType === 'application/x-ndjson' ||
+    mediaType === 'application/ndjson' ||
+    hasStructuredSuffix(mediaType, '+ndjson')
   ) {
     return 'ndjson'
   }
 
   if (
-    contentType.includes('application/json') ||
-    contentType.includes('+json')
+    mediaType === 'application/json' ||
+    hasStructuredSuffix(mediaType, '+json')
   ) {
     return 'json'
   }
 
   return 'text'
+}
+
+function hasStructuredSuffix(mediaType: string, suffix: string): boolean {
+  const slashIndex = mediaType.indexOf('/')
+  const suffixStart = mediaType.length - suffix.length
+
+  return slashIndex > 0 && suffixStart > slashIndex + 1 &&
+    mediaType.endsWith(suffix)
 }
