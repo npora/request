@@ -20,6 +20,8 @@ export type ResponseType =
   | 'blob'
   | 'arrayBuffer'
   | 'stream'
+  | 'sse'
+  | 'ndjson'
 
 /**
  * Native Fetch options passed to the underlying adapter.

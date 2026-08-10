@@ -71,8 +71,8 @@ pnpm test:browser
 ```
 
 Playwright validates Chromium, Firefox, and WebKit, including Fetch requests,
-Web Workers, plugin lifecycle, HEAD/OPTIONS, and concurrent XHR
-upload/download progress.
+SSE and NDJSON streaming, Web Workers, plugin lifecycle, HEAD/OPTIONS, and
+concurrent XHR upload/download progress.
 
 ## Performance checks
 

@@ -117,6 +117,19 @@ const server = createServer(
         return
       }
 
+      if (url.pathname === '/api/records') {
+        response.writeHead(200, {
+          'content-type': 'application/x-ndjson; charset=utf-8',
+          'cache-control': 'no-store',
+          'access-control-allow-origin': '*'
+        })
+        response.write('{"id":1,"name":"你好"}\n')
+        await delay(10)
+        response.end('{"id":2,"name":"browser"}\n')
+
+        return
+      }
+
       if (url.pathname === '/api/stream-error') {
         response.writeHead(200, {
           'content-type': 'application/octet-stream',

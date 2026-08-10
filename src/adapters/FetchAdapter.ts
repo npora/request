@@ -2,8 +2,11 @@ import { RequestError } from '../errors'
 import type { Adapter, NporaResponse, RequestConfig } from '../types'
 import {
   type BuiltRequest,
+  finalizeStreamingResponse,
   limitResponseSize,
+  isStreamingResponseType,
   parseResponse,
+  resolveResponseType,
   validateRequestConfig
 } from '../utils'
 import { buildRequestWithHeaders } from '../utils/buildRequest'
@@ -37,17 +40,33 @@ export class FetchAdapter implements Adapter {
     preserveRaw: boolean
   ): Promise<NporaResponse<T>> {
     let request: BuiltRequest | undefined
+    let deferCleanup = false
+    let responseExposed = false
 
     try {
       request = buildRequestWithHeaders(config, headers)
-      const response = limitResponseSize(
+      let response = limitResponseSize(
         await fetch(request.url, request.init),
         config
       )
       const validateStatus = config.validateStatus ?? defaultValidateStatus
       const validStatus = validateStatus(response.status)
+      const streaming = isStreamingResponseType(
+        resolveResponseType(response, config)
+      )
+
+      if (streaming) {
+        response = finalizeStreamingResponse(
+          response,
+          request.init.signal,
+          config,
+          request.clear
+        )
+        deferCleanup = Boolean(response.body)
+      }
+
       const parseTarget =
-        config.responseType === 'stream' ||
+        streaming ||
         (
           !preserveRaw &&
           validStatus
@@ -63,6 +82,8 @@ export class FetchAdapter implements Adapter {
         config,
         raw: response
       }
+
+      responseExposed = true
 
       if (!validStatus) {
         throw new RequestError<T>(response.statusText || 'Request failed', {
@@ -113,7 +134,9 @@ export class FetchAdapter implements Adapter {
         cause: error
       })
     } finally {
-      request?.clear()
+      if (!deferCleanup || !responseExposed) {
+        request?.clear()
+      }
     }
   }
 }

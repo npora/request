@@ -47,7 +47,14 @@ interface BrowserRequestConfig {
   query?: Record<string, string | number>
   timeout?: number
   maxResponseSize?: number
-  responseType?: 'json' | 'text' | 'blob' | 'arrayBuffer' | 'stream'
+  responseType?:
+    | 'json'
+    | 'text'
+    | 'blob'
+    | 'arrayBuffer'
+    | 'stream'
+    | 'sse'
+    | 'ndjson'
 }
 
 interface BrowserWindow extends Window {
@@ -431,46 +438,80 @@ test(
 )
 
 test(
-  'should consume server-sent events as a browser stream',
+  'should parse server-sent events in the browser',
   async ({ page }) => {
     await openFixture(page)
 
-    const content = await page.evaluate(async () => {
+    const events = await page.evaluate(async () => {
       const request = (window as BrowserWindow).nporaRequest
 
       if (!request) {
         throw new Error('Npora request client is unavailable')
       }
 
-      const stream = await request.get<ReadableStream<Uint8Array>>(
+      const stream = await request.get<AsyncIterable<{
+        data: string
+        event: string
+        id: string
+      }>>(
         '/events',
         {
-          responseType: 'stream'
+          responseType: 'sse'
         }
       )
-      const reader = stream.getReader()
-      const decoder = new TextDecoder()
-      let content = ''
+      const events = []
 
-      while (true) {
-        const result = await reader.read()
-
-        if (result.done) {
-          break
-        }
-
-        content += decoder.decode(result.value, {
-          stream: true
-        })
+      for await (const event of stream) {
+        events.push(event)
       }
 
-      return content + decoder.decode()
+      return events
     })
 
-    expect(content).toContain('event: ready')
-    expect(content).toContain('data: {"step":1}')
-    expect(content).toContain('event: done')
-    expect(content).toContain('data: {"step":2}')
+    expect(events).toEqual([
+      {
+        data: '{"step":1}',
+        event: 'ready',
+        id: ''
+      },
+      {
+        data: '{"step":2}',
+        event: 'done',
+        id: ''
+      }
+    ])
+  }
+)
+
+test(
+  'should parse NDJSON records in the browser',
+  async ({ page }) => {
+    await openFixture(page)
+
+    const records = await page.evaluate(async () => {
+      const request = (window as BrowserWindow).nporaRequest
+
+      if (!request) {
+        throw new Error('Npora request client is unavailable')
+      }
+
+      const stream = await request.get<AsyncIterable<{
+        id: number
+        name: string
+      }>>('/records')
+      const records = []
+
+      for await (const record of stream) {
+        records.push(record)
+      }
+
+      return records
+    })
+
+    expect(records).toEqual([
+      { id: 1, name: '你好' },
+      { id: 2, name: 'browser' }
+    ])
   }
 )
 

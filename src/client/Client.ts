@@ -12,7 +12,8 @@ import type {
   Adapter,
   ClientOptions,
   NporaResponse,
-  RequestConfig
+  RequestConfig,
+  ServerSentEvent
 } from '../types'
 
 export class Client {
@@ -303,6 +304,58 @@ export class Client {
       ...config,
       url,
       method: 'OPTIONS'
+    })
+  }
+
+  /**
+   * Consume a server-sent event response as a lazy async iterable.
+   */
+  sse(
+    url: string,
+    config: Omit<RequestConfig, 'url' | 'method' | 'responseType'> = {}
+  ): Promise<AsyncIterable<ServerSentEvent>> {
+    return this.get<AsyncIterable<ServerSentEvent>>(url, {
+      ...config,
+      responseType: 'sse'
+    })
+  }
+
+  /**
+   * Consume a server-sent event response with complete response metadata.
+   */
+  sseResponse(
+    url: string,
+    config: Omit<RequestConfig, 'url' | 'method' | 'responseType'> = {}
+  ): Promise<NporaResponse<AsyncIterable<ServerSentEvent>>> {
+    return this.getResponse<AsyncIterable<ServerSentEvent>>(url, {
+      ...config,
+      responseType: 'sse'
+    })
+  }
+
+  /**
+   * Consume newline-delimited JSON records as a lazy async iterable.
+   */
+  ndjson<T = unknown>(
+    url: string,
+    config: Omit<RequestConfig, 'url' | 'method' | 'responseType'> = {}
+  ): Promise<AsyncIterable<T>> {
+    return this.get<AsyncIterable<T>>(url, {
+      ...config,
+      responseType: 'ndjson'
+    })
+  }
+
+  /**
+   * Consume newline-delimited JSON with complete response metadata.
+   */
+  ndjsonResponse<T = unknown>(
+    url: string,
+    config: Omit<RequestConfig, 'url' | 'method' | 'responseType'> = {}
+  ): Promise<NporaResponse<AsyncIterable<T>>> {
+    return this.getResponse<AsyncIterable<T>>(url, {
+      ...config,
+      responseType: 'ndjson'
     })
   }
 

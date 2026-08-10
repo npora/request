@@ -67,6 +67,7 @@ const publicExports = [
   'RequestLogger',
   'ResponseLogEntry',
   'ResponseType',
+  'ServerSentEvent',
   'RetryEvent',
   'RetryOptions',
   'UploadData',

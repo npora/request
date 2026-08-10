@@ -53,6 +53,32 @@ console.log(response.headers)
 console.log(response.raw)
 ```
 
+## Streaming responses
+
+SSE and NDJSON responses are decoded incrementally as async iterables. The
+client also detects `text/event-stream` and common NDJSON content types
+automatically:
+
+```ts
+import type { ServerSentEvent } from '@npora/request'
+
+const events = await api.sse('/events')
+
+for await (const event of events) {
+  console.log(event.event, event.data, event.id)
+}
+
+const records = await api.ndjson<User>('/users/export')
+
+for await (const user of records) {
+  console.log(user.name)
+}
+```
+
+Iteration is lazy and does not buffer the complete response. Breaking out of
+the loop cancels the response reader. `maxResponseSize` remains enforced while
+the stream is consumed.
+
 ## Request configuration
 
 ```ts
