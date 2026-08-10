@@ -1,5 +1,15 @@
 # @npora/request
 
+## 1.10.0
+
+### Minor Changes
+
+- f5fd0bd: Add zero-dependency Standard Schema v1 response validation with automatic
+  output type inference, synchronous and asynchronous validator support,
+  transformed response data, and a unified `SchemaValidationError` carrying the
+  stable `SCHEMA_ERROR` code, issues, schema vendor, parsed data, and response
+  metadata.
+
 ## 1.9.1
 
 ### Patch Changes
