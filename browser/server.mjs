@@ -9,7 +9,7 @@ import {
 } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-const HOST = '127.0.0.1'
+const HOST = 'localhost'
 const PORT = 4173
 
 const rootDir = fileURLToPath(
