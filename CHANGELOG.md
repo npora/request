@@ -1,5 +1,14 @@
 # @npora/request
 
+## 1.10.2
+
+### Patch Changes
+
+- 26fa3f5: Expire cache entries at their exact TTL boundary, preserve HTTP error handling
+  for bodyless 304 responses, classify failing validateStatus callbacks as
+  configuration errors, reduce duplicate plugin origin-resolution code, and omit
+  documentation comments from runtime bundles.
+
 ## 1.10.1
 
 ### Patch Changes
