@@ -544,6 +544,30 @@ optional `total` and `progress`, per-event `bytes`, average bytes-per-second
 `rate`, and remaining-seconds `estimated`. Rate estimates begin after a
 250-millisecond sample; fields that cannot be determined are omitted.
 
+Return a stream for large downloads that should retain backpressure instead of
+being assembled into an in-memory Blob:
+
+```ts
+const stream = await request.get<ReadableStream<Uint8Array>>('/archive.zip', {
+  maxResponseSize: 1024 * 1024 * 1024,
+  extensions: {
+    download: {
+      output: 'stream',
+      onProgress({ loaded, rate, estimated }) {
+        console.log({ loaded, rate, estimated })
+      }
+    }
+  }
+})
+
+await stream.pipeTo(destination)
+```
+
+Stream output requires the Fetch transport. Progress follows consumer reads,
+cancellation propagates to the response body, and `maxResponseSize` remains
+enforced during consumption. Body-read and progress-callback errors surface
+from the stream reader or `pipeTo()` after the request promise has resolved.
+
 Plugins must not replace client methods.
 
 Plugins should extend the request lifecycle through supported extension points.

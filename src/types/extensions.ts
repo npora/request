@@ -299,7 +299,19 @@ export interface UploadOptions {
  */
 export interface DownloadProgress extends TransferProgress {}
 
+export type DownloadOutput = 'blob' | 'stream'
+
 export interface DownloadOptions {
+  /**
+   * Returned download representation.
+   *
+   * `stream` requires Fetch response-stream support and preserves backpressure
+   * without buffering the complete response in memory.
+   *
+   * @default 'blob'
+   */
+  output?: DownloadOutput
+
   /**
    * Reserved legacy field. It does not save or rename the returned Blob.
    *
