@@ -110,9 +110,10 @@ export class ConfigMerger {
       query: defaults.query
         ? { ...defaults.query }
         : undefined,
-      searchParams: defaults.searchParams
-        ? new URLSearchParams(defaults.searchParams)
-        : undefined
+      searchParams:
+        defaults.searchParams instanceof URLSearchParams
+          ? new URLSearchParams(defaults.searchParams)
+          : defaults.searchParams
     }
   }
 

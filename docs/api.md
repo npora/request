@@ -141,8 +141,8 @@ continues to manage `method`, `headers`, `body` and `signal`.
 
 Object `query` parameters are shallow merged with client defaults. Native
 `searchParams` replace inherited query defaults and preserve repeated keys,
-entry order and encoding exactly. `query` and `searchParams` are mutually
-exclusive.
+entry order and native `URLSearchParams` encoding semantics. `query` and
+`searchParams` are mutually exclusive.
 
 ```ts
 await request.get('/account', {

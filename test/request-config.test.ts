@@ -243,6 +243,25 @@ describe('request config', () => {
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
+  it('should reject invalid inherited searchParams before fetch', async () => {
+    const fetchMock = vi.fn()
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const client = createClient({
+      searchParams: {
+        page: 1
+      } as never
+    })
+
+    await expect(client.get('/users')).rejects.toMatchObject({
+      code: 'CONFIG_ERROR',
+      message: 'Request searchParams must be URLSearchParams'
+    })
+
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
   it.each([
     ['maxResponseSize', -1],
     ['maxResponseSize', 1.5],

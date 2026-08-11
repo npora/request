@@ -151,6 +151,22 @@ describe('ConfigMerger', () => {
     expect(defaults.get('locale')).toBe('en')
   })
 
+  it('should preserve invalid inherited searchParams for validation', () => {
+    const invalidSearchParams = {
+      locale: 'en'
+    }
+    const config = ConfigMerger.merge(
+      {
+        searchParams: invalidSearchParams as never
+      },
+      {
+        url: '/users'
+      }
+    )
+
+    expect(config.searchParams).toBe(invalidSearchParams)
+  })
+
   it('should replace inherited searchParams with object query input', () => {
     const config = ConfigMerger.merge(
       {
