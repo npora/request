@@ -1,5 +1,10 @@
 import { RequestError } from '../errors'
-import type { RequestConfig, ResponseType } from '../types'
+import type {
+  HttpMethod,
+  RequestConfig,
+  ResponseType
+} from '../types'
+import { isURLSearchParams } from './isURLSearchParams'
 
 const BODY_FIELDS = [
   'body',
@@ -18,11 +23,22 @@ const RESPONSE_TYPES: readonly ResponseType[] = [
   'ndjson'
 ]
 
+const HTTP_METHODS: readonly HttpMethod[] = [
+  'GET',
+  'POST',
+  'PUT',
+  'PATCH',
+  'DELETE',
+  'HEAD',
+  'OPTIONS'
+]
+
 /**
  * Validate configuration before request hooks or adapters act on it.
  */
 export function validateRequestConfig(config: RequestConfig): Headers {
   validateURL(config)
+  validateMethod(config)
   validateTimeout(config)
   validateLimits(config)
   validateQuery(config)
@@ -44,12 +60,21 @@ function validateQuery(config: RequestConfig): void {
 
   if (
     config.searchParams !== undefined &&
-    !(config.searchParams instanceof URLSearchParams)
+    !isURLSearchParams(config.searchParams)
   ) {
     throw configError(
       'Request searchParams must be URLSearchParams',
       config
     )
+  }
+}
+
+function validateMethod(config: RequestConfig): void {
+  if (
+    config.method !== undefined &&
+    !HTTP_METHODS.includes(config.method)
+  ) {
+    throw configError('Request method is invalid', config)
   }
 }
 

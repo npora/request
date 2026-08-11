@@ -17,6 +17,7 @@ import {
   loggerPlugin,
   RequestError
 } from '../src'
+import { isURLSearchParams } from '../src/utils/isURLSearchParams'
 
 afterEach(() => {
   vi.restoreAllMocks()
@@ -47,6 +48,21 @@ function createAdapter(
 }
 
 describe('security boundaries', () => {
+  it('should reject objects that only spoof the URLSearchParams tag', () => {
+    const spoofed = {
+      [Symbol.toStringTag]: 'URLSearchParams',
+      entries() {
+        return new Map([['tag', 'spoofed']]).entries()
+      },
+      toString() {
+        return 'tag=spoofed'
+      }
+    }
+
+    expect(isURLSearchParams(new URLSearchParams('tag=native'))).toBe(true)
+    expect(isURLSearchParams(spoofed)).toBe(false)
+  })
+
   it('should reject header injection before calling an adapter', async () => {
     const requests: RequestConfig[] = []
     const request = createClient({

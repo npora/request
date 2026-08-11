@@ -1,4 +1,5 @@
 import type { RequestConfig } from '../types'
+import { isURLSearchParams } from '../utils/isURLSearchParams'
 
 /**
  * Request configuration merger.
@@ -90,7 +91,7 @@ export class ConfigMerger {
       return {
         query: config.query,
         searchParams:
-          config.searchParams instanceof URLSearchParams
+          isURLSearchParams(config.searchParams)
             ? new URLSearchParams(config.searchParams)
             : config.searchParams
       }
@@ -111,7 +112,7 @@ export class ConfigMerger {
         ? { ...defaults.query }
         : undefined,
       searchParams:
-        defaults.searchParams instanceof URLSearchParams
+        isURLSearchParams(defaults.searchParams)
           ? new URLSearchParams(defaults.searchParams)
           : defaults.searchParams
     }

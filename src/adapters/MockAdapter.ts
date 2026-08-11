@@ -7,6 +7,7 @@ import type {
   RequestConfig
 } from '../types'
 import { validateResponseStatus } from '../utils/validateResponseStatus'
+import { isURLSearchParams } from '../utils/isURLSearchParams'
 
 export type MockHandler<T = unknown> = (
   config: RequestConfig
@@ -585,7 +586,7 @@ function isBodyInit(value: unknown): value is BodyInit {
   return (
     (typeof Blob !== 'undefined' && value instanceof Blob) ||
     (typeof FormData !== 'undefined' && value instanceof FormData) ||
-    (typeof URLSearchParams !== 'undefined' && value instanceof URLSearchParams) ||
+    isURLSearchParams(value) ||
     (typeof ReadableStream !== 'undefined' && value instanceof ReadableStream) ||
     value instanceof ArrayBuffer ||
     ArrayBuffer.isView(value)
