@@ -182,6 +182,10 @@ The body options `body`, `json`, `form`, and `formData` are mutually exclusive.
 `GET` and `HEAD` requests cannot contain a body. Invalid configuration throws a
 `RequestError` before the adapter sends a request.
 
+See the complete [configuration reference](https://github.com/npora/request/blob/main/docs/configuration.md)
+for every option, default, merge rule, plugin extension, environment limit,
+and transfer-progress behavior.
+
 Create isolated clients with inherited defaults:
 
 ```ts
@@ -420,6 +424,7 @@ allowlist, and size budgets.
 
 ## Documentation
 
+- [Configuration reference](https://github.com/npora/request/blob/main/docs/configuration.md)
 - [API reference](https://github.com/npora/request/blob/main/docs/api.md)
 - [Architecture](https://github.com/npora/request/blob/main/docs/architecture.md)
 - [Migration from 0.x](https://github.com/npora/request/blob/main/docs/migration.md)

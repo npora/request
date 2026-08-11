@@ -185,6 +185,45 @@ describe('plugin', () => {
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
+  it('should use and clean up scoped transport hooks', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ source: 'fetch' }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' }
+      })
+    )
+    const plugin: Plugin = {
+      name: 'transport',
+      install({ hooks }) {
+        hooks.onTransport(context => {
+          context.response = {
+            data: { source: 'transport' },
+            status: 200,
+            statusText: 'OK',
+            headers: new Headers(),
+            config: context.config,
+            raw: new Response()
+          }
+        })
+      }
+    }
+    const request = createClient().use(plugin)
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(request.get('/transport')).resolves.toEqual({
+      source: 'transport'
+    })
+    expect(fetchMock).not.toHaveBeenCalled()
+
+    request.unuse('transport')
+
+    await expect(request.get('/fetch')).resolves.toEqual({
+      source: 'fetch'
+    })
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
   it('should require dependencies to be installed first', () => {
     const request = createClient()
     const plugin: Plugin = {

@@ -298,6 +298,11 @@ export interface DownloadProgress {
 }
 
 export interface DownloadOptions {
+  /**
+   * Reserved legacy field. It does not save or rename the returned Blob.
+   *
+   * @deprecated This field currently has no effect.
+   */
   filename?: string
 
   /**

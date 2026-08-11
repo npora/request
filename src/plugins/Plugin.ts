@@ -25,6 +25,18 @@ export interface PluginHookManager {
     options?: HookOptions
   ): HookDisposer
 
+  /**
+   * Provide an alternative transport for the current attempt.
+   *
+   * Transport hooks run inside the retry loop. A hook that handles the
+   * request assigns `context.response`; later transport hooks and the client
+   * adapter are then skipped for that attempt.
+   */
+  onTransport(
+    hook: RequestHook,
+    options?: HookOptions
+  ): HookDisposer
+
   onResponse(
     hook: RequestHook,
     options?: HookOptions

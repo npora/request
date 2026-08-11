@@ -9,7 +9,8 @@ import {
 import {
   createClient,
   downloadPlugin,
-  RequestError
+  RequestError,
+  retryPlugin
 } from '../src'
 
 type XHRScenario = (xhr: FakeXMLHttpRequest) => void
@@ -103,6 +104,30 @@ afterEach(() => {
 })
 
 describe('downloadPlugin XMLHttpRequest fallback', () => {
+  it('should retry failed XHR downloads through the normal retry lifecycle', async () => {
+    scenario = xhr => {
+      if (FakeXMLHttpRequest.instances.length === 1) {
+        xhr.fail()
+        return
+      }
+
+      xhr.load()
+    }
+
+    const request = createClient()
+      .use(downloadPlugin({ transport: 'xhr' }))
+      .use(retryPlugin({ retries: 1, delay: () => 0 }))
+
+    const data = await request.get<Blob>('/file', {
+      extensions: {
+        download: { onProgress() {} }
+      }
+    })
+
+    expect(await data.text()).toBe('npora')
+    expect(FakeXMLHttpRequest.instances).toHaveLength(2)
+  })
+
   it('should use forced XHR without issuing a Fetch request', async () => {
     const fetchMock = vi.fn()
     const onProgress = vi.fn()

@@ -68,6 +68,11 @@ authentication, logging, and transfer progress through scoped interceptors
 and hooks. A plugin may declare dependencies and conflicts, return cleanup
 logic, and be removed with `unuse()`.
 
+Alternative network transports register an `onTransport` hook. It runs inside
+each attempt after request coordination and before the default adapter, so XHR
+progress transfers retain the same error, authentication-refresh, retry,
+response, and settled lifecycle as Fetch requests.
+
 The final `onSettled` hook runs after response/error interceptors and all retry
 decisions. It is intended for terminal coordination such as releasing
 deduplicated cache followers. Settled observers are isolated: one observer

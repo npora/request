@@ -67,18 +67,26 @@ export class Pipeline {
           const headers = validatedHeaders
 
           validatedHeaders = undefined
-          context.response =
-            headers && this.adapter.requestValidated
-              ? await this.adapter.requestValidated<T>(
-                  context.config,
-                  headers,
-                  preserveRaw ||
-                  this.hooks.hasResponseHooks ||
-                  this.interceptors.response.active
-                )
-              : await this.adapter.request<T>(
-                  context.config
-                )
+
+          if (this.hooks.hasTransportHooks) {
+            await this.hooks.runTransport(context)
+          }
+
+          if (!context.response) {
+            context.response =
+              headers && this.adapter.requestValidated
+                ? await this.adapter.requestValidated<T>(
+                    context.config,
+                    headers,
+                    preserveRaw ||
+                    this.hooks.hasResponseHooks ||
+                    this.interceptors.response.active
+                  )
+                : await this.adapter.request<T>(
+                    context.config
+                  )
+          }
+
           return await this.processResponse(context)
         } catch (error) {
           const errorHooksSucceeded = await this.notifyError(
