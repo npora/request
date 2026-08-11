@@ -6,6 +6,7 @@ import type {
   QueryParams,
   RequestConfig
 } from '../types'
+import { validateResponseStatus } from '../utils/validateResponseStatus'
 
 export type MockHandler<T = unknown> = (
   config: RequestConfig
@@ -503,9 +504,7 @@ function validateMockResponse<T>(
   response: NporaResponse<T>,
   config: RequestConfig
 ): NporaResponse<T> {
-  const validateStatus = config.validateStatus ?? defaultValidateStatus
-
-  if (!validateStatus(response.status)) {
+  if (!validateResponseStatus(response.status, config)) {
     throw new RequestError(
       response.statusText || 'Mock request failed',
       {
@@ -516,10 +515,6 @@ function validateMockResponse<T>(
   }
 
   return response
-}
-
-function defaultValidateStatus(status: number): boolean {
-  return status >= 200 && status < 300
 }
 
 function defaultStatusText(status: number): string {

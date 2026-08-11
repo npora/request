@@ -6,5 +6,8 @@ export default defineConfig({
   dts: true,
   clean: true,
   fixedExtension: false,
-  target: 'es2020'
+  target: 'es2020',
+  outputOptions: {
+    comments: false
+  }
 })

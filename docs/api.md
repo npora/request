@@ -212,6 +212,10 @@ Both synchronous and asynchronous validators are supported, successful schema
 transformations replace `response.data`, and the schema output type is inferred
 by data-only and complete-response methods.
 
+HEAD, 204, 205, and 304 responses are treated as bodyless. A 304 response still
+fails the default status policy with `HTTP_ERROR`, but it does not become a
+`PARSER_ERROR` solely because a JSON content type accompanies its empty body.
+
 Schemas are endpoint-specific request configuration and are intentionally not
 accepted as client or `extend()` defaults, preventing one endpoint's contract
 from being inherited by unrelated requests.

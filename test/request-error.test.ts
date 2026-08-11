@@ -68,6 +68,8 @@ describe('RequestError', () => {
     'TIMEOUT_ERROR',
     'ABORT_ERROR',
     'PARSER_ERROR',
+    'SCHEMA_ERROR',
+    'RESPONSE_TOO_LARGE',
     'CIRCUIT_OPEN',
     'CONCURRENCY_LIMIT'
   ] as const)('should support %s', code => {

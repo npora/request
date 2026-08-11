@@ -226,6 +226,57 @@ describe('FetchAdapter', () => {
     expect(response.data).toBeUndefined()
   })
 
+  it('should preserve HTTP_ERROR for a bodyless 304 response', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(null, {
+          status: 304,
+          statusText: 'Not Modified',
+          headers: {
+            'content-type': 'application/json'
+          }
+        })
+      )
+    )
+
+    await expect(
+      new FetchAdapter().request({
+        url: 'https://api.example.com/not-modified'
+      })
+    ).rejects.toMatchObject({
+      code: 'HTTP_ERROR',
+      status: 304,
+      data: undefined,
+      response: {
+        status: 304,
+        data: undefined
+      }
+    })
+  })
+
+  it('should classify validateStatus callback failures as config errors', async () => {
+    const cause = new Error('status validation failed')
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(new Response('ok'))
+    )
+
+    await expect(
+      new FetchAdapter().request({
+        url: 'https://api.example.com/status',
+        validateStatus() {
+          throw cause
+        }
+      })
+    ).rejects.toMatchObject({
+      code: 'CONFIG_ERROR',
+      status: 200,
+      cause
+    })
+  })
+
   it('should reject a response larger than maxResponseSize', async () => {
     vi.stubGlobal(
       'fetch',
@@ -250,6 +301,28 @@ describe('FetchAdapter', () => {
       code: 'RESPONSE_TOO_LARGE',
       status: 200
     })
+  })
+
+  it('should allow a response exactly at maxResponseSize', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response('1234', {
+          headers: {
+            'content-length': '4',
+            'content-type': 'text/plain'
+          }
+        })
+      )
+    )
+
+    const response = await new FetchAdapter().request<string>({
+      url: 'https://api.example.com/exact-size',
+      maxResponseSize: 4,
+      responseType: 'text'
+    })
+
+    expect(response.data).toBe('1234')
   })
 
   it('should enforce maxResponseSize while a stream is consumed', async () => {

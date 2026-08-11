@@ -168,7 +168,8 @@ export async function parseResponse<T = unknown>(
   if (
     config.method === 'HEAD' ||
     response.status === 204 ||
-    response.status === 205
+    response.status === 205 ||
+    response.status === 304
   ) {
     return undefined as T
   }

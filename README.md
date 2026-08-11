@@ -1,5 +1,11 @@
 # @npora/request
 
+[![npm version](https://img.shields.io/npm/v/@npora/request.svg)](https://www.npmjs.com/package/@npora/request)
+[![CI](https://github.com/npora/request/actions/workflows/ci.yml/badge.svg)](https://github.com/npora/request/actions/workflows/ci.yml)
+[![Security](https://github.com/npora/request/actions/workflows/security.yml/badge.svg)](https://github.com/npora/request/actions/workflows/security.yml)
+[![runtime dependencies](https://img.shields.io/badge/runtime_dependencies-0-success)](package.json)
+[![license](https://img.shields.io/npm/l/@npora/request.svg)](LICENSE)
+
 A production-focused, TypeScript-first HTTP client built on the standard Fetch
 API, with zero runtime dependencies.
 
