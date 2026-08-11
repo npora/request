@@ -1,5 +1,12 @@
 # @npora/request
 
+## 1.10.3
+
+### Patch Changes
+
+- 414dec3: Reject invalid response types and status validators as configuration errors
+  before starting network I/O.
+
 ## 1.10.2
 
 ### Patch Changes
