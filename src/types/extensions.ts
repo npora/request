@@ -115,6 +115,12 @@ export interface RetryEvent {
 export interface CacheOptions {
   enabled?: boolean
 
+  /**
+   * Time in milliseconds before a cached response expires.
+   * Use `0` to disable persistence or `Infinity` to retain it indefinitely.
+   *
+   * @default 30000
+   */
   ttl?: number
 
   key?: string

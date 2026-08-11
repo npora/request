@@ -1,11 +1,28 @@
 # @npora/request
 
-A TypeScript-first HTTP client built on the standard Fetch API.
+A production-focused, TypeScript-first HTTP client built on the standard Fetch
+API, with zero runtime dependencies.
 
-Npora Request adds typed configuration, a predictable request lifecycle,
-runtime response validation, streaming, interceptors, plugins, unified errors,
-retries, caching, concurrency control, circuit breaking, authentication, and
-upload/download progress without adding runtime dependencies.
+Npora Request keeps the native Fetch model while adding the contracts and
+resilience needed by real applications: inferred response types, runtime
+validation, incremental streaming, stable errors, deterministic extension
+ordering, retries, caching, concurrency control, circuit breaking,
+authentication, and upload/download progress.
+
+## Why Npora Request
+
+- **Trust responses at runtime.** Standard Schema v1 validation checks and can
+  transform untrusted data while preserving full response and error metadata.
+- **Stream without buffering everything.** SSE and NDJSON are exposed as lazy
+  async iterables with cancellation, timeout, and response-size enforcement.
+- **Add resilience without hiding the transport.** Retry, cache, circuit
+  breaker, concurrency, authentication, logging, and progress are isolated,
+  composable plugins over the standard Fetch API.
+- **Use one predictable contract everywhere.** Browsers, Web Workers, Node.js,
+  ESM, and CommonJS share the same typed lifecycle and stable error codes.
+- **Ship less supply-chain risk.** The package has no runtime dependencies and
+  verifies public exports, browser behavior, security regressions, and size
+  budgets before release.
 
 ## Features
 
