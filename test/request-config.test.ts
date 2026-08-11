@@ -380,6 +380,37 @@ describe('request config', () => {
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
+  it.each([
+    {
+      config: {
+        responseType: 'xml'
+      },
+      message: 'Request responseType is invalid'
+    },
+    {
+      config: {
+        validateStatus: null
+      },
+      message: 'Request validateStatus must be a function'
+    }
+  ])('should reject invalid response configuration before fetch', async ({
+    config,
+    message
+  }) => {
+    const fetchMock = vi.fn()
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(
+      createClient().get('/users', config as never)
+    ).rejects.toMatchObject({
+      code: 'CONFIG_ERROR',
+      message
+    })
+
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
   it('should reject invalid headers', async () => {
     const fetchMock = vi.fn()
 

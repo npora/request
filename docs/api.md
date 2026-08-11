@@ -304,10 +304,11 @@ Client defaults and request configuration are merged deterministically:
 
 The body options `body`, `json`, `form` and `formData` are mutually exclusive.
 `GET` and `HEAD` requests cannot include a body. Invalid headers, invalid
-timeout values, unsupported method/body combinations and body configuration
-conflicts throw a `RequestError` with code `CONFIG_ERROR` before any network
-request is sent. Configuration is validated again after plugin request hooks,
-including when a custom adapter is used.
+timeout values, invalid response types or status validators, unsupported
+method/body combinations and body configuration conflicts throw a
+`RequestError` with code `CONFIG_ERROR` before any network request is sent.
+Configuration is validated again after plugin request hooks, including when a
+custom adapter is used.
 
 ---
 
