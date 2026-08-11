@@ -1,5 +1,17 @@
 # @npora/request
 
+## 1.12.0
+
+### Minor Changes
+
+- d34d3c9: Run alternative plugin transports inside each retry attempt so upload and
+  download progress requests preserve retry, authentication refresh, circuit
+  breaker, concurrency, cache, response, and settled lifecycle behavior.
+
+  Add a complete configuration reference covering core parameters, plugin
+  extensions, defaults, merge rules, transfer progress semantics, memory limits,
+  and Fetch options that XMLHttpRequest cannot preserve.
+
 ## 1.11.1
 
 ### Patch Changes
