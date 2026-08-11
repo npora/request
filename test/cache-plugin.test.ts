@@ -59,7 +59,7 @@ describe('cachePlugin', () => {
       headers: []
     })
 
-    vi.advanceTimersByTime(101)
+    vi.advanceTimersByTime(100)
 
     expect(store.get('temporary')).toBeUndefined()
   })
@@ -252,7 +252,7 @@ describe('cachePlugin', () => {
 
     const first = await request.get('/user', config)
 
-    vi.advanceTimersByTime(101)
+    vi.advanceTimersByTime(100)
 
     const second = await request.get('/user', config)
 
@@ -349,7 +349,7 @@ describe('cachePlugin', () => {
       version: 1
     })
 
-    vi.advanceTimersByTime(11)
+    vi.advanceTimersByTime(10)
 
     await expect(request.get('/version', config)).resolves.toEqual({
       version: 2

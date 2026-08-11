@@ -10,6 +10,7 @@ import {
   validateRequestConfig
 } from '../utils'
 import { buildRequestWithHeaders } from '../utils/buildRequest'
+import { validateResponseStatus } from '../utils/validateResponseStatus'
 
 export class FetchAdapter implements Adapter {
   async request<T = unknown>(
@@ -49,8 +50,7 @@ export class FetchAdapter implements Adapter {
         await fetch(request.url, request.init),
         config
       )
-      const validateStatus = config.validateStatus ?? defaultValidateStatus
-      const validStatus = validateStatus(response.status)
+      const validStatus = validateResponseStatus(response.status, config)
       const streaming = isStreamingResponseType(
         resolveResponseType(response, config)
       )
@@ -139,8 +139,4 @@ export class FetchAdapter implements Adapter {
       }
     }
   }
-}
-
-function defaultValidateStatus(status: number): boolean {
-  return status >= 200 && status < 300
 }

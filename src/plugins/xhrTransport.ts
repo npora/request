@@ -7,6 +7,7 @@ import {
   buildRequest,
   parseResponse
 } from '../utils'
+import { validateResponseStatus } from '../utils/validateResponseStatus'
 
 interface TransferProgress {
   loaded: number
@@ -221,10 +222,7 @@ async function processResponse<T>(
       config,
       raw
     }
-    const validateStatus =
-      config.validateStatus ?? defaultValidateStatus
-
-    if (!validateStatus(xhr.status)) {
+    if (!validateResponseStatus(xhr.status, config)) {
       throw new RequestError(
         xhr.statusText || 'Request failed',
         {
@@ -370,8 +368,4 @@ function createConfigError(
 
 function isNullBodyStatus(status: number): boolean {
   return status === 204 || status === 205 || status === 304
-}
-
-function defaultValidateStatus(status: number): boolean {
-  return status >= 200 && status < 300
 }

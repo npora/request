@@ -8,7 +8,14 @@
     "fetch",
     "http",
     "http-client",
-    "typescript"
+    "typescript",
+    "retry",
+    "cache",
+    "sse",
+    "ndjson",
+    "standard-schema",
+    "circuit-breaker",
+    "web-worker"
   ],
   "homepage": "https://github.com/npora/request",
   "repository": {

@@ -1,6 +1,7 @@
 import { RequestError } from '../errors'
 import type { RequestConfig } from '../types'
 import type { Plugin } from './Plugin'
+import { resolveRequestOrigin } from '../utils/resolveRequestOrigin'
 import { resolveExtensionConfig } from './resolveExtensionConfig'
 
 export interface ConcurrencyPluginOptions {
@@ -351,7 +352,7 @@ function normalizeOptions(
     maxQueue: normalizeNonNegativeInteger(options.maxQueue, 1000),
     queueTimeout: normalizeDuration(options.queueTimeout, 30000),
     maxKeys: normalizePositiveInteger(options.maxKeys, 1000),
-    createKey: options.createKey ?? createDefaultKey
+    createKey: options.createKey ?? resolveRequestOrigin
   }
 }
 
@@ -396,24 +397,6 @@ function normalizeKey(key: string): string {
   const normalized = String(key).trim()
 
   return normalized || 'default'
-}
-
-function createDefaultKey(config: RequestConfig): string {
-  try {
-    return new URL(config.url).origin
-  } catch {
-    // Resolve a relative request only when its base is absolute.
-  }
-
-  try {
-    if (config.baseURL) {
-      return new URL(config.url, config.baseURL).origin
-    }
-  } catch {
-    // Relative bases do not provide a safe origin isolation key.
-  }
-
-  return 'default'
 }
 
 function createLimitError(

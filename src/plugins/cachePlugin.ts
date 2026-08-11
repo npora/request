@@ -759,5 +759,5 @@ function normalizeCacheTtl(
 }
 
 function isExpired(expiresAt: number): boolean {
-  return Number.isNaN(expiresAt) || Date.now() > expiresAt
+  return Number.isNaN(expiresAt) || Date.now() >= expiresAt
 }

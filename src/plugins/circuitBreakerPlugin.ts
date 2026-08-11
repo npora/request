@@ -5,6 +5,7 @@ import type {
   RequestConfig
 } from '../types'
 import type { Plugin } from './Plugin'
+import { resolveRequestOrigin } from '../utils/resolveRequestOrigin'
 import { resolveExtensionConfig } from './resolveExtensionConfig'
 
 export interface CircuitBreakerPluginOptions {
@@ -283,7 +284,7 @@ function normalizeOptions(
       1
     ),
     maxCircuits: normalizePositiveInteger(options.maxCircuits, 1000),
-    createKey: options.createKey ?? createDefaultKey,
+    createKey: options.createKey ?? resolveRequestOrigin,
     shouldCountFailure:
       options.shouldCountFailure ?? defaultShouldCountFailure,
     onStateChange: options.onStateChange
@@ -322,24 +323,6 @@ function normalizeDuration(
 
 function normalizeKey(key: string): string {
   return key || 'default'
-}
-
-function createDefaultKey(config: RequestConfig): string {
-  try {
-    return new URL(config.url).origin
-  } catch {
-    // Resolve a relative request only when its base is absolute.
-  }
-
-  try {
-    if (config.baseURL) {
-      return new URL(config.url, config.baseURL).origin
-    }
-  } catch {
-    // Relative bases do not provide a safe origin isolation key.
-  }
-
-  return 'default'
 }
 
 function getCircuit(
