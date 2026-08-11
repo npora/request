@@ -61,10 +61,7 @@ export class MemoryCacheStore implements CacheStore {
       return undefined
     }
 
-    if (
-      !Number.isFinite(entry.expiresAt) ||
-      Date.now() > entry.expiresAt
-    ) {
+    if (isExpired(entry.expiresAt)) {
       this.entries.delete(key)
       return undefined
     }
@@ -200,6 +197,8 @@ export function cachePlugin(
           return
         }
 
+        normalizeCacheTtl(cache.ttl, requestContext.config)
+
         const key = createCacheKey(
           requestContext.config,
           cache,
@@ -212,10 +211,7 @@ export function cachePlugin(
         }
 
         if (record) {
-          if (
-            !Number.isFinite(record.expiresAt) ||
-            Date.now() > record.expiresAt
-          ) {
+          if (isExpired(record.expiresAt)) {
             await deleteStore(store, key)
           } else {
             const cachedResponse = restoreCacheEntry(
@@ -294,7 +290,10 @@ export function cachePlugin(
           return
         }
 
-        const ttl = cache.ttl ?? 30000
+        const ttl = normalizeCacheTtl(
+          cache.ttl,
+          requestContext.config
+        )
         const record = createCacheEntry(
           requestContext.response,
           Date.now() + Math.max(0, ttl)
@@ -735,4 +734,30 @@ function normalizeMaxEntries(value?: number): number {
   }
 
   return Math.max(0, Math.floor(value))
+}
+
+function normalizeCacheTtl(
+  value: number | undefined,
+  config: RequestConfig
+): number {
+  const ttl = value ?? 30000
+
+  if (
+    ttl !== Number.POSITIVE_INFINITY &&
+    (!Number.isFinite(ttl) || ttl < 0)
+  ) {
+    throw new RequestError(
+      'Cache ttl must be a non-negative finite number or Infinity',
+      {
+        code: 'CONFIG_ERROR',
+        config
+      }
+    )
+  }
+
+  return ttl
+}
+
+function isExpired(expiresAt: number): boolean {
+  return Number.isNaN(expiresAt) || Date.now() > expiresAt
 }

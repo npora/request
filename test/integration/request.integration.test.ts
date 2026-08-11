@@ -30,7 +30,9 @@ beforeAll(async () => {
 })
 
 afterAll(async () => {
-  await closeTestServer(testServer.server)
+  if (testServer) {
+    await closeTestServer(testServer.server)
+  }
 })
 
 describe('request integration', () => {

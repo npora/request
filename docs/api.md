@@ -809,6 +809,11 @@ await request.get('/user', {
 cache.clear()
 ```
 
+Cache entries expire after 30 seconds by default. Set `ttl` in milliseconds,
+use `0` to disable persistent storage for a request, or use `Infinity` to retain
+the entry indefinitely. Negative and non-numeric TTL values fail with
+`CONFIG_ERROR` before a network request is sent.
+
 Each cache plugin instance owns an isolated `MemoryCacheStore` by default.
 It retains at most 1,000 entries with LRU eviction and removes expired entries
 when they are read. Configure the built-in store with `maxEntries`; `0` disables

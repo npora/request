@@ -64,6 +64,20 @@ describe('cachePlugin', () => {
     expect(store.get('temporary')).toBeUndefined()
   })
 
+  it('should retain memory entries with no expiration', () => {
+    const store = new MemoryCacheStore()
+
+    store.set('permanent', {
+      data: true,
+      expiresAt: Number.POSITIVE_INFINITY,
+      status: 200,
+      statusText: 'OK',
+      headers: []
+    })
+
+    expect(store.get('permanent')?.data).toBe(true)
+  })
+
   it('should allow the default memory cache to be disabled', () => {
     const store = new MemoryCacheStore({
       maxEntries: 0
@@ -245,6 +259,64 @@ describe('cachePlugin', () => {
     expect(first).toEqual({ version: 1 })
     expect(second).toEqual({ version: 2 })
     expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('should cache indefinitely when ttl is Infinity', async () => {
+    vi.useFakeTimers()
+
+    const fetchMock = vi.fn().mockResolvedValue(
+      createJsonResponse({ version: 1 })
+    )
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient().use(cachePlugin())
+    const config = {
+      extensions: {
+        cache: {
+          enabled: true,
+          ttl: Number.POSITIVE_INFINITY
+        }
+      }
+    }
+
+    await expect(request.get('/permanent', config)).resolves.toEqual({
+      version: 1
+    })
+
+    vi.advanceTimersByTime(365 * 24 * 60 * 60 * 1000)
+
+    await expect(request.get('/permanent', config)).resolves.toEqual({
+      version: 1
+    })
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it.each([
+    Number.NaN,
+    Number.NEGATIVE_INFINITY,
+    -1
+  ])('should reject invalid cache ttl %s before sending', async ttl => {
+    const fetchMock = vi.fn()
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient().use(cachePlugin())
+
+    await expect(
+      request.get('/invalid-ttl', {
+        extensions: {
+          cache: {
+            enabled: true,
+            ttl
+          }
+        }
+      })
+    ).rejects.toMatchObject({
+      code: 'CONFIG_ERROR',
+      message: 'Cache ttl must be a non-negative finite number or Infinity'
+    })
+    expect(fetchMock).not.toHaveBeenCalled()
   })
 
   it('should not extend ttl when a cached response is read', async () => {
