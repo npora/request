@@ -1,5 +1,14 @@
 # @npora/request
 
+## 1.13.0
+
+### Minor Changes
+
+- eb885ec: Add per-event byte deltas, average transfer rate, and estimated remaining time
+  to upload and download progress callbacks while preserving the existing
+  loaded, total, and progress fields. Fetch-stream downloads now also report an
+  empty transfer exactly once.
+
 ## 1.12.0
 
 ### Minor Changes
