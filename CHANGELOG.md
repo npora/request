@@ -1,5 +1,13 @@
 # @npora/request
 
+## 1.11.1
+
+### Patch Changes
+
+- 35a91e7: Reject unsupported HTTP methods before custom adapters run, and accept native
+  `URLSearchParams` values created by another browser realm without weakening
+  runtime configuration validation.
+
 ## 1.11.0
 
 ### Minor Changes
