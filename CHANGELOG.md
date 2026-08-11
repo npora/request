@@ -1,5 +1,13 @@
 # @npora/request
 
+## 1.10.1
+
+### Patch Changes
+
+- cdd39a3: Preserve cache entries configured with an infinite TTL, reject invalid TTL
+  values before sending a request, and make integration-test cleanup safe when
+  the local test server cannot start.
+
 ## 1.10.0
 
 ### Minor Changes
