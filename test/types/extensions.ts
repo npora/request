@@ -8,6 +8,7 @@ import type {
   ConcurrencyPlugin,
   ConcurrencyPluginOptions,
   ConcurrencyState,
+  DownloadOutput,
   DownloadPluginOptions,
   LoggerEntry,
   MemoryCacheStoreOptions,
@@ -138,6 +139,22 @@ const downloadOptions: DownloadPluginOptions = {
 }
 
 client.use(downloadPlugin(downloadOptions))
+
+const downloadOutput: DownloadOutput = 'stream'
+const streamingDownload: Promise<ReadableStream<Uint8Array>> = client.get<
+  ReadableStream<Uint8Array>
+>('/archive', {
+  extensions: {
+    download: {
+      output: downloadOutput,
+      onProgress(progress) {
+        void progress.loaded
+      }
+    }
+  }
+})
+
+void streamingDownload
 
 const uploadProgress = (progress: UploadProgress) => {
   const transfer: TransferProgress = progress

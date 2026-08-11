@@ -24,6 +24,7 @@ const publicExports = [
   'Client',
   'ClientOptions',
   'DownloadOptions',
+  'DownloadOutput',
   'DownloadPluginOptions',
   'DownloadProgress',
   'DownloadTransport',

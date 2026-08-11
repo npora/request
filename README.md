@@ -19,8 +19,9 @@ authentication, and upload/download progress.
 
 - **Trust responses at runtime.** Standard Schema v1 validation checks and can
   transform untrusted data while preserving full response and error metadata.
-- **Stream without buffering everything.** SSE and NDJSON are exposed as lazy
-  async iterables with cancellation, timeout, and response-size enforcement.
+- **Stream without buffering everything.** File downloads, SSE, and NDJSON can
+  be consumed lazily with backpressure, cancellation, timeout, progress, and
+  response-size enforcement.
 - **Add resilience without hiding the transport.** Retry, cache, circuit
   breaker, concurrency, authentication, logging, and progress are isolated,
   composable plugins over the standard Fetch API.
@@ -37,6 +38,8 @@ authentication, and upload/download progress.
   `searchParams`.
 - Standard Schema v1 validation and transformation for untrusted responses.
 - Incremental SSE and NDJSON async iterables with cancellation and size limits.
+- Progress-aware file download streams that preserve backpressure and avoid
+  buffering the complete response in memory.
 - Unified errors across Fetch, XHR, parsing, validation, timeouts, and aborts.
 - Request/response/error interceptors with deterministic priority ordering.
 - Official retry, cache, circuit-breaker, concurrency, authentication, logger,

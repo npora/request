@@ -1,5 +1,6 @@
 import { RequestError } from '../errors'
 import type {
+  DownloadOutput,
   DownloadProgress,
   NporaResponse
 } from '../types'
@@ -41,6 +42,20 @@ export function downloadPlugin(
           return config
         }
 
+        const output = resolveDownloadOutput(
+          download.output,
+          config
+        )
+
+        if (output === 'stream') {
+          validateStreamOutput(options.transport, config)
+
+          return {
+            ...config,
+            responseType: 'stream'
+          }
+        }
+
         const responseType =
           download.onProgress &&
           !shouldUseXHR(options.transport)
@@ -65,6 +80,7 @@ export function downloadPlugin(
         const onProgress = download?.onProgress
 
         if (
+          download?.output === 'stream' ||
           !onProgress ||
           !shouldUseXHR(options.transport)
         ) {
@@ -107,24 +123,44 @@ export function downloadPlugin(
         )
         const onProgress = download?.onProgress
 
-        if (!download || !onProgress) {
+        if (!download) {
           return
         }
 
-        const stream = response.data
+        let stream = response.data
 
-        if (
-          typeof ReadableStream === 'undefined' ||
-          !(stream instanceof ReadableStream)
-        ) {
-          throw new RequestError(
-            'Download response stream is unavailable',
-            {
-              code: 'PARSER_ERROR',
-              status: response.status,
-              config: response.config
+        if (download.output === 'stream') {
+          if (
+            stream === undefined &&
+            isBodylessResponse(response)
+          ) {
+            stream = createEmptyDownloadStream()
+          }
+
+          if (!isReadableStream(stream)) {
+            throw unavailableDownloadStream(response)
+          }
+
+          if (onProgress) {
+            requestContext.response = {
+              ...response,
+              data: monitorDownloadStream(
+                stream,
+                response,
+                onProgress
+              )
             }
-          )
+          }
+
+          return
+        }
+
+        if (!onProgress) {
+          return
+        }
+
+        if (!isReadableStream(stream)) {
+          throw unavailableDownloadStream(response)
         }
 
         const blob = await consumeDownloadStream(
@@ -140,6 +176,92 @@ export function downloadPlugin(
       })
     }
   }
+}
+
+function isBodylessResponse(response: NporaResponse): boolean {
+  return (
+    response.config.method === 'HEAD' ||
+    response.status === 204 ||
+    response.status === 205 ||
+    response.status === 304
+  )
+}
+
+function createEmptyDownloadStream(): ReadableStream<Uint8Array> {
+  return new ReadableStream({
+    start(controller) {
+      controller.close()
+    }
+  })
+}
+
+function resolveDownloadOutput(
+  output: unknown,
+  config: NporaResponse['config']
+): DownloadOutput {
+  if (output === undefined || output === 'blob') {
+    return 'blob'
+  }
+
+  if (output === 'stream') {
+    return output
+  }
+
+  throw new RequestError(
+    'Download output must be "blob" or "stream"',
+    {
+      code: 'CONFIG_ERROR',
+      config
+    }
+  )
+}
+
+function validateStreamOutput(
+  transport: DownloadTransport | undefined,
+  config: NporaResponse['config']
+): void {
+  if (transport === 'xhr') {
+    throw new RequestError(
+      'Stream downloads require the Fetch transport',
+      {
+        code: 'CONFIG_ERROR',
+        config
+      }
+    )
+  }
+
+  if (!supportsFetchResponseStream()) {
+    throw new RequestError(
+      'Fetch response streams are unavailable',
+      {
+        code: 'CONFIG_ERROR',
+        config
+      }
+    )
+  }
+}
+
+function unavailableDownloadStream(
+  response: NporaResponse
+): RequestError {
+  return new RequestError(
+    'Download response stream is unavailable',
+    {
+      code: 'PARSER_ERROR',
+      status: response.status,
+      config: response.config
+    }
+  )
+}
+
+function isReadableStream(
+  value: unknown
+): value is ReadableStream<Uint8Array<ArrayBufferLike>> {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    typeof (value as ReadableStream).getReader === 'function'
+  )
 }
 
 function shouldUseXHR(
@@ -214,6 +336,70 @@ async function consumeDownloadStream(
 
   return new Blob(chunks, {
     type: response.headers.get('content-type') ?? ''
+  })
+}
+
+function monitorDownloadStream(
+  stream: ReadableStream<Uint8Array<ArrayBufferLike>>,
+  response: NporaResponse,
+  onProgress: (progress: DownloadProgress) => void
+): ReadableStream<Uint8Array<ArrayBufferLike>> {
+  const reader = stream.getReader()
+  const total = parseContentLength(
+    response.headers.get('content-length')
+  )
+  const trackProgress = createTransferProgressTracker()
+  let loaded = 0
+  let reported = false
+  let released = false
+
+  const release = () => {
+    if (!released) {
+      released = true
+      reader.releaseLock()
+    }
+  }
+
+  return new ReadableStream<Uint8Array<ArrayBufferLike>>({
+    async pull(controller) {
+      try {
+        const result = await reader.read()
+
+        if (result.done) {
+          if (!reported) {
+            onProgress(trackProgress(0, total))
+          }
+
+          release()
+          controller.close()
+          return
+        }
+
+        loaded += result.value.byteLength
+        reported = true
+        onProgress(trackProgress(loaded, total))
+        controller.enqueue(result.value)
+      } catch (error) {
+        try {
+          await reader.cancel(error)
+        } catch {
+          // Preserve the original stream/progress failure.
+        }
+
+        release()
+        controller.error(error)
+      }
+    },
+
+    async cancel(reason) {
+      try {
+        await reader.cancel(reason)
+      } finally {
+        release()
+      }
+    }
+  }, {
+    highWaterMark: 0
   })
 }
 

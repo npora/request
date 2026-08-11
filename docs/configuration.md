@@ -208,6 +208,7 @@ Requires `downloadPlugin()`.
 | Field | Default | Purpose |
 | --- | --- | --- |
 | `onProgress` | none | Receive transfer totals, byte deltas, rate, and estimated time as bytes arrive. |
+| `output` | `blob` | Return a buffered `Blob` or a backpressure-aware `ReadableStream`. |
 | `filename` | unused; deprecated | Reserved legacy field. It does not save or rename a file. |
 
 `downloadPlugin()` returns a `Blob`. With progress enabled, `auto` prefers a
@@ -218,6 +219,14 @@ If `Content-Length` is unavailable, `total` and `progress` are omitted.
 `estimated` is also omitted without a known total. An empty Fetch-stream
 download reports one event with `loaded`, `total`, and `bytes` all set to zero.
 Throwing from the progress callback cancels or aborts the transfer.
+
+Set `output: 'stream'` for downloads that should not be buffered in memory.
+Stream output requires Fetch response-stream support and is incompatible with
+`downloadPlugin({ transport: 'xhr' })`; invalid or unavailable combinations
+fail with `CONFIG_ERROR` before network I/O. Progress advances as the consumer
+reads. Cancelling the returned stream cancels the underlying response reader.
+Response-size violations and progress callback failures reject stream reads
+because the request promise has already returned the stream.
 
 ## Merge and validation rules
 

@@ -833,6 +833,73 @@ test(
 )
 
 test(
+  'should stream downloads with consumer-driven progress',
+  async ({ page }) => {
+    await openFixture(page)
+
+    const result = await page.evaluate(async () => {
+      const moduleURL = `${location.origin}/dist/index.js`
+      const {
+        createClient,
+        downloadPlugin
+      } = await import(moduleURL)
+      const request = createClient({
+        baseURL: '/api'
+      }).use(downloadPlugin())
+      const events: Array<{
+        loaded: number
+        total?: number
+        progress?: number
+        bytes?: number
+      }> = []
+      const stream = await request.get('/download', {
+        extensions: {
+          download: {
+            output: 'stream',
+            onProgress(progress: {
+              loaded: number
+              total?: number
+              progress?: number
+              bytes?: number
+            }) {
+              events.push(progress)
+            }
+          }
+        }
+      }) as ReadableStream<Uint8Array>
+
+      const reader = stream.getReader()
+      let received = 0
+
+      while (true) {
+        const chunk = await reader.read()
+
+        if (chunk.done) {
+          break
+        }
+
+        received += chunk.value.byteLength
+      }
+
+      return {
+        received,
+        eventCount: events.length,
+        last: events.at(-1)
+      }
+    })
+
+    expect(result.received).toBe(64 * 1024)
+    expect(result.eventCount).toBeGreaterThan(0)
+    expect(result.last).toMatchObject({
+      loaded: 64 * 1024,
+      total: 64 * 1024,
+      progress: 1
+    })
+    expect(result.last?.bytes).toBeGreaterThan(0)
+  }
+)
+
+test(
   'should handle concurrent native XHR upload progress',
   async ({ page }) => {
     await openFixture(page)
