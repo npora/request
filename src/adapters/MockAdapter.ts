@@ -19,6 +19,8 @@ export interface MockRequestMatcher {
 
   query?: QueryParams
 
+  searchParams?: URLSearchParams
+
   headers?: HeadersInit
 }
 
@@ -411,6 +413,7 @@ function matchesRequest(
   return (
     matchesURL(matcher.url, config.url) &&
     matchesQuery(matcher.query, config.query) &&
+    matchesSearchParams(matcher.searchParams, config.searchParams) &&
     matchesHeaders(matcher.headers, config.headers)
   )
 }
@@ -454,6 +457,18 @@ function normalizeQuery(query?: QueryParams): string {
   }
 
   return JSON.stringify(entries)
+}
+
+function matchesSearchParams(
+  expected?: URLSearchParams,
+  actual?: URLSearchParams
+): boolean {
+  if (!expected) {
+    return true
+  }
+
+  return JSON.stringify([...expected.entries()]) ===
+    JSON.stringify([...(actual?.entries() ?? [])])
 }
 
 function matchesHeaders(

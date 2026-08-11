@@ -54,6 +54,10 @@ const retry: RetryOptions = {
 
 const config: RequestConfig = {
   url: '/user',
+  searchParams: new URLSearchParams([
+    ['tag', 'first'],
+    ['tag', 'second']
+  ]),
   extensions: {
     retry,
     cache: {

@@ -421,6 +421,41 @@ describe('cachePlugin', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 
+  it('should preserve native searchParams entry order in cache keys', async () => {
+    const fetchMock = vi.fn().mockImplementation(() => {
+      return Promise.resolve(createJsonResponse({ ok: true }))
+    })
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient().use(cachePlugin())
+    const cache = { enabled: true }
+
+    await request.get('/search', {
+      extensions: { cache },
+      searchParams: new URLSearchParams([
+        ['tag', 'first'],
+        ['tag', 'second']
+      ])
+    })
+    await request.get('/search', {
+      extensions: { cache },
+      searchParams: new URLSearchParams([
+        ['tag', 'first'],
+        ['tag', 'second']
+      ])
+    })
+    await request.get('/search', {
+      extensions: { cache },
+      searchParams: new URLSearchParams([
+        ['tag', 'second'],
+        ['tag', 'first']
+      ])
+    })
+
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
   it('should isolate cached data by response type', async () => {
     const fetchMock = vi
       .fn()

@@ -196,6 +196,24 @@ assert.equal(
   'true'
 )
 
+const nativeSearchParams = new URLSearchParams([
+  ['tag', 'first'],
+  ['tag', 'second']
+])
+
+await child.get('/native-query', {
+  searchParams: nativeSearchParams
+})
+nativeSearchParams.append('tag', 'changed-after-request')
+
+const nativeQueryConfig = requests.at(-1)
+
+assert.equal(nativeQueryConfig.query, undefined)
+assert.deepEqual([...nativeQueryConfig.searchParams.entries()], [
+  ['tag', 'first'],
+  ['tag', 'second']
+])
+
 let installs = 0
 let cleanups = 0
 const plugin = {

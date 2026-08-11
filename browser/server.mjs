@@ -69,6 +69,7 @@ const server = createServer(
         sendJson(response, 200, {
           method: request.method,
           query: Object.fromEntries(url.searchParams),
+          queryEntries: [...url.searchParams.entries()],
           headers: request.headers,
           body: body ? JSON.parse(body) : undefined
         })

@@ -33,6 +33,8 @@ authentication, and upload/download progress.
 ## Features
 
 - Data-first and complete-response APIs with TypeScript inference.
+- Object query merging plus native ordered `URLSearchParams` through
+  `searchParams`.
 - Standard Schema v1 validation and transformation for untrusted responses.
 - Incremental SSE and NDJSON async iterables with cancellation and size limits.
 - Unified errors across Fetch, XHR, parsing, validation, timeouts, and aborts.
@@ -159,9 +161,11 @@ once; it does not validate individual SSE events or NDJSON records.
 
 ```ts
 await api.post('/users', {
-  query: {
-    notify: true
-  },
+  searchParams: new URLSearchParams([
+    ['notify', 'true'],
+    ['tag', 'typescript'],
+    ['tag', 'fetch']
+  ]),
   json: {
     name: 'Npora'
   },
@@ -170,6 +174,9 @@ await api.post('/users', {
   }
 })
 ```
+
+Query objects merge with client defaults. Native `searchParams` replace
+inherited query defaults while preserving repeated keys and order.
 
 The body options `body`, `json`, `form`, and `formData` are mutually exclusive.
 `GET` and `HEAD` requests cannot contain a body. Invalid configuration throws a

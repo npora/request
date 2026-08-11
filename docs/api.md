@@ -131,12 +131,18 @@ response body. Use `headResponse()` to inspect status and headers.
   fetchOptions?: FetchOptions
   headers?: HeadersInit
   query?: QueryParams
+  searchParams?: URLSearchParams
   extensions?: RequestExtensions
 }
 ```
 
 `fetchOptions` passes native Fetch options to the adapter. Npora Request
 continues to manage `method`, `headers`, `body` and `signal`.
+
+Object `query` parameters are shallow merged with client defaults. Native
+`searchParams` replace inherited query defaults and preserve repeated keys,
+entry order and native `URLSearchParams` encoding semantics. `query` and
+`searchParams` are mutually exclusive.
 
 ```ts
 await request.get('/account', {
@@ -298,7 +304,8 @@ Client defaults and request configuration are merged deterministically:
 
 - Request values override client defaults.
 - Header names are merged case-insensitively.
-- `query` and `fetchOptions` are shallow merged.
+- `query` and `fetchOptions` are shallow merged; `searchParams` are cloned and
+  replace inherited query defaults.
 - Each `extensions` entry is shallow merged when both values are objects.
 - Supplying a request body mode replaces the default body mode.
 
@@ -337,7 +344,8 @@ const request = createClient({ adapter })
 Available method matchers are `onGet`, `onPost`, `onPut`, `onPatch`,
 `onDelete`, `onHead`, `onOptions` and generic `onMethod`. URLs may be exact
 strings or regular expressions. Object matchers can additionally require an
-exact query and a subset of request headers:
+exact object query or ordered native `searchParams`, and a subset of request
+headers:
 
 ```ts
 adapter.onGet({

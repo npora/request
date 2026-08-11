@@ -50,10 +50,15 @@ export class ConfigMerger {
       )
     }
 
-    if (defaults.query || config.query) {
-      result.query = this.mergeObject(
-        defaults.query,
-        config.query
+    if (
+      defaults.query ||
+      config.query ||
+      defaults.searchParams ||
+      config.searchParams
+    ) {
+      Object.assign(
+        result,
+        this.mergeQueryConfig(defaults, config)
       )
     }
 
@@ -75,6 +80,41 @@ export class ConfigMerger {
     }
 
     return result
+  }
+
+  private static mergeQueryConfig(
+    defaults: Partial<RequestConfig>,
+    config: Partial<RequestConfig>
+  ): Pick<RequestConfig, 'query' | 'searchParams'> {
+    if (config.searchParams !== undefined) {
+      return {
+        query: config.query,
+        searchParams:
+          config.searchParams instanceof URLSearchParams
+            ? new URLSearchParams(config.searchParams)
+            : config.searchParams
+      }
+    }
+
+    if (config.query !== undefined) {
+      return {
+        query: this.mergeObject(
+          defaults.searchParams ? undefined : defaults.query,
+          config.query
+        ),
+        searchParams: undefined
+      }
+    }
+
+    return {
+      query: defaults.query
+        ? { ...defaults.query }
+        : undefined,
+      searchParams:
+        defaults.searchParams instanceof URLSearchParams
+          ? new URLSearchParams(defaults.searchParams)
+          : defaults.searchParams
+    }
   }
 
   private static mergeFetchOptions(
