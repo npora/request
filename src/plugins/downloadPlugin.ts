@@ -6,6 +6,7 @@ import type {
 import type { Plugin } from './Plugin'
 import { resolveExtensionConfig } from './resolveExtensionConfig'
 import { xhrRequest } from './xhrTransport'
+import { createTransferProgressTracker } from './transferProgress'
 
 export type DownloadTransport = 'auto' | 'fetch' | 'xhr'
 
@@ -176,7 +177,9 @@ async function consumeDownloadStream(
   const total = parseContentLength(
     response.headers.get('content-length')
   )
+  const trackProgress = createTransferProgressTracker()
   let loaded = 0
+  let reported = false
 
   try {
     while (true) {
@@ -190,7 +193,12 @@ async function consumeDownloadStream(
 
       chunks.push(toDownloadBuffer(chunk))
       loaded += chunk.byteLength
-      onProgress(createProgress(loaded, total))
+      reported = true
+      onProgress(trackProgress(loaded, total))
+    }
+
+    if (!reported) {
+      onProgress(trackProgress(0, total))
     }
   } catch (error) {
     try {
@@ -251,22 +259,4 @@ function parseContentLength(
   }
 
   return total
-}
-
-function createProgress(
-  loaded: number,
-  total?: number
-): DownloadProgress {
-  if (total === undefined || total === 0) {
-    return {
-      loaded,
-      total
-    }
-  }
-
-  return {
-    loaded,
-    total,
-    progress: Math.min(loaded / total, 1)
-  }
 }

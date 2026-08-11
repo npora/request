@@ -484,8 +484,8 @@ const result = await request.post('/upload', {
         file,
         category: 'reports'
       },
-      onProgress({ loaded, total, progress }) {
-        console.log({ loaded, total, progress })
+      onProgress({ loaded, total, progress, bytes, rate, estimated }) {
+        console.log({ loaded, total, progress, bytes, rate, estimated })
       }
     }
   }
@@ -512,8 +512,8 @@ const request = createClient().use(downloadPlugin())
 const file = await request.get<Blob>('/report.pdf', {
   extensions: {
     download: {
-      onProgress({ loaded, total, progress }) {
-        console.log({ loaded, total, progress })
+      onProgress({ loaded, total, progress, bytes, rate, estimated }) {
+        console.log({ loaded, total, progress, bytes, rate, estimated })
       }
     }
   }
@@ -538,6 +538,11 @@ regardless of this option. XHR downloads preserve URL, query, headers,
 authentication refresh, response hooks and response interceptors. Other Fetch
 credential modes and Fetch-only options have documented
 [XHR limitations](configuration.md#xhr-transport-limitations).
+
+Upload and download progress share the same fields: cumulative `loaded`,
+optional `total` and `progress`, per-event `bytes`, average bytes-per-second
+`rate`, and remaining-seconds `estimated`. Rate estimates begin after a
+250-millisecond sample; fields that cannot be determined are omitted.
 
 Plugins must not replace client methods.
 

@@ -70,6 +70,7 @@ const publicExports = [
   'SchemaValidationError',
   'ServerSentEvent',
   'StandardSchemaV1',
+  'TransferProgress',
   'RetryEvent',
   'RetryOptions',
   'UploadData',

@@ -171,7 +171,8 @@ describe('downloadPlugin XMLHttpRequest fallback', () => {
     expect(onProgress).toHaveBeenCalledWith({
       loaded: 5,
       total: 5,
-      progress: 1
+      progress: 1,
+      bytes: 5
     })
     expect(xhr.onload).toBeNull()
     expect(xhr.onprogress).toBeNull()

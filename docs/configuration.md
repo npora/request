@@ -188,7 +188,7 @@ Requires `uploadPlugin()`.
 | Field | Default | Purpose |
 | --- | --- | --- |
 | `data` | required | `FormData` or an object converted to multipart FormData. |
-| `onProgress` | none | Receive `{ loaded, total?, progress? }` during browser XHR upload. |
+| `onProgress` | none | Receive transfer totals, byte deltas, rate, and estimated time during browser XHR upload. |
 
 When `onProgress` is omitted, the normal Fetch adapter is used. When it is
 present, the request uses XHR inside the normal retry/auth lifecycle. If the
@@ -196,13 +196,18 @@ browser cannot determine the total size, `total` and `progress` are omitted.
 Throwing from the progress callback aborts the transfer and rejects the
 request with the original callback error.
 
+Progress values contain cumulative `loaded` bytes and the `bytes` transferred
+since the previous event. After at least 250 milliseconds, `rate` reports the
+average bytes per second. `estimated` reports remaining seconds only when both
+the total size and rate are available.
+
 ### `extensions.download`
 
 Requires `downloadPlugin()`.
 
 | Field | Default | Purpose |
 | --- | --- | --- |
-| `onProgress` | none | Receive `{ loaded, total?, progress? }` as bytes arrive. |
+| `onProgress` | none | Receive transfer totals, byte deltas, rate, and estimated time as bytes arrive. |
 | `filename` | unused; deprecated | Reserved legacy field. It does not save or rename a file. |
 
 `downloadPlugin()` returns a `Blob`. With progress enabled, `auto` prefers a
@@ -210,6 +215,8 @@ Fetch response stream and falls back to XHR; `transport: 'fetch'` and
 `transport: 'xhr'` select explicitly. The current Blob result is assembled in
 memory, so set `maxResponseSize` for untrusted or potentially large downloads.
 If `Content-Length` is unavailable, `total` and `progress` are omitted.
+`estimated` is also omitted without a known total. An empty Fetch-stream
+download reports one event with `loaded`, `total`, and `bytes` all set to zero.
 Throwing from the progress callback cancels or aborts the transfer.
 
 ## Merge and validation rules
