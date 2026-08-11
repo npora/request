@@ -1,5 +1,13 @@
 # @npora/request
 
+## 1.11.0
+
+### Minor Changes
+
+- 5f5637a: Add native URLSearchParams query input through `searchParams`, with exact
+  repeated-key, ordering and encoding preservation across Fetch, XHR, caching
+  and MockAdapter matching.
+
 ## 1.10.3
 
 ### Patch Changes
