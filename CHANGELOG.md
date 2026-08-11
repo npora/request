@@ -1,5 +1,15 @@
 # @npora/request
 
+## 1.14.0
+
+### Minor Changes
+
+- f67b1ce: Add backpressure-aware download stream output through
+  `extensions.download.output: 'stream'`. Stream downloads report progress as
+  the consumer reads, propagate cancellation to the response body, preserve
+  response-size enforcement, and reject unsupported XHR combinations before
+  network I/O.
+
 ## 1.13.0
 
 ### Minor Changes
