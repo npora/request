@@ -50,6 +50,11 @@ Applications must still:
   schema before use when runtime validation is required.
 - Store credentials using controls appropriate to the runtime.
 - Avoid placing secrets in URLs, thrown error messages, or application logs.
+- Do not serialize a complete `RequestError` into logs or telemetry. Its public
+  `config`, `response`, `data`, and `cause` fields intentionally preserve
+  debugging context and may contain credentials or application data. Log an
+  explicit allowlist of fields such as `name`, `message`, `code`, and `status`,
+  or use `loggerPlugin`, which emits a safe summary.
 - Configure CORS, TLS, cookies, redirects, and content security policy at the
   application and server layers.
 - Review custom adapters, plugins, interceptors, schemas, cache keys, and

@@ -1,5 +1,6 @@
 import type { QueryParams, RequestConfig } from '../types'
 import { createTimeoutSignal } from './createTimeoutSignal'
+import { isURLSearchParams } from './isURLSearchParams'
 
 export interface BuiltRequest {
   url: string
@@ -183,7 +184,7 @@ function buildBody(
 function buildURLSearchParams(
   form: URLSearchParams | Record<string, QueryParams[string]>
 ): URLSearchParams {
-  if (form instanceof URLSearchParams) {
+  if (isURLSearchParams(form)) {
     return form
   }
 

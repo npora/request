@@ -1042,6 +1042,12 @@ try {
 When an HTTP response is available, `RequestError<T>` preserves its parsed
 body and complete response metadata.
 
+Do not serialize the complete error into logs or telemetry. Its `config`,
+`response`, `data`, and `cause` fields may contain credentials, request bodies,
+response data, or other application secrets. Log an explicit allowlist such as
+`name`, `message`, `code`, and `status`, or use `loggerPlugin` for a structured
+safe summary.
+
 Error codes:
 
 ```ts

@@ -6,6 +6,7 @@ import type {
   RequestConfig
 } from '../types'
 import { RequestError } from '../errors'
+import { isURLSearchParams } from '../utils/isURLSearchParams'
 import type { Plugin } from './Plugin'
 import { resolveExtensionConfig } from './resolveExtensionConfig'
 
@@ -659,7 +660,7 @@ function normalizeQuery(
     return []
   }
 
-  if (query instanceof URLSearchParams) {
+  if (isURLSearchParams(query)) {
     return [...query.entries()]
   }
 

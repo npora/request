@@ -252,6 +252,44 @@ test(
 )
 
 test(
+  'should accept native searchParams created by another realm',
+  async ({ page }) => {
+    await openFixture(page)
+
+    const result = await page.evaluate(async () => {
+      const request = (window as BrowserWindow).nporaRequest
+      const frame = document.createElement('iframe')
+
+      document.body.append(frame)
+
+      try {
+        if (!request || !frame.contentWindow) {
+          throw new Error('Npora request client or iframe is unavailable')
+        }
+
+        const searchParams = new frame.contentWindow.URLSearchParams([
+          ['tag', 'first'],
+          ['tag', 'second']
+        ])
+
+        return request.get<{
+          queryEntries: Array<[string, string]>
+        }>('/echo', {
+          searchParams
+        })
+      } finally {
+        frame.remove()
+      }
+    })
+
+    expect(result.queryEntries).toEqual([
+      ['tag', 'first'],
+      ['tag', 'second']
+    ])
+  }
+)
+
+test(
   'should expose unified HTTP and timeout errors in the browser',
   async ({ page }) => {
     await openFixture(page)
