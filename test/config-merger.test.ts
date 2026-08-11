@@ -107,6 +107,67 @@ describe('ConfigMerger', () => {
     })
   })
 
+  it('should replace inherited query defaults with cloned URLSearchParams', () => {
+    const query = new URLSearchParams([
+      ['tag', 'first'],
+      ['tag', 'second']
+    ])
+    const config = ConfigMerger.merge(
+      {
+        query: {
+          locale: 'en'
+        }
+      },
+      {
+        url: '/users',
+        searchParams: query
+      }
+    )
+
+    query.append('tag', 'changed-after-merge')
+
+    expect(config.query).toBeUndefined()
+    expect(config.searchParams?.getAll('tag')).toEqual([
+      'first',
+      'second'
+    ])
+  })
+
+  it('should clone inherited URLSearchParams defaults', () => {
+    const defaults = new URLSearchParams([
+      ['locale', 'en']
+    ])
+    const first = ConfigMerger.merge({ searchParams: defaults }, {
+      url: '/first'
+    })
+
+    first.searchParams?.set('locale', 'changed')
+
+    const second = ConfigMerger.merge({ searchParams: defaults }, {
+      url: '/second'
+    })
+
+    expect(second.searchParams?.get('locale')).toBe('en')
+    expect(defaults.get('locale')).toBe('en')
+  })
+
+  it('should replace inherited searchParams with object query input', () => {
+    const config = ConfigMerger.merge(
+      {
+        searchParams: new URLSearchParams('locale=en')
+      },
+      {
+        url: '/users',
+        query: {
+          page: 2
+        }
+      }
+    )
+
+    expect(config.query).toEqual({ page: 2 })
+    expect(config.searchParams).toBeUndefined()
+  })
+
   it('should merge namespaced extension options by plugin key', () => {
     const config = ConfigMerger.merge(
       {

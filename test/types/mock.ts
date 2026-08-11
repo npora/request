@@ -11,9 +11,9 @@ import {
 
 const matcher: MockRequestMatcher = {
   url: /^\/users\//,
-  query: {
-    active: true
-  },
+  searchParams: new URLSearchParams([
+    ['active', 'true']
+  ]),
   headers: {
     authorization: 'Bearer token'
   }

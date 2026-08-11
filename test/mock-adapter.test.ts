@@ -145,6 +145,38 @@ describe('MockAdapter', () => {
     ).rejects.toThrow('No mock handler found')
   })
 
+  it('should match ordered native searchParams entries', async () => {
+    const adapter = new MockAdapter()
+
+    adapter.onGet({
+      url: '/search',
+      searchParams: new URLSearchParams([
+        ['tag', 'first'],
+        ['tag', 'second']
+      ])
+    }).reply(200, { matched: true })
+
+    await expect(adapter.request({
+      url: '/search',
+      method: 'GET',
+      searchParams: new URLSearchParams([
+        ['tag', 'first'],
+        ['tag', 'second']
+      ])
+    })).resolves.toMatchObject({
+      data: { matched: true }
+    })
+
+    await expect(adapter.request({
+      url: '/search',
+      method: 'GET',
+      searchParams: new URLSearchParams([
+        ['tag', 'second'],
+        ['tag', 'first']
+      ])
+    })).rejects.toThrow('No mock handler found')
+  })
+
   it('should create dynamic replies from the effective request config', async () => {
     const adapter = new MockAdapter()
 

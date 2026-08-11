@@ -71,6 +71,8 @@ export interface RequestConfig {
 
   query?: QueryParams
 
+  searchParams?: URLSearchParams
+
   body?: BodyInit | Record<string, unknown> | null
 
   json?: Record<string, unknown> | unknown[]

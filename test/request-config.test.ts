@@ -46,7 +46,7 @@ describe('request config', () => {
     )
   })
 
-  it('should preserve URLSearchParams encoding and array order', () => {
+  it('should preserve query encoding and array order', () => {
     const inheritedQuery = Object.create({
       inherited: 'ignored'
     }) as Record<string, unknown>
@@ -68,6 +68,27 @@ describe('request config', () => {
     expect(url).toBe(
       'https://api.example.com/search?search=hello+world%7E&tags=first&tags=second#results'
     )
+  })
+
+  it('should accept searchParams without losing repeated-key order', () => {
+    const query = new URLSearchParams([
+      ['tag', 'first'],
+      ['search', 'hello world~'],
+      ['tag', 'second']
+    ])
+    const { url } = buildRequest({
+      url: '/search?existing=true#results',
+      searchParams: query
+    })
+
+    expect(url).toBe(
+      '/search?existing=true&tag=first&search=hello+world%7E&tag=second#results'
+    )
+    expect([...query.entries()]).toEqual([
+      ['tag', 'first'],
+      ['search', 'hello world~'],
+      ['tag', 'second']
+    ])
   })
 
   it('should not prepend baseURL to an absolute request URL', () => {
@@ -375,6 +396,38 @@ describe('request config', () => {
       })
     ).rejects.toMatchObject({
       code: 'CONFIG_ERROR'
+    })
+
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    {
+      query: {
+        page: 1
+      },
+      searchParams: new URLSearchParams('page=1'),
+      message: 'Request query and searchParams are mutually exclusive'
+    },
+    {
+      searchParams: {
+        page: 1
+      },
+      message: 'Request searchParams must be URLSearchParams'
+    }
+  ])('should reject invalid native search parameters before fetch', async ({
+    message,
+    ...config
+  }) => {
+    const fetchMock = vi.fn()
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(
+      createClient().get('/users', config as never)
+    ).rejects.toMatchObject({
+      code: 'CONFIG_ERROR',
+      message
     })
 
     expect(fetchMock).not.toHaveBeenCalled()

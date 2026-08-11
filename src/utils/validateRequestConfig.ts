@@ -25,12 +25,32 @@ export function validateRequestConfig(config: RequestConfig): Headers {
   validateURL(config)
   validateTimeout(config)
   validateLimits(config)
+  validateQuery(config)
   validateResponseOptions(config)
   validateSchema(config)
   const headers = validateHeaders(config)
   validateBody(config)
 
   return headers
+}
+
+function validateQuery(config: RequestConfig): void {
+  if (config.query !== undefined && config.searchParams !== undefined) {
+    throw configError(
+      'Request query and searchParams are mutually exclusive',
+      config
+    )
+  }
+
+  if (
+    config.searchParams !== undefined &&
+    !(config.searchParams instanceof URLSearchParams)
+  ) {
+    throw configError(
+      'Request searchParams must be URLSearchParams',
+      config
+    )
+  }
 }
 
 function validateResponseOptions(config: RequestConfig): void {

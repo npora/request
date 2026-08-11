@@ -221,6 +221,37 @@ test(
 )
 
 test(
+  'should preserve native searchParams order in the browser',
+  async ({ page }) => {
+    await openFixture(page)
+
+    const result = await page.evaluate(async () => {
+      const request = (window as BrowserWindow).nporaRequest
+
+      if (!request) {
+        throw new Error('Npora request client is unavailable')
+      }
+
+      return request.get<{
+        queryEntries: Array<[string, string]>
+      }>('/echo', {
+        searchParams: new URLSearchParams([
+          ['tag', 'first'],
+          ['search', 'hello world'],
+          ['tag', 'second']
+        ])
+      })
+    })
+
+    expect(result.queryEntries).toEqual([
+      ['tag', 'first'],
+      ['search', 'hello world'],
+      ['tag', 'second']
+    ])
+  }
+)
+
+test(
   'should expose unified HTTP and timeout errors in the browser',
   async ({ page }) => {
     await openFixture(page)

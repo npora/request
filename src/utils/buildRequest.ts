@@ -42,11 +42,13 @@ export function buildRequestWithHeaders(
 function buildURL(config: RequestConfig): string {
   const url = joinURL(config.baseURL, config.url)
 
-  if (!config.query) {
+  if (!config.query && !config.searchParams) {
     return url
   }
 
-  const query = stringifyQuery(config.query)
+  const query = config.searchParams
+    ? config.searchParams.toString()
+    : stringifyQuery(config.query as QueryParams)
 
   if (!query) {
     return url

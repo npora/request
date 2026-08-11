@@ -623,7 +623,7 @@ function createCacheKey(
     method: config.method ?? 'GET',
     baseURL: config.baseURL,
     url: config.url,
-    query: normalizeQuery(config.query),
+    query: normalizeQuery(config.searchParams ?? config.query),
     responseType: config.responseType ?? 'auto',
     headers: normalizeCacheHeaders(headers, varyHeaders)
   })
@@ -653,10 +653,14 @@ function normalizeCacheHeaders(
 }
 
 function normalizeQuery(
-  query?: QueryParams
+  query?: QueryParams | URLSearchParams
 ): Array<[string, string]> {
   if (!query) {
     return []
+  }
+
+  if (query instanceof URLSearchParams) {
+    return [...query.entries()]
   }
 
   const entries: Array<[string, string]> = []
