@@ -25,7 +25,7 @@ export function uploadPlugin(): Plugin {
         }
       })
 
-      context.hooks.onRequest(async requestContext => {
+      context.hooks.onTransport(async requestContext => {
         if (requestContext.response) {
           return
         }

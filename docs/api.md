@@ -2,6 +2,9 @@
 
 > Public API contract of Npora Request.
 
+For option types, defaults, merge behavior, runtime support, and plugin-owned
+request fields, see the [configuration reference](configuration.md).
+
 ---
 
 # Client
@@ -490,8 +493,11 @@ const result = await request.post('/upload', {
 ```
 
 The XHR upload path preserves URL, query, headers, timeout, cancellation,
-status validation, response parsing, response hooks and response interceptors.
-The browser generates the multipart boundary automatically.
+status validation, retries, authentication refresh, response parsing, response
+hooks and response interceptors. The browser generates the multipart boundary
+automatically. See the
+[XHR option limitations](configuration.md#xhr-transport-limitations) before
+relying on native Fetch options with progress enabled.
 
 ### Download Progress Transport
 
@@ -528,8 +534,10 @@ downloadPlugin({ transport: 'fetch' })
 
 Requests without `onProgress` continue through the normal Fetch adapter,
 regardless of this option. XHR downloads preserve URL, query, headers,
-credentials, timeout, cancellation, status validation, response hooks and
-response interceptors.
+`credentials: 'include'`, timeout, cancellation, status validation, retries,
+authentication refresh, response hooks and response interceptors. Other Fetch
+credential modes and Fetch-only options have documented
+[XHR limitations](configuration.md#xhr-transport-limitations).
 
 Plugins must not replace client methods.
 
@@ -590,6 +598,12 @@ hooks.onRequest(handler, {
   priority: 20
 })
 ```
+
+Transport plugins use `hooks.onTransport(handler)`. Transport hooks execute
+inside each retry attempt, after request hooks and before the configured
+adapter. A handler sets `context.response` when it handles an attempt; later
+transport hooks and the adapter are skipped for that attempt. Errors continue
+through normal error, authentication-refresh, and retry hooks.
 
 ## Extension Configuration
 

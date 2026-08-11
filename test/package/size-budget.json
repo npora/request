@@ -9,16 +9,16 @@
       "gzipBytes": 22300
     },
     "dist/index.d.ts": {
-      "bytes": 32500,
-      "gzipBytes": 7400
+      "bytes": 33500,
+      "gzipBytes": 7700
     },
     "dist/index.d.cts": {
-      "bytes": 32500,
-      "gzipBytes": 7400
+      "bytes": 33500,
+      "gzipBytes": 7700
     }
   },
   "package": {
     "bytes": 65000,
-    "unpackedBytes": 283000
+    "unpackedBytes": 286000
   }
 }

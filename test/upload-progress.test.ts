@@ -7,7 +7,9 @@ import {
   vi
 } from 'vitest'
 import {
+  authPlugin,
   createClient,
+  retryPlugin,
   uploadPlugin
 } from '../src'
 
@@ -85,6 +87,10 @@ class FakeUploadXHR {
   load(): void {
     this.onload?.({} as ProgressEvent)
   }
+
+  fail(): void {
+    this.onerror?.({} as ProgressEvent)
+  }
 }
 
 beforeEach(() => {
@@ -103,6 +109,71 @@ afterEach(() => {
 })
 
 describe('uploadPlugin progress', () => {
+  it('should retry failed XHR uploads through the normal retry lifecycle', async () => {
+    scenario = xhr => {
+      if (FakeUploadXHR.instances.length === 1) {
+        xhr.fail()
+        return
+      }
+
+      xhr.load()
+    }
+
+    const request = createClient()
+      .use(uploadPlugin())
+      .use(retryPlugin({
+        retries: 1,
+        methods: ['POST'],
+        delay: () => 0
+      }))
+
+    await expect(request.post('/upload', {
+      extensions: {
+        upload: {
+          data: { name: 'report' },
+          onProgress() {}
+        }
+      }
+    })).resolves.toEqual({ ok: true })
+
+    expect(FakeUploadXHR.instances).toHaveLength(2)
+  })
+
+  it('should refresh authentication and retry an XHR upload after 401', async () => {
+    let token = 'expired-token'
+    const refreshToken = vi.fn(async () => {
+      token = 'refreshed-token'
+      return token
+    })
+
+    scenario = xhr => {
+      if (xhr.requestHeaders.get('authorization') === 'Bearer expired-token') {
+        xhr.status = 401
+        xhr.statusText = 'Unauthorized'
+      }
+
+      xhr.load()
+    }
+
+    const request = createClient()
+      .use(authPlugin({ token: () => token, refreshToken }))
+      .use(uploadPlugin())
+
+    await expect(request.post('/upload', {
+      extensions: {
+        upload: {
+          data: { name: 'report' },
+          onProgress() {}
+        }
+      }
+    })).resolves.toEqual({ ok: true })
+
+    expect(refreshToken).toHaveBeenCalledTimes(1)
+    expect(FakeUploadXHR.instances).toHaveLength(2)
+    expect(FakeUploadXHR.instances[1]?.requestHeaders.get('authorization'))
+      .toBe('Bearer refreshed-token')
+  })
+
   it('should send FormData with native XHR and parse JSON response', async () => {
     const fetchMock = vi.fn()
     const onProgress = vi.fn()

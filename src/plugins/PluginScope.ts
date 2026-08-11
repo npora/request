@@ -137,6 +137,13 @@ function createScopedHooks(
       )
     },
 
+    onTransport(hook, options) {
+      return trackHook(
+        hooks.onTransport(hook, withPriority(options, pluginPriority)),
+        cleanups
+      )
+    },
+
     onResponse(hook, options) {
       return trackHook(
         hooks.onResponse(hook, withPriority(options, pluginPriority)),

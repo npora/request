@@ -34,6 +34,8 @@ export type RetryHook = (
 export class PluginHooks {
   private readonly requestHooks = new HookRegistry<RequestHook>()
 
+  private readonly transportHooks = new HookRegistry<RequestHook>()
+
   private readonly responseHooks = new HookRegistry<RequestHook>()
 
   private readonly errorHooks = new HookRegistry<RequestHook>()
@@ -48,6 +50,10 @@ export class PluginHooks {
 
   get hasResponseHooks(): boolean {
     return this.responseHooks.active
+  }
+
+  get hasTransportHooks(): boolean {
+    return this.transportHooks.active
   }
 
   get hasErrorHooks(): boolean {
@@ -74,6 +80,13 @@ export class PluginHooks {
     options: HookOptions = {}
   ): HookDisposer {
     return this.responseHooks.register(hook, options)
+  }
+
+  onTransport(
+    hook: RequestHook,
+    options: HookOptions = {}
+  ): HookDisposer {
+    return this.transportHooks.register(hook, options)
   }
 
   onError(
@@ -106,6 +119,16 @@ export class PluginHooks {
   async runResponse(context: RequestContext<unknown>): Promise<void> {
     for (const hook of this.responseHooks.values()) {
       await hook(context)
+    }
+  }
+
+  async runTransport(context: RequestContext<unknown>): Promise<void> {
+    for (const hook of this.transportHooks.values()) {
+      await hook(context)
+
+      if (context.response) {
+        return
+      }
     }
   }
 

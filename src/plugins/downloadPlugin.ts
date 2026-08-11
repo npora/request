@@ -52,7 +52,7 @@ export function downloadPlugin(
         }
       })
 
-      context.hooks.onRequest(async requestContext => {
+      context.hooks.onTransport(async requestContext => {
         if (requestContext.response) {
           return
         }
