@@ -1,5 +1,5 @@
 import { RequestError } from '../errors'
-import type { RequestConfig } from '../types'
+import type { RequestConfig, ResponseType } from '../types'
 
 const BODY_FIELDS = [
   'body',
@@ -8,6 +8,16 @@ const BODY_FIELDS = [
   'formData'
 ] as const
 
+const RESPONSE_TYPES: readonly ResponseType[] = [
+  'json',
+  'text',
+  'blob',
+  'arrayBuffer',
+  'stream',
+  'sse',
+  'ndjson'
+]
+
 /**
  * Validate configuration before request hooks or adapters act on it.
  */
@@ -15,11 +25,28 @@ export function validateRequestConfig(config: RequestConfig): Headers {
   validateURL(config)
   validateTimeout(config)
   validateLimits(config)
+  validateResponseOptions(config)
   validateSchema(config)
   const headers = validateHeaders(config)
   validateBody(config)
 
   return headers
+}
+
+function validateResponseOptions(config: RequestConfig): void {
+  if (
+    config.responseType !== undefined &&
+    !RESPONSE_TYPES.includes(config.responseType)
+  ) {
+    throw configError('Request responseType is invalid', config)
+  }
+
+  if (
+    config.validateStatus !== undefined &&
+    typeof config.validateStatus !== 'function'
+  ) {
+    throw configError('Request validateStatus must be a function', config)
+  }
 }
 
 function validateSchema(config: RequestConfig): void {
