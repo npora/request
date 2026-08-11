@@ -15,6 +15,7 @@ import type {
   RequestLogger,
   RequestConfig,
   ServerSentEvent,
+  TransferProgress,
   RetryEvent,
   RetryOptions,
   UploadProgress
@@ -139,10 +140,19 @@ const downloadOptions: DownloadPluginOptions = {
 client.use(downloadPlugin(downloadOptions))
 
 const uploadProgress = (progress: UploadProgress) => {
-  return progress.progress
+  const transfer: TransferProgress = progress
+
+  return (transfer.bytes ?? 0) + (transfer.rate ?? 0)
+}
+
+const legacyUploadProgress: UploadProgress = {
+  loaded: 1,
+  total: 2,
+  progress: 0.5
 }
 
 void uploadProgress
+void legacyUploadProgress
 
 const logger: RequestLogger = {
   info(_message, entry) {

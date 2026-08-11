@@ -104,11 +104,54 @@ beforeEach(() => {
 })
 
 afterEach(() => {
+  vi.useRealTimers()
   vi.restoreAllMocks()
   vi.unstubAllGlobals()
 })
 
 describe('uploadPlugin progress', () => {
+  it('should report byte deltas, transfer rate and estimated time', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(0)
+
+    scenario = xhr => {
+      vi.setSystemTime(1000)
+      xhr.uploadProgress(4, 10)
+      vi.setSystemTime(2000)
+      xhr.uploadProgress(10, 10)
+      xhr.load()
+    }
+
+    const onProgress = vi.fn()
+    const request = createClient().use(uploadPlugin())
+
+    await request.post('/upload', {
+      extensions: {
+        upload: {
+          data: { name: 'report' },
+          onProgress
+        }
+      }
+    })
+
+    expect(onProgress).toHaveBeenNthCalledWith(1, {
+      loaded: 4,
+      total: 10,
+      progress: 0.4,
+      bytes: 4,
+      rate: 4,
+      estimated: 1.5
+    })
+    expect(onProgress).toHaveBeenNthCalledWith(2, {
+      loaded: 10,
+      total: 10,
+      progress: 1,
+      bytes: 6,
+      rate: 5,
+      estimated: 0
+    })
+  })
+
   it('should retry failed XHR uploads through the normal retry lifecycle', async () => {
     scenario = xhr => {
       if (FakeUploadXHR.instances.length === 1) {
@@ -216,12 +259,14 @@ describe('uploadPlugin progress', () => {
     expect(onProgress).toHaveBeenNthCalledWith(1, {
       loaded: 5,
       total: 10,
-      progress: 0.5
+      progress: 0.5,
+      bytes: 5
     })
     expect(onProgress).toHaveBeenNthCalledWith(2, {
       loaded: 10,
       total: 10,
-      progress: 1
+      progress: 1,
+      bytes: 5
     })
     expect(xhr.upload.onprogress).toBeNull()
   })

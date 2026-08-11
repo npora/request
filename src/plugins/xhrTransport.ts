@@ -4,16 +4,16 @@ import type {
   RequestConfig
 } from '../types'
 import {
+  createTransferProgressTracker,
+  type TransferProgressSnapshot
+} from './transferProgress'
+import {
   buildRequest,
   parseResponse
 } from '../utils'
 import { validateResponseStatus } from '../utils/validateResponseStatus'
 
-interface TransferProgress {
-  loaded: number
-  total?: number
-  progress?: number
-}
+type TransferProgress = TransferProgressSnapshot
 
 export interface XHRTransportOptions {
   onDownloadProgress?: (progress: TransferProgress) => void
@@ -259,6 +259,10 @@ function createProgressHandler(
     return null
   }
 
+  const trackProgress = callback
+    ? createTransferProgressTracker()
+    : undefined
+
   return event => {
     if (
       Number.isFinite(maxResponseSize) &&
@@ -276,13 +280,13 @@ function createProgressHandler(
       return
     }
 
-    if (!callback) {
+    if (!callback || !trackProgress) {
       return
     }
 
     try {
       callback(
-        createProgress(
+        trackProgress(
           event.loaded,
           event.lengthComputable
             ? event.total
@@ -292,24 +296,6 @@ function createProgressHandler(
     } catch (error) {
       abortWith(error)
     }
-  }
-}
-
-function createProgress(
-  loaded: number,
-  total?: number
-): TransferProgress {
-  if (total === undefined || total === 0) {
-    return {
-      loaded,
-      total
-    }
-  }
-
-  return {
-    loaded,
-    total,
-    progress: Math.min(loaded / total, 1)
   }
 }
 

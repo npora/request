@@ -55,13 +55,15 @@ describe('downloadPlugin progress', () => {
     expect(onProgress).toHaveBeenNthCalledWith(1, {
       loaded: firstChunk.byteLength,
       total,
-      progress: firstChunk.byteLength / total
+      progress: firstChunk.byteLength / total,
+      bytes: firstChunk.byteLength
     })
 
     expect(onProgress).toHaveBeenNthCalledWith(2, {
       loaded: total,
       total,
-      progress: 1
+      progress: 1,
+      bytes: secondChunk.byteLength
     })
   })
 
@@ -103,7 +105,39 @@ describe('downloadPlugin progress', () => {
 
     expect(onProgress).toHaveBeenCalledWith({
       loaded: chunk.byteLength,
-      total: undefined
+      total: undefined,
+      bytes: chunk.byteLength
+    })
+  })
+
+  it('should report an empty streamed download', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(new Uint8Array(), {
+          status: 200,
+          headers: {
+            'content-length': '0',
+            'content-type': 'application/octet-stream'
+          }
+        })
+      )
+    )
+
+    const onProgress = vi.fn()
+    const request = createClient().use(downloadPlugin())
+    const data = await request.get<Blob>('/empty', {
+      extensions: {
+        download: { onProgress }
+      }
+    })
+
+    expect(data.size).toBe(0)
+    expect(onProgress).toHaveBeenCalledOnce()
+    expect(onProgress).toHaveBeenCalledWith({
+      loaded: 0,
+      total: 0,
+      bytes: 0
     })
   })
 

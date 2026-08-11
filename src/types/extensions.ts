@@ -248,17 +248,14 @@ export interface RequestLogger {
 
 export type UploadData = FormData | Record<string, unknown>
 
-/**
- * Upload progress information.
- */
-export interface UploadProgress {
+export interface TransferProgress {
   /**
-   * Number of bytes sent.
+   * Cumulative number of bytes transferred.
    */
   loaded: number
 
   /**
-   * Total request size when the browser provides it.
+   * Total transfer size when the runtime provides it.
    */
   total?: number
 
@@ -266,7 +263,27 @@ export interface UploadProgress {
    * Progress ratio between 0 and 1 when total is available.
    */
   progress?: number
+
+  /**
+   * Bytes transferred since the previous progress event.
+   */
+  bytes?: number
+
+  /**
+   * Average transfer rate in bytes per second when measurable.
+   */
+  rate?: number
+
+  /**
+   * Estimated remaining seconds when total and rate are available.
+   */
+  estimated?: number
 }
+
+/**
+ * Upload progress information.
+ */
+export interface UploadProgress extends TransferProgress {}
 
 export interface UploadOptions {
   data: UploadData
@@ -280,22 +297,7 @@ export interface UploadOptions {
 /**
  * Download progress information.
  */
-export interface DownloadProgress {
-  /**
-   * Number of bytes received.
-   */
-  loaded: number
-
-  /**
-   * Total response size when Content-Length is available.
-   */
-  total?: number
-
-  /**
-   * Progress ratio between 0 and 1 when total is available.
-   */
-  progress?: number
-}
+export interface DownloadProgress extends TransferProgress {}
 
 export interface DownloadOptions {
   /**
