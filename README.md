@@ -431,6 +431,8 @@ allowlist, and size budgets.
 - [API reference](https://github.com/npora/request/blob/main/docs/api.md)
 - [Architecture](https://github.com/npora/request/blob/main/docs/architecture.md)
 - [Migration from 0.x](https://github.com/npora/request/blob/main/docs/migration.md)
+- [Migration from Axios or Ky](https://github.com/npora/request/blob/main/docs/migration-from-axios-and-ky.md)
+- [HTTP client comparison](https://github.com/npora/request/blob/main/docs/comparison.md)
 - [Security model](https://github.com/npora/request/blob/main/docs/security.md)
 - [Testing and release gates](https://github.com/npora/request/blob/main/docs/testing.md)
 - [Performance benchmarks](https://github.com/npora/request/blob/main/docs/benchmark.md)

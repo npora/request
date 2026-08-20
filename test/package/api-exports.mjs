@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { createRequire } from 'node:module'
 import { fileURLToPath } from 'node:url'
 import ts from 'typescript-api'
 
@@ -111,12 +112,28 @@ const runtimeExports = [
 const module = await import(
   new URL('../../dist/index.js', import.meta.url).href
 )
+const require = createRequire(import.meta.url)
+const commonJSModule = require('../../dist/index.cjs')
 
 assert.deepEqual(
   Object.keys(module).sort(),
   runtimeExports,
   'Runtime exports changed. Update the public API contract intentionally.'
 )
+
+for (const packageModule of [module, commonJSModule]) {
+  for (const exportName of runtimeExports) {
+    const exported = packageModule[exportName]
+
+    if (typeof exported === 'function' && /^[A-Z]/.test(exportName)) {
+      assert.equal(
+        exported.name,
+        exportName,
+        `Exported constructor name changed for ${exportName}.`
+      )
+    }
+  }
+}
 
 const declarationPath = fileURLToPath(
   new URL('../../dist/index.d.ts', import.meta.url)
