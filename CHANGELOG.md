@@ -1,5 +1,14 @@
 # @npora/request
 
+## 1.14.1
+
+### Patch Changes
+
+- 14f850e: Minify the published ESM and CommonJS entrypoints and lower the enforced
+  package-size budgets, reducing the JavaScript and unpacked package footprint
+  without changing runtime exports, exported constructor names, type
+  declarations, or documented behavior.
+
 ## 1.14.0
 
 ### Minor Changes
