@@ -39,6 +39,7 @@ pnpm typecheck
 pnpm test:coverage
 pnpm test:examples
 pnpm benchmark:types
+pnpm test:release-workflow
 pnpm build
 pnpm test:package
 pnpm test:security

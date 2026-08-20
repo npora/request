@@ -102,6 +102,9 @@ jobs:
       - name: Check documentation links
         run: pnpm test:docs
 
+      - name: Verify release workflow contract
+        run: pnpm test:release-workflow
+
       - name: Unit, integration and coverage tests
         run: pnpm test:coverage
 

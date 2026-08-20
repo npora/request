@@ -64,6 +64,7 @@
     "test:run": "vitest run",
     "test:security": "vitest run test/security.test.ts",
     "test:docs": "node test/docs.mjs",
+    "test:release-workflow": "node test/release-workflow.mjs",
     "test:types": "pnpm build && tsc -p test/types/tsconfig.json",
     "test:examples": "tsc -p examples/tsconfig.json",
     "test:package": "node test/package/esm.mjs && node test/package/cjs.cjs && node test/package/api-exports.mjs && node test/package/api-contract.mjs && node test/package/npm-pack-result.test.mjs && node test/package/manifest.mjs && pnpm test:size",
@@ -79,7 +80,7 @@
     "benchmark:types": "tsc -p benchmark/tsconfig.json"
   },
   "devDependencies": {
-    "@changesets/cli": "^2.31.0",
+    "@changesets/cli": "^3.0.0",
     "@playwright/test": "^1.61.1",
     "@types/node": "^26.2.0",
     "@vitest/coverage-v8": "^4.1.10",
