@@ -66,6 +66,24 @@ limits also account for the synchronized feature, support-policy, and
 supply-chain README while retaining measured headroom without hiding larger
 future growth.
 
+Versions 1.11.0 through 1.14.0 kept the same budgets while adding native
+ordered `URLSearchParams`, retry-aware progress transports, richer progress
+events, and backpressure-aware streaming downloads. By 1.14.0 the raw
+entrypoints and unpacked package had less than one percent headroom remaining.
+
+Version 1.14.1 minifies the published JavaScript entrypoints after tree
+shaking while preserving exported constructor names. The ESM entrypoint
+decreased from about 104 kB to 62 kB, its gzip size decreased from about 22.3
+kB to 16.9 kB, and the unpacked package decreased from about 292 kB to 208 kB.
+Type declarations are unchanged. The JavaScript, tarball, and
+unpacked-package budgets were lowered at the same time so this recovered
+headroom cannot be consumed accidentally by later features.
+
+Published JavaScript is optimized for machines rather than direct inspection.
+Use the tagged repository source when debugging internals; public error names,
+codes, metadata, export names, constructor names, and declarations remain
+verified package contracts.
+
 `pnpm test:package` includes the size check, so release verification cannot
 publish a package that exceeds the checked-in budgets. CI also stores the JSON
 report for comparing changes over time.
