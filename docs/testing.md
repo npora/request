@@ -90,3 +90,9 @@ Every user-visible change includes a Changesets entry. CI verifies Node.js 22,
 24, and 26 plus the quality and browser suites. Merging the generated version
 PR publishes to npm with trusted publishing, creates a Git tag, and creates a
 GitHub Release.
+
+The release workflow uses Changesets CLI v3 with an immutable-pinned
+Changesets Action v2. Run `pnpm test:release-workflow` after changing release
+automation; it verifies the CLI/config generation, action pin, token input,
+and v2 input names. Infrastructure-only changes use an empty changeset and do
+not bump the published package version.
