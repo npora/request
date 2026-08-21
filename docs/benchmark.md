@@ -35,6 +35,8 @@ pnpm benchmark -- \
 - `concurrentPluginPipeline`: concurrent client with request/response
   interceptors and request/response plugin hooks.
 - `cacheHitClient`: repeated data reads from the default in-memory cache.
+- `cacheMissClient`: repeated cacheable requests with persistence disabled,
+  covering miss registration and response handling.
 - `concurrencyImmediateClient`: sequential requests admitted immediately by
   the concurrency plugin without queueing.
 - `circuitBreakerSuccessClient`: successful requests tracked by a closed
@@ -44,6 +46,8 @@ pnpm benchmark -- \
 - `retryOnceClient`: requests that fail once and retry immediately.
 - `loggerNoopClient`: request and response logging through a synchronous
   no-op logger.
+- `authNonRefreshErrorClient`: rejected authenticated requests that do not
+  qualify for token refresh.
 - `fetchAdapterClient`: complete FetchAdapter lifecycle against an in-memory
   Fetch response, without network latency.
 - `fetchAdapterCompleteResponse`: the same Fetch lifecycle while preserving

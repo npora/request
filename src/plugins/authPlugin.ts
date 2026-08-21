@@ -1,4 +1,5 @@
 import { RequestError } from '../errors'
+import type { RequestContext } from '../core/RequestContext'
 import type { RequestConfig } from '../types'
 import type { Plugin } from './Plugin'
 import { isPromiseLike } from '../utils/isPromiseLike'
@@ -74,8 +75,10 @@ export function authPlugin(options: AuthPluginOptions = {}): Plugin {
         return applyAuthorization(config, options)
       })
 
-      context.hooks.onRetry(async requestContext => {
-        if (!options.refreshToken || !requestContext.error) {
+      context.hooks.onRetry(requestContext => {
+        const refreshToken = options.refreshToken
+
+        if (!refreshToken || !requestContext.error) {
           return undefined
         }
 
@@ -85,24 +88,43 @@ export function authPlugin(options: AuthPluginOptions = {}): Plugin {
 
         const shouldRefresh =
           options.shouldRefresh ?? defaultShouldRefresh
+        const refresh = shouldRefresh(requestContext.error)
 
-        if (!(await shouldRefresh(requestContext.error))) {
+        if (isPromiseLike(refresh)) {
+          return Promise.resolve(refresh).then(shouldRefreshToken => {
+            return shouldRefreshToken
+              ? refreshRequest(requestContext, refreshToken)
+              : undefined
+          })
+        }
+
+        if (!refresh) {
           return undefined
         }
 
+        return refreshRequest(requestContext, refreshToken)
+      })
+
+      async function refreshRequest(
+        requestContext: RequestContext<unknown>,
+        refreshToken: NonNullable<AuthPluginOptions['refreshToken']>
+      ): Promise<{ retry: true; delay: 0 } | undefined> {
         refreshedContexts.add(requestContext)
 
         try {
           const refreshedToken = await refreshAccessToken(
-            options.refreshToken
+            refreshToken
           )
-          const authorization = await resolveAuthorization(
+          const resolvedAuthorization = resolveAuthorization(
             requestContext.config,
             options,
             typeof refreshedToken === 'string'
               ? refreshedToken
               : undefined
           )
+          const authorization = isPromiseLike(resolvedAuthorization)
+            ? await resolvedAuthorization
+            : resolvedAuthorization
 
           if (!authorization.token) {
             return undefined
@@ -121,7 +143,7 @@ export function authPlugin(options: AuthPluginOptions = {}): Plugin {
         } catch {
           return undefined
         }
-      })
+      }
     }
   }
 
@@ -130,9 +152,15 @@ export function authPlugin(options: AuthPluginOptions = {}): Plugin {
   ): Promise<string | void> {
     if (!refreshPromise) {
       refreshPromise = Promise.resolve(refreshToken())
-        .then(async token => {
-          if (token) {
-            await options.storage?.set(token)
+        .then(token => {
+          if (!token) {
+            return token
+          }
+
+          const write = options.storage?.set(token)
+
+          if (isPromiseLike(write)) {
+            return Promise.resolve(write).then(() => token)
           }
 
           return token

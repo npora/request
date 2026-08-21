@@ -53,6 +53,9 @@ const pipelineClient = createClient({
 const cacheClient = createClient({
   adapter
 }).use(cachePlugin())
+const cacheMissClient = createClient({
+  adapter
+}).use(cachePlugin())
 const concurrencyClient = createClient({
   adapter
 }).use(concurrencyPlugin())
@@ -78,6 +81,12 @@ const loggerNoopClient = createClient({
     error() {}
   }
 }))
+const authNonRefreshErrorClient = createClient({
+  adapter: createErrorBenchmarkAdapter(403)
+}).use(authPlugin({
+  token: 'benchmark-token',
+  refreshToken: () => 'unused-token'
+}))
 const cachedRequestConfig: RequestConfig = {
   url: '/benchmark-cache',
   method: 'GET',
@@ -85,6 +94,16 @@ const cachedRequestConfig: RequestConfig = {
     cache: {
       enabled: true,
       ttl: Number.POSITIVE_INFINITY
+    }
+  }
+}
+const cacheMissRequestConfig: RequestConfig = {
+  url: '/benchmark-cache-miss',
+  method: 'GET',
+  extensions: {
+    cache: {
+      enabled: true,
+      ttl: 0
     }
   }
 }
@@ -130,6 +149,10 @@ const cacheHitClient = await runSequential(
   options.operations,
   () => cacheClient.get('/benchmark-cache', cachedRequestConfig)
 )
+const cacheMissClientResult = await runSequential(
+  options.operations,
+  () => cacheMissClient.get('/benchmark-cache-miss', cacheMissRequestConfig)
+)
 const concurrencyImmediateClient = await runSequential(
   options.operations,
   () => concurrencyClient.get('/benchmark', requestConfig)
@@ -149,6 +172,11 @@ const retryOnceClientResult = await runSequential(
 const loggerNoopClientResult = await runSequential(
   options.operations,
   () => loggerNoopClient.get('/benchmark', requestConfig)
+)
+const authNonRefreshErrorClientResult = await runSequential(
+  options.operations,
+  () => authNonRefreshErrorClient.get('/benchmark', requestConfig)
+    .catch(ignoreBenchmarkError)
 )
 const fetchAdapterClient = await runSequential(
   options.operations,
@@ -209,11 +237,13 @@ const report = {
     concurrentClient: concurrent,
     concurrentPluginPipeline: pluginPipeline,
     cacheHitClient,
+    cacheMissClient: cacheMissClientResult,
     concurrencyImmediateClient,
     circuitBreakerSuccessClient,
     authStaticTokenClient: authStaticTokenClientResult,
     retryOnceClient: retryOnceClientResult,
     loggerNoopClient: loggerNoopClientResult,
+    authNonRefreshErrorClient: authNonRefreshErrorClientResult,
     fetchAdapterClient,
     fetchAdapterCompleteResponse,
     fetchAdapterBoundedClient,
@@ -268,6 +298,22 @@ function createRetryBenchmarkAdapter(): Adapter {
     }
   }
 }
+
+function createErrorBenchmarkAdapter(status: number): Adapter {
+  return {
+    async request<T>(
+      config: RequestConfig
+    ): Promise<NporaResponse<T>> {
+      throw new RequestError('benchmark error', {
+        code: 'HTTP_ERROR',
+        status,
+        config
+      })
+    }
+  }
+}
+
+function ignoreBenchmarkError(): void {}
 
 function createBenchmarkPlugin(): Plugin {
   return {

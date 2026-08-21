@@ -172,8 +172,9 @@ export function cachePlugin(
   const methods = new Set(
     options.methods ?? DEFAULT_CACHE_METHODS
   )
-  const varyHeaders =
+  const varyHeaders = normalizeVaryHeaders(
     options.varyHeaders ?? DEFAULT_VARY_HEADERS
+  )
 
   const plugin: CachePlugin = {
     name: 'cache',
@@ -695,23 +696,27 @@ function normalizeCacheHeaders(
   headers: Headers,
   varyHeaders: readonly string[]
 ): Array<[string, string | null]> {
-  const values = new Map<string, string | null>()
+  const values: Array<[string, string | null]> = []
 
   headers.forEach((value, name) => {
-    values.set(name.toLowerCase(), value)
+    values.push([name, value])
   })
 
   for (const name of varyHeaders) {
-    const normalizedName = name.toLowerCase()
-
-    if (!values.has(normalizedName)) {
-      values.set(normalizedName, headers.get(name))
+    if (!headers.has(name)) {
+      values.push([name, null])
     }
   }
 
-  return [...values.entries()].sort(([first], [second]) => {
+  return values.sort(([first], [second]) => {
     return first.localeCompare(second)
   })
+}
+
+function normalizeVaryHeaders(
+  headers: readonly string[]
+): readonly string[] {
+  return [...new Set(headers.map(name => name.toLowerCase()))]
 }
 
 function normalizeQuery(

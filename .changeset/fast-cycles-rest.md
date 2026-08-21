@@ -13,6 +13,10 @@ path while preserving asynchronous continuation and hook ordering. Avoid
 allocating observer Promises for synchronous logger, retry, and circuit-breaker
 callbacks. Resolve Fetch response types once and avoid double-wrapping bounded
 data-only response streams. Keep synchronous memory-cache reads, writes,
-deletions, hits, and miss registration off the asynchronous hook path.
+deletions, hits, and miss registration off the asynchronous hook path. Keep
+non-refreshing authentication errors and synchronous refresh policy decisions
+off the asynchronous retry path. Merge query and body configuration directly
+into the request result without temporary objects. Normalize cache vary-header
+names once and avoid per-request Map allocation while creating cache keys.
 Preserve the stable response-size error when cancellation of an oversized
 stream also fails.
