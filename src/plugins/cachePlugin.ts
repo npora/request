@@ -273,7 +273,7 @@ export function cachePlugin(
 
           if (
             pending?.owner === requestContext &&
-            (pending.hasFollowers || waitsForDeletion)
+            (pending.promise !== undefined || waitsForDeletion)
           ) {
             completedRecords.set(
               requestContext,
@@ -360,10 +360,8 @@ export function cachePlugin(
         const pending = inFlight.get(key)
 
         if (pending) {
-          pending.hasFollowers = true
-
           return waitForSharedRecord(
-            pending.promise,
+            getInFlightPromise(pending),
             requestContext.config
           ).then(sharedRecord => {
             if (!sharedRecord) {
@@ -404,7 +402,7 @@ export function cachePlugin(
         inFlight.delete(key)
 
         if (uncacheableLeaders.delete(requestContext)) {
-          pending.resolve(undefined)
+          pending.resolve?.(undefined)
           return
         }
 
@@ -420,11 +418,11 @@ export function cachePlugin(
             isSchemaValidationFailure(requestContext.error)
           )
         ) {
-          pending.resolve(record)
+          pending.resolve?.(record)
           return
         }
 
-        pending.reject(
+        pending.reject?.(
           requestContext.error ??
           new RequestError('Shared request failed', {
             code: 'NETWORK_ERROR',
@@ -452,7 +450,7 @@ export function cachePlugin(
           }
 
           inFlight.delete(key)
-          pending.reject(
+          pending.reject?.(
             new RequestError('Cache plugin removed during shared request', {
               code: 'ABORT_ERROR'
             })
@@ -470,16 +468,26 @@ export function cachePlugin(
 interface InFlightRequest {
   owner: object
 
-  hasFollowers: boolean
+  promise?: Promise<CacheEntry | undefined>
 
-  promise: Promise<CacheEntry | undefined>
+  resolve?: (entry: CacheEntry | undefined) => void
 
-  resolve(entry: CacheEntry | undefined): void
-
-  reject(error: unknown): void
+  reject?: (error: unknown) => void
 }
 
 function createInFlightRequest(owner: object): InFlightRequest {
+  return {
+    owner
+  }
+}
+
+function getInFlightPromise(
+  request: InFlightRequest
+): Promise<CacheEntry | undefined> {
+  if (request.promise) {
+    return request.promise
+  }
+
   let resolve!: (entry: CacheEntry | undefined) => void
   let reject!: (error: unknown) => void
   const promise = new Promise<CacheEntry | undefined>(
@@ -491,13 +499,11 @@ function createInFlightRequest(owner: object): InFlightRequest {
 
   void promise.catch(() => {})
 
-  return {
-    owner,
-    hasFollowers: false,
-    promise,
-    resolve,
-    reject
-  }
+  request.promise = promise
+  request.resolve = resolve
+  request.reject = reject
+
+  return promise
 }
 
 function readStore(

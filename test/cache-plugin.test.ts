@@ -960,20 +960,25 @@ describe('cachePlugin', () => {
     })
 
     const second = request.get<{ value: number }>('/shared', config)
+    const third = request.get<{ value: number }>('/shared', config)
 
     await Promise.resolve()
     expect(fetchMock).toHaveBeenCalledTimes(1)
 
     resolveFetch(createJsonResponse({ value: 1 }))
 
-    const [firstData, secondData] = await Promise.all([
+    const [firstData, secondData, thirdData] = await Promise.all([
       first,
-      second
+      second,
+      third
     ])
 
     firstData.value = 2
 
     expect(secondData).toEqual({
+      value: 1
+    })
+    expect(thirdData).toEqual({
       value: 1
     })
     expect(fetchMock).toHaveBeenCalledTimes(1)
