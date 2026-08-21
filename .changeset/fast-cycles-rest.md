@@ -28,11 +28,13 @@ memory-cache reads, writes,
 deletions, hits, and miss registration off the asynchronous hook path, and
 reuse immutable primitive cache values without structured cloning. Avoid
 rewriting the in-memory LRU order when the requested entry is already newest.
+Skip clock reads for permanent cache entries, and reuse empty normalized query
+metadata while generating headerless cache keys.
 Keep non-refreshing authentication errors and synchronous refresh policy
-decisions
-off the asynchronous retry path. Merge query and body configuration directly
-into the request result without temporary objects. Normalize cache vary-header
-names once, avoid per-request Map allocation while creating cache keys, and
+decisions off the asynchronous retry path. Merge query and body configuration
+directly into the request result without temporary objects. Normalize cache
+vary-header names once, avoid per-request Map allocation while creating cache
+keys, and
 reuse empty vary-header metadata for headerless requests. Reuse the registered
 deduplication key when persisting or discarding a cache miss response instead
 of serializing the same request identity twice. Skip transient response

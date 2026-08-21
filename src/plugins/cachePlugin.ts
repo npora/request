@@ -174,6 +174,8 @@ const DEFAULT_VARY_HEADERS = [
   'accept-language'
 ] as const
 
+const EMPTY_QUERY: ReadonlyArray<[string, string]> = []
+
 export function cachePlugin(
   options: CachePluginOptions = {}
 ): CachePlugin {
@@ -776,9 +778,9 @@ function normalizeVaryHeaders(
 
 function normalizeQuery(
   query?: QueryParams | URLSearchParams
-): Array<[string, string]> {
+): ReadonlyArray<[string, string]> {
   if (!query) {
-    return []
+    return EMPTY_QUERY
   }
 
   if (isURLSearchParams(query)) {
@@ -889,5 +891,6 @@ function normalizeCacheTtl(
 }
 
 function isExpired(expiresAt: number): boolean {
-  return Number.isNaN(expiresAt) || Date.now() >= expiresAt
+  return expiresAt !== Number.POSITIVE_INFINITY &&
+    (Number.isNaN(expiresAt) || Date.now() >= expiresAt)
 }
