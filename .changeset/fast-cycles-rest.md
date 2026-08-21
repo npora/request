@@ -11,6 +11,8 @@ each logical request, and skip response-schema validation setup when no schema
 is configured. Keep fully synchronous plugin hook chains on the synchronous
 path while preserving asynchronous continuation and hook ordering. Avoid
 allocating observer Promises for synchronous logger, retry, and circuit-breaker
-callbacks.
+callbacks. Resolve Fetch response types once and avoid double-wrapping bounded
+data-only response streams. Keep synchronous memory-cache reads, writes,
+deletions, hits, and miss registration off the asynchronous hook path.
 Preserve the stable response-size error when cancellation of an oversized
 stream also fails.

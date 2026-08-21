@@ -186,7 +186,7 @@ export function cachePlugin(
       const ownedLeaders = new Set<object>()
       let active = true
 
-      context.hooks.onRequest(async requestContext => {
+      context.hooks.onRequest(requestContext => {
         const cache = resolveExtensionConfig(
           requestContext.config,
           'cache'
@@ -207,73 +207,17 @@ export function cachePlugin(
           varyHeaders
         )
         const stored = readStore(store, key)
-        const record = isPromiseLike(stored)
-          ? await stored
-          : stored
 
-        if (!active) {
-          return
+        if (isPromiseLike(stored)) {
+          return Promise.resolve(stored).then(record => {
+            return handleCacheRecord(requestContext, cache, key, record)
+          })
         }
 
-        if (record) {
-          if (isExpired(record.expiresAt)) {
-            const deletion = deleteStore(store, key)
-
-            if (isPromiseLike(deletion)) {
-              await deletion
-            }
-          } else {
-            const cachedResponse = restoreCacheEntry(
-              record,
-              requestContext.config
-            )
-
-            if (cachedResponse) {
-              requestContext.response = cachedResponse
-              cacheHits.add(requestContext)
-              return
-            }
-
-            const deletion = deleteStore(store, key)
-
-            if (isPromiseLike(deletion)) {
-              await deletion
-            }
-          }
-        }
-
-        if (!(cache.dedupe ?? options.dedupe ?? true)) {
-          return
-        }
-
-        const pending = inFlight.get(key)
-
-        if (pending) {
-          const sharedRecord = await waitForSharedRecord(
-            pending.promise,
-            requestContext.config
-          )
-
-          if (!sharedRecord) {
-            return
-          }
-
-          requestContext.response = createCachedResponse(
-            sharedRecord,
-            requestContext.config
-          )
-          cacheHits.add(requestContext)
-          return
-        }
-
-        const created = createInFlightRequest(requestContext)
-
-        inFlight.set(key, created)
-        leaders.set(requestContext, key)
-        ownedLeaders.add(requestContext)
+        return handleCacheRecord(requestContext, cache, key, stored)
       })
 
-      context.hooks.onResponse(async requestContext => {
+      context.hooks.onResponse(requestContext => {
         if (cacheHits.has(requestContext)) {
           return
         }
@@ -302,7 +246,7 @@ export function cachePlugin(
           const deletion = deleteStore(store, key)
 
           if (isPromiseLike(deletion)) {
-            await deletion
+            return deletion
           }
           return
         }
@@ -325,7 +269,7 @@ export function cachePlugin(
           const deletion = deleteStore(store, key)
 
           if (isPromiseLike(deletion)) {
-            await deletion
+            return deletion
           }
           return
         }
@@ -333,9 +277,86 @@ export function cachePlugin(
         const write = writeStore(store, key, record)
 
         if (isPromiseLike(write)) {
-          await write
+          return write
         }
       })
+
+      function handleCacheRecord(
+        requestContext: {
+          config: RequestConfig
+          response?: NporaResponse
+        },
+        cache: CacheOptions,
+        key: string,
+        record: CacheEntry | undefined
+      ): void | Promise<void> {
+        if (!active) {
+          return
+        }
+
+        if (record) {
+          if (!isExpired(record.expiresAt)) {
+            const cachedResponse = restoreCacheEntry(
+              record,
+              requestContext.config
+            )
+
+            if (cachedResponse) {
+              requestContext.response = cachedResponse
+              cacheHits.add(requestContext)
+              return
+            }
+          }
+
+          const deletion = deleteStore(store, key)
+
+          if (isPromiseLike(deletion)) {
+            return Promise.resolve(deletion).then(() => {
+              return prepareCacheMiss(requestContext, cache, key)
+            })
+          }
+        }
+
+        return prepareCacheMiss(requestContext, cache, key)
+      }
+
+      function prepareCacheMiss(
+        requestContext: {
+          config: RequestConfig
+          response?: NporaResponse
+        },
+        cache: CacheOptions,
+        key: string
+      ): void | Promise<void> {
+        if (!active || !(cache.dedupe ?? options.dedupe ?? true)) {
+          return
+        }
+
+        const pending = inFlight.get(key)
+
+        if (pending) {
+          return waitForSharedRecord(
+            pending.promise,
+            requestContext.config
+          ).then(sharedRecord => {
+            if (!sharedRecord) {
+              return
+            }
+
+            requestContext.response = createCachedResponse(
+              sharedRecord,
+              requestContext.config
+            )
+            cacheHits.add(requestContext)
+          })
+        }
+
+        const created = createInFlightRequest(requestContext)
+
+        inFlight.set(key, created)
+        leaders.set(requestContext, key)
+        ownedLeaders.add(requestContext)
+      }
 
       context.hooks.onSettled(requestContext => {
         const key = leaders.get(requestContext)
