@@ -1,6 +1,7 @@
 import { RequestError } from '../errors'
 import type { RequestConfig } from '../types'
 import { isURLSearchParams } from './isURLSearchParams'
+import { MAX_TIMER_DELAY } from './maxTimerDelay'
 
 const BODY_FIELDS = [
   'body',
@@ -172,7 +173,7 @@ function validateTimeout(config: RequestConfig): void {
   if (
     !Number.isFinite(config.timeout) ||
     config.timeout < 0 ||
-    config.timeout > 2_147_483_647
+    config.timeout > MAX_TIMER_DELAY
   ) {
     throw configError(
       'Request timeout is out of range',

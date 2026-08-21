@@ -314,6 +314,41 @@ describe('retryPlugin', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2)
   })
 
+  it('should cap retry delays at the platform timer limit', async () => {
+    vi.useFakeTimers()
+
+    const controller = new AbortController()
+    let observeDelay!: (delay: number) => void
+    const scheduled = new Promise<number>(resolve => {
+      observeDelay = resolve
+    })
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response('Busy', { status: 503 })
+    )
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient().use(
+      retryPlugin({
+        retries: 1,
+        delay: Number.MAX_SAFE_INTEGER,
+        maxDelay: Number.MAX_SAFE_INTEGER,
+        onRetry(event) {
+          observeDelay(event.delay)
+        }
+      })
+    )
+    const outcome = request.get('/busy', {
+      signal: controller.signal
+    }).catch(error => error)
+    const delay = await scheduled
+
+    controller.abort()
+
+    await outcome
+    expect(delay).toBe(2_147_483_647)
+  })
+
   it('should apply custom jitter and emit a retry event', async () => {
     vi.useFakeTimers()
 

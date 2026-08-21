@@ -6,6 +6,7 @@ import type { Adapter, NporaResponse, RequestConfig } from '../types'
 import { RequestError, SchemaValidationError } from '../errors'
 import { validateRequestConfig } from '../utils'
 import { isPromiseLike } from '../utils/isPromiseLike'
+import { MAX_TIMER_DELAY } from '../utils/maxTimerDelay'
 import { RequestContext } from './RequestContext'
 
 export interface PipelineInterceptors {
@@ -445,7 +446,7 @@ function waitForRetry(
     const timer = setTimeout(() => {
       cleanup()
       resolve()
-    }, milliseconds)
+    }, Math.min(milliseconds, MAX_TIMER_DELAY))
 
     const onAbort = () => {
       clearTimeout(timer)

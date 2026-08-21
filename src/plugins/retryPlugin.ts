@@ -7,6 +7,7 @@ import type {
 } from '../types'
 import type { Plugin } from './Plugin'
 import { isPromiseLike } from '../utils/isPromiseLike'
+import { MAX_TIMER_DELAY } from '../utils/maxTimerDelay'
 import { resolveExtensionConfig } from './resolveExtensionConfig'
 
 const DEFAULT_RETRY_METHODS: readonly HttpMethod[] = [
@@ -339,10 +340,10 @@ function normalizeMaxDelay(maxDelay?: number): number {
   }
 
   if (!Number.isFinite(maxDelay)) {
-    return maxDelay > 0 ? Number.MAX_SAFE_INTEGER : 0
+    return maxDelay > 0 ? MAX_TIMER_DELAY : 0
   }
 
-  return Math.max(0, maxDelay)
+  return Math.min(Math.max(0, maxDelay), MAX_TIMER_DELAY)
 }
 
 function normalizeRetries(retries: number): number {

@@ -111,7 +111,7 @@ Type: `number | RetryOptions`. Requires `retryPlugin()`.
 | `methods` | `GET`, `HEAD`, `OPTIONS`, `PUT`, `DELETE` | Replayable methods allowed to retry. |
 | `delay` | `0` | Milliseconds or a callback producing the delay. |
 | `respectRetryAfter` | `true` | Honor a valid server `Retry-After` value. |
-| `maxDelay` | `60000` | Upper bound for retry delay. |
+| `maxDelay` | `60000` | Upper bound for retry delay, capped at `2_147_483_647`. |
 | `jitter` | `false` | Randomize client-configured retry delays. |
 | `maxElapsedTime` | `Infinity` | Total retry time budget, including planned delays. |
 | `shouldRetry` | network errors, timeout, HTTP 408/425/429/5xx | Custom retry decision. |
@@ -153,7 +153,7 @@ Requires `concurrencyPlugin()`.
 | --- | --- | --- |
 | `enabled` | `true` | Apply the concurrency limit. |
 | `key` | resolved request origin | Override queue isolation. |
-| `queueTimeout` | plugin-level value | Maximum time waiting for a permit. |
+| `queueTimeout` | plugin-level value | Maximum time waiting for a permit, capped at `2_147_483_647`. |
 
 Queue overflow and queue timeout fail with `CONCURRENCY_LIMIT`.
 

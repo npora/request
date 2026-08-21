@@ -6,6 +6,7 @@ import type {
   QueryParams,
   RequestConfig
 } from '../types'
+import { MAX_TIMER_DELAY } from '../utils/maxTimerDelay'
 import { validateResponseStatus } from '../utils/validateResponseStatus'
 import { isURLSearchParams } from '../utils/isURLSearchParams'
 
@@ -600,8 +601,6 @@ function normalizeDelay(delay?: number): number {
 
   return Math.min(Math.max(0, delay ?? 0), MAX_TIMER_DELAY)
 }
-
-const MAX_TIMER_DELAY = 2_147_483_647
 
 function waitForDelay(
   delay: number,

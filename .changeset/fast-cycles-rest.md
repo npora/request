@@ -69,3 +69,5 @@ Register external abort listeners before allocating timeout timers, avoiding
 timer churn for pre-aborted signals and leaks when listener setup fails.
 Reject request timeouts beyond the platform timer range instead of allowing
 Node to overflow them into an immediate timeout.
+Cap retry and concurrency queue delays at the same platform limit, including
+delays returned by custom retry hooks, so oversized waits cannot wrap to 1ms.

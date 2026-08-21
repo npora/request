@@ -196,6 +196,34 @@ describe('concurrencyPlugin', () => {
     await active
   })
 
+  it('should cap queue waits at the platform timer limit', async () => {
+    vi.useFakeTimers()
+
+    const timerSpy = vi.spyOn(globalThis, 'setTimeout')
+    const adapter = new ControlledAdapter()
+    const request = createClient({ adapter }).use(
+      concurrencyPlugin({
+        maxConcurrent: 1,
+        queueTimeout: Number.MAX_SAFE_INTEGER
+      })
+    )
+
+    const active = request.get('/active')
+    const queued = request.get('/queued')
+
+    await flush()
+    expect(timerSpy).toHaveBeenCalledWith(
+      expect.any(Function),
+      2_147_483_647
+    )
+
+    adapter.complete('/active')
+    await active
+    await flush()
+    adapter.complete('/queued')
+    await queued
+  })
+
   it('should allow a request to override the queue timeout', async () => {
     vi.useFakeTimers()
 

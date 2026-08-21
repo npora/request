@@ -1,4 +1,5 @@
 import { RequestError } from '../errors'
+import { MAX_TIMER_DELAY } from '../utils/maxTimerDelay'
 import type { RequestConfig } from '../types'
 import type { Plugin } from './Plugin'
 import { resolveRequestOrigin } from '../utils/resolveRequestOrigin'
@@ -383,7 +384,7 @@ function normalizeDuration(
     return value > 0 ? Number.POSITIVE_INFINITY : 0
   }
 
-  return Math.max(0, value)
+  return Math.min(Math.max(0, value), MAX_TIMER_DELAY)
 }
 
 function normalizeKey(key: string): string {

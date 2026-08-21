@@ -1,0 +1,1 @@
+export const MAX_TIMER_DELAY = 2_147_483_647
