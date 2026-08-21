@@ -295,6 +295,34 @@ describe('downloadPlugin XMLHttpRequest fallback', () => {
     expect(response.raw.body).toBeNull()
   })
 
+  it('should abort before serializing or creating an XHR', async () => {
+    const controller = new AbortController()
+    const serialize = vi.fn(() => ({ value: 'unused' }))
+
+    controller.abort('already cancelled')
+
+    const request = createClient().use(
+      downloadPlugin({ transport: 'xhr' })
+    )
+
+    await expect(request.post('/abort', {
+      json: {
+        toJSON: serialize
+      },
+      signal: controller.signal,
+      extensions: {
+        download: {
+          onProgress: vi.fn()
+        }
+      }
+    })).rejects.toMatchObject({
+      code: 'ABORT_ERROR'
+    })
+
+    expect(serialize).not.toHaveBeenCalled()
+    expect(FakeXMLHttpRequest.instances).toHaveLength(0)
+  })
+
   it('should abort XHR for external cancellation and timeout', async () => {
     scenario = () => {}
 
