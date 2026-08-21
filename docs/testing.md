@@ -7,7 +7,7 @@ repeats critical contracts against the built and published package.
 
 ```sh
 pnpm typecheck
-pnpm test:run
+pnpm test
 pnpm test:coverage
 pnpm test:types
 pnpm test:examples
