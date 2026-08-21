@@ -229,6 +229,7 @@ describe('FetchAdapter', () => {
         status
       })
       const clone = vi.spyOn(raw, 'clone')
+      const getHeader = vi.spyOn(raw.headers, 'get')
 
       vi.stubGlobal(
         'fetch',
@@ -243,6 +244,7 @@ describe('FetchAdapter', () => {
 
       expect(response.data).toBeUndefined()
       expect(clone).not.toHaveBeenCalled()
+      expect(getHeader).not.toHaveBeenCalled()
     }
   )
 
@@ -255,6 +257,7 @@ describe('FetchAdapter', () => {
       }
     })
     const clone = vi.spyOn(raw, 'clone')
+    const getHeader = vi.spyOn(raw.headers, 'get')
 
     vi.stubGlobal(
       'fetch',
@@ -275,6 +278,7 @@ describe('FetchAdapter', () => {
       }
     })
     expect(clone).not.toHaveBeenCalled()
+    expect(getHeader).not.toHaveBeenCalled()
   })
 
   it('should classify validateStatus callback failures as config errors', async () => {
@@ -421,6 +425,7 @@ describe('FetchAdapter', () => {
       }
     })
     const clone = vi.spyOn(raw, 'clone')
+    const getHeader = vi.spyOn(raw.headers, 'get')
 
     vi.stubGlobal(
       'fetch',
@@ -436,6 +441,7 @@ describe('FetchAdapter', () => {
     expect(response.data).toBeUndefined()
     expect(response.headers.get('content-length')).toBe('128')
     expect(clone).not.toHaveBeenCalled()
+    expect(getHeader).toHaveBeenCalledTimes(1)
   })
 
   it('should expose RequestError instances', async () => {

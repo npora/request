@@ -7,6 +7,7 @@ import type {
   RequestConfig
 } from '../types'
 import { MAX_TIMER_DELAY } from '../utils/maxTimerDelay'
+import { isBodylessResponse } from '../utils/parseResponse'
 import { validateResponseStatus } from '../utils/validateResponseStatus'
 import { isURLSearchParams } from '../utils/isURLSearchParams'
 
@@ -565,9 +566,7 @@ function createRawBody(
   if (
     data === undefined ||
     data === null ||
-    status === 204 ||
-    status === 205 ||
-    status === 304
+    isBodylessResponse(undefined, status)
   ) {
     return null
   }

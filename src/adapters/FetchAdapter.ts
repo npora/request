@@ -4,6 +4,7 @@ import {
   type BuiltRequest,
   finalizeStreamingResponse,
   limitResponseSize,
+  isBodylessResponse,
   isStreamingResponseType,
   parseResponse,
   resolveResponseType,
@@ -54,18 +55,19 @@ export class FetchAdapter implements Adapter {
       request = buildRequestWithHeaders(config, headers)
       let response = await fetch(request.url, request.init)
       const validStatus = validateResponseStatus(response.status, config)
+      const bodyless = isBodylessResponse(
+        config.method,
+        response.status
+      )
 
-      if (preserveRaw || !validStatus) {
+      if (!bodyless && (preserveRaw || !validStatus)) {
         response = limitResponseSize(response, config)
       }
 
-      const responseType = resolveResponseType(response, config)
+      const responseType = bodyless
+        ? undefined
+        : resolveResponseType(response, config)
       const streaming = isStreamingResponseType(responseType)
-      const bodyless =
-        config.method === 'HEAD' ||
-        response.status === 204 ||
-        response.status === 205 ||
-        response.status === 304
 
       if (streaming) {
         response = finalizeStreamingResponse(
@@ -86,11 +88,9 @@ export class FetchAdapter implements Adapter {
         )
           ? response
           : response.clone()
-      const data = await parseResponse<T>(
-        parseTarget,
-        config,
-        responseType
-      )
+      const data = bodyless
+        ? undefined as T
+        : await parseResponse<T>(parseTarget, config, responseType)
       const nporaResponse: NporaResponse<T> = {
         data,
         status: response.status,

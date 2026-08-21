@@ -272,6 +272,8 @@ describe('downloadPlugin XMLHttpRequest fallback', () => {
   })
 
   it('should handle successful responses without an HTTP body', async () => {
+    const clone = vi.spyOn(Response.prototype, 'clone')
+
     scenario = xhr => {
       xhr.status = 204
       xhr.statusText = 'No Content'
@@ -293,6 +295,7 @@ describe('downloadPlugin XMLHttpRequest fallback', () => {
     expect(response.status).toBe(204)
     expect(response.data).toBeUndefined()
     expect(response.raw.body).toBeNull()
+    expect(clone).not.toHaveBeenCalled()
   })
 
   it('should abort before serializing or creating an XHR', async () => {

@@ -82,5 +82,6 @@ Short-circuit pre-aborted Fetch requests before body serialization and network
 dispatch, and share abort error conversion with XHR to remove duplicate code.
 Enforce the same cancellation gate at the shared transport boundary so XHR,
 Mock, and custom adapters are skipped before serialization or setup work.
-Avoid cloning Fetch responses for HEAD, 204, 205, and 304 results whose bodies
-are never parsed.
+Avoid response-type detection, parsing, and cloning for HEAD, 204, 205, and 304
+Fetch and XHR results, and share their bodyless-status classification across
+transports.

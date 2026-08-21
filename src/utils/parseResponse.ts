@@ -7,6 +7,17 @@ import {
 
 const TEXT_DECODER = new TextDecoder()
 
+/** Classify responses that cannot expose an HTTP message body. */
+export function isBodylessResponse(
+  method: RequestConfig['method'],
+  status: number
+): boolean {
+  return method === 'HEAD' ||
+    status === 204 ||
+    status === 205 ||
+    status === 304
+}
+
 /**
  * Bound a Fetch response before it can be cloned into multiple body branches.
  */
@@ -161,22 +172,14 @@ export function finalizeStreamingResponse(
 }
 
 /**
- * Parse a Fetch response according to the request configuration.
+ * Parse a Fetch response with a body according to the request configuration.
+ * Transports short-circuit bodyless responses before calling this function.
  */
 export async function parseResponse<T = unknown>(
   response: Response,
   config: RequestConfig,
   resolvedResponseType?: ResponseType
 ): Promise<T> {
-  if (
-    config.method === 'HEAD' ||
-    response.status === 204 ||
-    response.status === 205 ||
-    response.status === 304
-  ) {
-    return undefined as T
-  }
-
   const responseType =
     resolvedResponseType ?? resolveResponseType(response, config)
   const maxSize = config.maxResponseSize
