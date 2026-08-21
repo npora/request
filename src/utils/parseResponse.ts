@@ -426,7 +426,11 @@ function limitResponseStream(
         if (size > maxSize) {
           const error = createSizeError(response, maxSize, config)
 
-          await reader.cancel(error)
+          try {
+            await reader.cancel(error)
+          } catch {
+            // Preserve the stable size-limit error.
+          }
           release()
           controller.error(error)
           return

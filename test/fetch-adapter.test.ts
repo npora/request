@@ -355,6 +355,41 @@ describe('FetchAdapter', () => {
     })
   })
 
+  it('should preserve the size error when stream cancellation fails', async () => {
+    const cancel = vi.fn(() => {
+      throw new Error('cancel failed')
+    })
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode('first'))
+        controller.enqueue(new TextEncoder().encode('second'))
+      },
+      cancel
+    })
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(new Response(stream))
+    )
+
+    const response = await new FetchAdapter().request<
+      ReadableStream<Uint8Array>
+    >({
+      url: 'https://api.example.com/stream-cancel-error',
+      maxResponseSize: 6,
+      responseType: 'stream'
+    })
+    const reader = response.data.getReader()
+
+    await expect(reader.read()).resolves.toMatchObject({
+      done: false
+    })
+    await expect(reader.read()).rejects.toMatchObject({
+      code: 'RESPONSE_TOO_LARGE'
+    })
+    expect(cancel).toHaveBeenCalledTimes(1)
+  })
+
   it('should not parse a HEAD response body', async () => {
     vi.stubGlobal(
       'fetch',
