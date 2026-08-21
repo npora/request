@@ -5,6 +5,7 @@ import type { PluginHooks } from '../interceptors/PluginHooks'
 import type { Adapter, NporaResponse, RequestConfig } from '../types'
 import { RequestError, SchemaValidationError } from '../errors'
 import { validateRequestConfig } from '../utils'
+import { isPromiseLike } from '../utils/isPromiseLike'
 import { RequestContext } from './RequestContext'
 
 export interface PipelineInterceptors {
@@ -43,7 +44,12 @@ export class Pipeline {
         let headers = validateRequestConfig(context.config)
 
         if (this.hooks.hasRequestHooks) {
-          await this.hooks.runRequest(context)
+          const hooks = this.hooks.runRequest(context)
+
+          if (isPromiseLike(hooks)) {
+            await hooks
+          }
+
           headers = validateRequestConfig(context.config)
         }
 
@@ -69,7 +75,11 @@ export class Pipeline {
           validatedHeaders = undefined
 
           if (this.hooks.hasTransportHooks) {
-            await this.hooks.runTransport(context)
+            const hooks = this.hooks.runTransport(context)
+
+            if (isPromiseLike(hooks)) {
+              await hooks
+            }
           }
 
           if (!context.response) {
@@ -105,7 +115,11 @@ export class Pipeline {
           let decision
 
           try {
-            decision = await this.hooks.resolveRetry(context, attempt)
+            const resolved = this.hooks.resolveRetry(context, attempt)
+
+            decision = isPromiseLike(resolved)
+              ? await resolved
+              : resolved
           } catch (retryError) {
             return this.fail(context, retryError)
           }
@@ -120,10 +134,14 @@ export class Pipeline {
           context.attempt = attempt
 
           try {
-            await waitForRetry(
+            const wait = waitForRetry(
               decision.delay ?? 0,
               context.config
             )
+
+            if (wait) {
+              await wait
+            }
           } catch (waitError) {
             return this.fail(context, waitError)
           }
@@ -134,7 +152,11 @@ export class Pipeline {
 
       if (this.hooks.hasSettledHooks) {
         try {
-          await this.hooks.runSettled(context)
+          const hooks = this.hooks.runSettled(context)
+
+          if (isPromiseLike(hooks)) {
+            await hooks
+          }
         } catch {
           // Final observers must not replace the request result.
         }
@@ -146,10 +168,16 @@ export class Pipeline {
     context: RequestContext<T>
   ): Promise<NporaResponse<T>> {
     if (this.hooks.hasResponseHooks) {
-      await this.hooks.runResponse(context)
+      const hooks = this.hooks.runResponse(context)
+
+      if (isPromiseLike(hooks)) {
+        await hooks
+      }
     }
 
-    await this.validateResponseSchema(context)
+    if (context.config.schema && context.response) {
+      await this.validateResponseSchema(context)
+    }
 
     if (this.interceptors.response.active) {
       context.response = (await this.interceptors.response.run(
@@ -246,7 +274,12 @@ export class Pipeline {
 
     if (this.hooks.hasErrorHooks) {
       try {
-        await this.hooks.runError(context)
+        const hooks = this.hooks.runError(context)
+
+        if (isPromiseLike(hooks)) {
+          await hooks
+        }
+
         return true
       } catch (hookError) {
         context.error = hookError
@@ -281,7 +314,7 @@ export class Pipeline {
 function waitForRetry(
   milliseconds: number,
   config: RequestConfig
-): Promise<void> {
+): Promise<void> | undefined {
   const signal = config.signal
 
   if (signal?.aborted) {
@@ -289,7 +322,7 @@ function waitForRetry(
   }
 
   if (milliseconds <= 0) {
-    return Promise.resolve()
+    return undefined
   }
 
   return new Promise((resolve, reject) => {
