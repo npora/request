@@ -385,6 +385,47 @@ describe('cachePlugin', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 
+  it('should preserve the default headerless cache key', async () => {
+    let capturedKey: string | undefined
+    const store: CacheStore = {
+      get(key) {
+        capturedKey = key
+        return undefined
+      },
+      set() {},
+      delete() {},
+      clear() {}
+    }
+    const fetchMock = vi.fn().mockResolvedValue(
+      createJsonResponse({ ok: true })
+    )
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient().use(cachePlugin({ store }))
+
+    await request.get('/headerless', {
+      extensions: {
+        cache: {
+          enabled: true
+        }
+      }
+    })
+
+    expect(capturedKey).toBe(JSON.stringify({
+      method: 'GET',
+      url: '/headerless',
+      query: [],
+      responseType: 'auto',
+      headers: [
+        ['accept', null],
+        ['accept-language', null],
+        ['authorization', null],
+        ['cookie', null]
+      ]
+    }))
+  })
+
   it('should normalize query key order in the default cache key', async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       createJsonResponse({

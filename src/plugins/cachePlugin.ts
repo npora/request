@@ -175,6 +175,10 @@ export function cachePlugin(
   const varyHeaders = normalizeVaryHeaders(
     options.varyHeaders ?? DEFAULT_VARY_HEADERS
   )
+  const emptyHeaderValues = normalizeCacheHeaders(
+    undefined,
+    varyHeaders
+  )
 
   const plugin: CachePlugin = {
     name: 'cache',
@@ -205,7 +209,8 @@ export function cachePlugin(
         const key = createCacheKey(
           requestContext.config,
           cache,
-          varyHeaders
+          varyHeaders,
+          emptyHeaderValues
         )
         const stored = readStore(store, key)
 
@@ -239,7 +244,8 @@ export function cachePlugin(
         const key = createCacheKey(
           requestContext.config,
           cache,
-          varyHeaders
+          varyHeaders,
+          emptyHeaderValues
         )
 
         if (isAsyncIterable(requestContext.response.data)) {
@@ -674,13 +680,12 @@ function allowsPersistentCaching(response: NporaResponse): boolean {
 function createCacheKey(
   config: RequestConfig,
   cache: CacheOptions,
-  varyHeaders: readonly string[]
+  varyHeaders: readonly string[],
+  emptyHeaderValues: ReadonlyArray<[string, string | null]>
 ): string {
   if (cache.key) {
     return cache.key
   }
-
-  const headers = new Headers(config.headers)
 
   return JSON.stringify({
     method: config.method ?? 'GET',
@@ -688,22 +693,27 @@ function createCacheKey(
     url: config.url,
     query: normalizeQuery(config.searchParams ?? config.query),
     responseType: config.responseType ?? 'auto',
-    headers: normalizeCacheHeaders(headers, varyHeaders)
+    headers: config.headers
+      ? normalizeCacheHeaders(
+          new Headers(config.headers),
+          varyHeaders
+        )
+      : emptyHeaderValues
   })
 }
 
 function normalizeCacheHeaders(
-  headers: Headers,
+  headers: Headers | undefined,
   varyHeaders: readonly string[]
 ): Array<[string, string | null]> {
   const values: Array<[string, string | null]> = []
 
-  headers.forEach((value, name) => {
+  headers?.forEach((value, name) => {
     values.push([name, value])
   })
 
   for (const name of varyHeaders) {
-    if (!headers.has(name)) {
+    if (!headers?.has(name)) {
       values.push([name, null])
     }
   }

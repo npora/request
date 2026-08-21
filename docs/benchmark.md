@@ -78,6 +78,11 @@ Benchmark values depend on CPU, operating system, Node.js version and current
 machine load. Compare reports produced on equivalent runners and look for
 repeated trends rather than treating a single run as a release gate.
 
+The default cache-key path normalizes configured vary-header names once and
+reuses the resulting empty header metadata for headerless requests. The cache
+scenarios exercise this common path so repeated key setup remains visible in
+comparisons.
+
 CI stores the JSON report as a build artifact. Correctness and resource
 cleanup remain enforced separately by unit, integration and browser stress
 tests.
