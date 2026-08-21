@@ -13,7 +13,9 @@ plugin hook chains on the synchronous path while preserving asynchronous
 continuation and hook ordering. Keep error notification and final failure on
 the synchronous path until an asynchronous hook or interceptor requires a
 continuation. Detect body configuration through own fields without duplicate
-value probes on body-free requests. Avoid
+value probes on body-free requests. Dispatch requests without hooks,
+interceptors, or schemas directly after validation without allocating lifecycle
+context or timestamps. Avoid
 allocating observer Promises for synchronous logger, retry, and circuit-breaker
 callbacks. Resolve Fetch response types once and avoid double-wrapping bounded
 data-only response streams. Keep synchronous memory-cache reads, writes,

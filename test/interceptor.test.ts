@@ -4,12 +4,35 @@ import {
   InterceptorManager,
   RequestError
 } from '../src'
+import { PluginHooks } from '../src/interceptors/PluginHooks'
 
 afterEach(() => {
   vi.unstubAllGlobals()
 })
 
 describe('interceptors', () => {
+  it('should track active plugin hooks for pipeline dispatch', () => {
+    const hooks = new PluginHooks()
+
+    expect(hooks.active).toBe(false)
+
+    const dispose = hooks.onResponse(() => {})
+
+    expect(hooks.active).toBe(true)
+
+    dispose()
+
+    expect(hooks.active).toBe(false)
+
+    const disposeRetry = hooks.onRetry(() => undefined)
+
+    expect(hooks.active).toBe(true)
+
+    disposeRetry()
+
+    expect(hooks.active).toBe(false)
+  })
+
   it('should track whether the optimized interceptor path is active', () => {
     const interceptors = new InterceptorManager<number>()
 

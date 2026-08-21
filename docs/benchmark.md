@@ -90,6 +90,8 @@ path until a schema, interceptor, or Promise requires continuation. This keeps
 plugin ordering deterministic without allocating and sorting collections on
 every request. Error notification and final rejection likewise stay synchronous
 until an asynchronous error hook or error interceptor requires continuation.
+Requests without any hooks, interceptors, or response schema dispatch directly
+after validation without allocating lifecycle context or timestamps.
 
 Configuration merging creates nested values only when either side supplies
 them. Header normalization writes directly into one case-insensitive result

@@ -30,6 +30,24 @@ export class Pipeline {
     config: RequestConfig,
     preserveRaw = true
   ): Promise<NporaResponse<T>> {
+    if (
+      !config.schema &&
+      !this.hooks.active &&
+      !this.interceptors.request.active &&
+      !this.interceptors.response.active &&
+      !this.interceptors.error.active
+    ) {
+      const headers = validateRequestConfig(config)
+
+      return this.adapter.requestValidated
+        ? this.adapter.requestValidated<T>(
+            config,
+            headers,
+            preserveRaw
+          )
+        : this.adapter.request<T>(config)
+    }
+
     const context = new RequestContext<T>(config)
     let validatedHeaders: Headers | undefined
 

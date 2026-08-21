@@ -45,6 +45,17 @@ export class PluginHooks {
 
   private readonly retryHooks = new HookRegistry<RetryHook>()
 
+  get active(): boolean {
+    return (
+      this.requestHooks.active ||
+      this.transportHooks.active ||
+      this.responseHooks.active ||
+      this.errorHooks.active ||
+      this.settledHooks.active ||
+      this.retryHooks.active
+    )
+  }
+
   get hasRequestHooks(): boolean {
     return this.requestHooks.active
   }
