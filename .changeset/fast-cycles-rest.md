@@ -6,10 +6,12 @@ Reduce synchronous interceptor, plugin-hook, cache-store, bounded-response,
 timeout setup, request validation, body-merge, concurrency admission, and
 circuit-breaker settlement overhead. Avoid Promise chains for synchronous
 authentication token providers, storage, retry policies, delay functions,
-jitter functions, and zero-delay retries. Create bare static authorization
-headers without an intermediate Headers instance. Reuse normalized retry
-options for each logical request, and skip response-schema validation setup
-when no schema is configured. Keep synchronous response processing and fully
+jitter functions, and zero-delay retries. Apply configured static tokens
+directly when no request-level authentication override is present, and create
+bare static authorization headers without an intermediate Headers instance.
+Reuse normalized retry options for each logical request, and skip
+response-schema validation setup when no schema is configured. Keep
+synchronous response processing and fully
 synchronous plugin hook chains on the synchronous path while preserving
 asynchronous continuation and hook ordering. Keep error notification and final
 failure on the synchronous path until an asynchronous hook or interceptor

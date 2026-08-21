@@ -178,6 +178,18 @@ function applyAuthorization(
   config: RequestConfig,
   options: AuthPluginOptions
 ): MaybePromise<RequestConfig> {
+  if (
+    typeof options.token === 'string' &&
+    options.token &&
+    config.extensions?.auth === undefined
+  ) {
+    return setAuthorizationHeader(
+      config,
+      options.token,
+      options.scheme
+    )
+  }
+
   const authorization = resolveAuthorization(config, options)
 
   if (isPromiseLike(authorization)) {

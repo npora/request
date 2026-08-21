@@ -54,7 +54,7 @@ describe('authPlugin refresh token', () => {
     )
   })
 
-  it('should read request auth options from extensions', async () => {
+  it('should prefer request auth options over a static plugin token', async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       createJsonResponse({
         ok: true
@@ -63,7 +63,11 @@ describe('authPlugin refresh token', () => {
 
     vi.stubGlobal('fetch', fetchMock)
 
-    const request = createClient().use(authPlugin())
+    const request = createClient().use(
+      authPlugin({
+        token: 'plugin-token'
+      })
+    )
 
     await request.get('/user', {
       extensions: {
