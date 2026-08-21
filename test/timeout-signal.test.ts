@@ -105,4 +105,25 @@ describe('createTimeoutSignal', () => {
       vi.useRealTimers()
     }
   })
+
+  it('should not retain a timer when listener registration fails', () => {
+    vi.useFakeTimers()
+
+    try {
+      const signal = {
+        aborted: false,
+        addEventListener() {
+          throw new Error('listener registration failed')
+        },
+        removeEventListener() {}
+      } as unknown as AbortSignal
+
+      expect(() => createTimeoutSignal(signal, 1000)).toThrow(
+        'listener registration failed'
+      )
+      expect(vi.getTimerCount()).toBe(0)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
 })

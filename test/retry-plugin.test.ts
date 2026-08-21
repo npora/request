@@ -231,6 +231,42 @@ describe('retryPlugin', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2)
   })
 
+  it('should not retry a streaming request body', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response('Busy', {
+        status: 503
+      })
+    )
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient().use(
+      retryPlugin({
+        retries: 1,
+        methods: ['POST'],
+        delay: 0
+      })
+    )
+    const body = new ReadableStream({
+      start(controller) {
+        controller.close()
+      }
+    })
+
+    await expect(request.post('/upload', {
+      body,
+      responseType: 'text'
+    })).rejects.toMatchObject({
+      code: 'HTTP_ERROR',
+      status: 503
+    })
+
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(fetchMock.mock.calls[0]?.[1]).toMatchObject({
+      duplex: 'half'
+    })
+  })
+
   it('should respect Retry-After and maxDelay', async () => {
     vi.useFakeTimers()
 

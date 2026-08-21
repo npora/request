@@ -65,3 +65,5 @@ Enable Fetch half-duplex mode for `ReadableStream` request bodies so Node
 runtimes can send streaming uploads without caller-supplied transport options.
 Delay timeout allocation until synchronous request serialization succeeds,
 preventing timers and abort listeners from surviving configuration failures.
+Register external abort listeners before allocating timeout timers, avoiding
+timer churn for pre-aborted signals and leaks when listener setup fails.

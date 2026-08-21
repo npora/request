@@ -32,15 +32,6 @@ export function createTimeoutSignal(
     }
   }
 
-  timer = setTimeout(() => {
-    clear()
-    controller.abort(
-      new RequestError(`Request timeout after ${timeout}ms`, {
-        code: 'TIMEOUT_ERROR'
-      })
-    )
-  }, timeout)
-
   if (signal) {
     if (signal.aborted) {
       clear()
@@ -64,6 +55,17 @@ export function createTimeoutSignal(
         }
       )
     }
+  }
+
+  if (!controller.signal.aborted) {
+    timer = setTimeout(() => {
+      clear()
+      controller.abort(
+        new RequestError(`Request timeout after ${timeout}ms`, {
+          code: 'TIMEOUT_ERROR'
+        })
+      )
+    }, timeout)
   }
 
   return {
