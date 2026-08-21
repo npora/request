@@ -1,6 +1,7 @@
 import { RequestError } from '../errors'
 import type { RequestConfig } from '../types'
 import type { Plugin } from './Plugin'
+import { isPromiseLike } from '../utils/isPromiseLike'
 import { resolveExtensionConfig } from './resolveExtensionConfig'
 
 type MaybePromise<T> = T | Promise<T>
@@ -69,7 +70,7 @@ export function authPlugin(options: AuthPluginOptions = {}): Plugin {
     name: 'auth',
 
     install(context) {
-      context.interceptors.request.use(async config => {
+      context.interceptors.request.use(config => {
         return applyAuthorization(config, options)
       })
 
@@ -145,12 +146,25 @@ export function authPlugin(options: AuthPluginOptions = {}): Plugin {
   }
 }
 
-async function applyAuthorization(
+function applyAuthorization(
   config: RequestConfig,
   options: AuthPluginOptions
-): Promise<RequestConfig> {
-  const authorization = await resolveAuthorization(config, options)
+): MaybePromise<RequestConfig> {
+  const authorization = resolveAuthorization(config, options)
 
+  if (isPromiseLike(authorization)) {
+    return Promise.resolve(authorization).then(resolved => {
+      return applyResolvedAuthorization(config, resolved)
+    })
+  }
+
+  return applyResolvedAuthorization(config, authorization)
+}
+
+function applyResolvedAuthorization(
+  config: RequestConfig,
+  authorization: ResolvedAuthorization
+): RequestConfig {
   if (!authorization.token) {
     return config
   }
@@ -162,27 +176,35 @@ async function applyAuthorization(
   )
 }
 
-async function resolveAuthorization(
+function resolveAuthorization(
   config: RequestConfig,
   options: AuthPluginOptions,
   tokenOverride?: string
-): Promise<ResolvedAuthorization> {
+): MaybePromise<ResolvedAuthorization> {
   const requestAuth = resolveExtensionConfig(
     config,
     'auth'
   )
 
-  const token =
+  const resolvedToken =
     tokenOverride ??
     (
       requestAuth?.token
-        ? await resolveToken(requestAuth.token)
-        : await resolvePluginToken(options)
+        ? resolveToken(requestAuth.token)
+        : resolvePluginToken(options)
     )
+  const scheme = requestAuth?.scheme ?? options.scheme
+
+  if (isPromiseLike(resolvedToken)) {
+    return Promise.resolve(resolvedToken).then(token => ({
+      token,
+      scheme
+    }))
+  }
 
   return {
-    token,
-    scheme: requestAuth?.scheme ?? options.scheme
+    token: resolvedToken,
+    scheme
   }
 }
 
@@ -191,29 +213,45 @@ interface ResolvedAuthorization {
   scheme?: string
 }
 
-async function resolvePluginToken(
+function resolvePluginToken(
   options: AuthPluginOptions
-): Promise<string> {
-  const configuredToken = await resolveToken(options.token)
+): MaybePromise<string> {
+  const configuredToken = resolveToken(options.token)
+
+  if (isPromiseLike(configuredToken)) {
+    return Promise.resolve(configuredToken).then(token => {
+      return token || resolveStoredToken(options.storage)
+    })
+  }
 
   if (configuredToken) {
     return configuredToken
   }
 
-  const storedToken = await options.storage?.get()
+  return resolveStoredToken(options.storage)
+}
+
+function resolveStoredToken(
+  storage: AuthTokenStorage | undefined
+): MaybePromise<string> {
+  const storedToken = storage?.get()
+
+  if (isPromiseLike(storedToken)) {
+    return Promise.resolve(storedToken).then(token => token ?? '')
+  }
 
   return storedToken ?? ''
 }
 
-async function resolveToken(
+function resolveToken(
   token?: string | (() => MaybePromise<string>)
-): Promise<string> {
+): MaybePromise<string> {
   if (!token) {
     return ''
   }
 
   return typeof token === 'function'
-    ? await token()
+    ? token()
     : token
 }
 

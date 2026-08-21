@@ -5,6 +5,7 @@ import type {
   RequestLogger
 } from '../types'
 import type { Plugin } from './Plugin'
+import { isPromiseLike } from '../utils/isPromiseLike'
 import { resolveExtensionConfig } from './resolveExtensionConfig'
 
 export function loggerPlugin(defaultOptions: LoggerOptions = {}): Plugin {
@@ -140,9 +141,11 @@ function emitInfo(
   entry: Parameters<RequestLogger['info']>[1]
 ): void {
   try {
-    void Promise.resolve(
-      resolveLogger(options).info('[Npora Request]', entry)
-    ).catch(ignoreLoggerError)
+    const result = resolveLogger(options).info('[Npora Request]', entry)
+
+    if (isPromiseLike(result)) {
+      void Promise.resolve(result).catch(ignoreLoggerError)
+    }
   } catch {
     // Logging must not change the request lifecycle.
   }
@@ -153,9 +156,11 @@ function emitError(
   entry: ErrorLogEntry
 ): void {
   try {
-    void Promise.resolve(
-      resolveLogger(options).error('[Npora Request]', entry)
-    ).catch(ignoreLoggerError)
+    const result = resolveLogger(options).error('[Npora Request]', entry)
+
+    if (isPromiseLike(result)) {
+      void Promise.resolve(result).catch(ignoreLoggerError)
+    }
   } catch {
     // Logging must not replace the original request error.
   }

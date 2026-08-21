@@ -6,6 +6,7 @@ import type {
   RetryOptions
 } from '../types'
 import type { Plugin } from './Plugin'
+import { isPromiseLike } from '../utils/isPromiseLike'
 import { resolveExtensionConfig } from './resolveExtensionConfig'
 
 const DEFAULT_RETRY_METHODS: readonly HttpMethod[] = [
@@ -45,22 +46,34 @@ interface NormalizedRetryOptions {
 export function retryPlugin(
   defaultOptions: RetryOptions = {}
 ): Plugin {
+  const normalizedDefaults = normalizeRetryOptions(
+    undefined,
+    defaultOptions
+  )
+
   return {
     name: 'retry',
 
     install(context) {
-      context.hooks.onRetry(async (requestContext, attempt) => {
+      const requestOptions = new WeakMap<object, NormalizedRetryOptions>()
+
+      context.hooks.onRetry((requestContext, attempt) => {
         if (!requestContext.error) {
           return undefined
         }
 
-        const retryOptions = normalizeRetryOptions(
-          resolveExtensionConfig(
-            requestContext.config,
-            'retry'
-          ),
-          defaultOptions
-        )
+        let retryOptions = requestOptions.get(requestContext)
+
+        if (!retryOptions) {
+          retryOptions = resolveRetryOptions(
+            resolveExtensionConfig(
+              requestContext.config,
+              'retry'
+            ),
+            normalizedDefaults
+          )
+          requestOptions.set(requestContext, retryOptions)
+        }
 
         if (attempt >= retryOptions.retries) {
           return undefined
@@ -75,70 +88,179 @@ export function retryPlugin(
           return undefined
         }
 
-        const shouldRetry = await retryOptions.shouldRetry(
+        const shouldRetry = retryOptions.shouldRetry(
           requestContext.error,
           attempt
         )
+
+        if (isPromiseLike(shouldRetry)) {
+          return Promise.resolve(shouldRetry).then(result => {
+            return result
+              ? createRetryDecision(
+                  retryOptions,
+                  requestContext.error,
+                  requestContext.startTime,
+                  attempt
+                )
+              : undefined
+          })
+        }
 
         if (!shouldRetry) {
           return undefined
         }
 
-        const configuredDelay = await retryOptions.delay(
-          attempt,
-          requestContext.error
+        return createRetryDecision(
+          retryOptions,
+          requestContext.error,
+          requestContext.startTime,
+          attempt
         )
-        const retryAfter = retryOptions.respectRetryAfter
-          ? parseRetryAfter(requestContext.error)
-          : undefined
-        const baseDelay = normalizeRetryDelay(
-          retryAfter ?? configuredDelay,
-          retryOptions.maxDelay
-        )
-        const elapsedTime = Math.max(
-          0,
-          Date.now() - requestContext.startTime
-        )
-        const pendingEvent = {
-          attempt: attempt + 1,
-          delay: baseDelay,
-          elapsedTime,
-          error: requestContext.error
-        }
-        const jitteredDelay =
-          retryAfter === undefined
-            ? await applyJitter(
-                retryOptions.jitter,
-                pendingEvent
-              )
-            : baseDelay
-        const delay = normalizeRetryDelay(
-          jitteredDelay,
-          retryOptions.maxDelay
-        )
-        const event = {
-          ...pendingEvent,
-          delay
-        }
-
-        if (
-          exceedsElapsedTimeBudget(
-            elapsedTime,
-            delay,
-            retryOptions.maxElapsedTime
-          )
-        ) {
-          return undefined
-        }
-
-        notifyRetry(retryOptions.onRetry, event)
-
-        return {
-          retry: true,
-          delay
-        }
       })
     }
+  }
+}
+
+function resolveRetryOptions(
+  retry: number | RetryOptions | undefined,
+  defaults: NormalizedRetryOptions
+): NormalizedRetryOptions {
+  if (retry === undefined) {
+    return defaults
+  }
+
+  if (typeof retry === 'number') {
+    return {
+      ...defaults,
+      retries: normalizeRetries(retry)
+    }
+  }
+
+  return {
+    retries:
+      retry.retries === undefined
+        ? defaults.retries
+        : normalizeRetries(retry.retries),
+    methods:
+      retry.methods === undefined
+        ? defaults.methods
+        : normalizeMethods(retry.methods),
+    delay:
+      retry.delay === undefined
+        ? defaults.delay
+        : normalizeDelay(retry.delay),
+    respectRetryAfter:
+      retry.respectRetryAfter ?? defaults.respectRetryAfter,
+    maxDelay:
+      retry.maxDelay === undefined
+        ? defaults.maxDelay
+        : normalizeMaxDelay(retry.maxDelay),
+    jitter: retry.jitter ?? defaults.jitter,
+    maxElapsedTime:
+      retry.maxElapsedTime === undefined
+        ? defaults.maxElapsedTime
+        : normalizeMaxElapsedTime(retry.maxElapsedTime),
+    shouldRetry: retry.shouldRetry ?? defaults.shouldRetry,
+    onRetry: retry.onRetry ?? defaults.onRetry
+  }
+}
+
+function createRetryDecision(
+  options: NormalizedRetryOptions,
+  error: unknown,
+  startTime: number,
+  attempt: number
+): { retry: true; delay: number } | undefined | Promise<{
+  retry: true
+  delay: number
+} | undefined> {
+  const configuredDelay = options.delay(attempt, error)
+
+  if (isPromiseLike(configuredDelay)) {
+    return Promise.resolve(configuredDelay).then(delay => {
+      return finalizeRetryDecision(
+        options,
+        error,
+        startTime,
+        attempt,
+        delay
+      )
+    })
+  }
+
+  return finalizeRetryDecision(
+    options,
+    error,
+    startTime,
+    attempt,
+    configuredDelay
+  )
+}
+
+function finalizeRetryDecision(
+  options: NormalizedRetryOptions,
+  error: unknown,
+  startTime: number,
+  attempt: number,
+  configuredDelay: number
+): { retry: true; delay: number } | undefined | Promise<{
+  retry: true
+  delay: number
+} | undefined> {
+  const retryAfter = options.respectRetryAfter
+    ? parseRetryAfter(error)
+    : undefined
+  const baseDelay = normalizeRetryDelay(
+    retryAfter ?? configuredDelay,
+    options.maxDelay
+  )
+  const elapsedTime = Math.max(0, Date.now() - startTime)
+  const pendingEvent = {
+    attempt: attempt + 1,
+    delay: baseDelay,
+    elapsedTime,
+    error
+  }
+  const jitteredDelay =
+    retryAfter === undefined
+      ? applyJitter(options.jitter, pendingEvent)
+      : baseDelay
+
+  if (isPromiseLike(jitteredDelay)) {
+    return Promise.resolve(jitteredDelay).then(delay => {
+      return completeRetryDecision(options, pendingEvent, delay)
+    })
+  }
+
+  return completeRetryDecision(options, pendingEvent, jitteredDelay)
+}
+
+function completeRetryDecision(
+  options: NormalizedRetryOptions,
+  pendingEvent: Readonly<RetryEvent>,
+  jitteredDelay: number
+): { retry: true; delay: number } | undefined {
+  const delay = normalizeRetryDelay(jitteredDelay, options.maxDelay)
+  const event = {
+    ...pendingEvent,
+    delay
+  }
+
+  if (
+    exceedsElapsedTimeBudget(
+      pendingEvent.elapsedTime,
+      delay,
+      options.maxElapsedTime
+    )
+  ) {
+    return undefined
+  }
+
+  notifyRetry(options.onRetry, event)
+
+  return {
+    retry: true,
+    delay
   }
 }
 
@@ -259,10 +381,10 @@ function normalizeRetryDelay(delay: number, maxDelay: number): number {
   return Math.min(Math.max(0, delay), maxDelay)
 }
 
-async function applyJitter(
+function applyJitter(
   jitter: NonNullable<RetryOptions['jitter']>,
   event: Readonly<RetryEvent>
-): Promise<number> {
+): number | Promise<number> {
   if (jitter === false) {
     return event.delay
   }
@@ -294,7 +416,11 @@ function notifyRetry(
   }
 
   try {
-    void Promise.resolve(onRetry(event)).catch(ignoreRetryObserverError)
+    const result = onRetry(event)
+
+    if (isPromiseLike(result)) {
+      void Promise.resolve(result).catch(ignoreRetryObserverError)
+    }
   } catch {
     // Retry observers must not change the request lifecycle.
   }

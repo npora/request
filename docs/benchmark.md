@@ -39,6 +39,11 @@ pnpm benchmark -- \
   the concurrency plugin without queueing.
 - `circuitBreakerSuccessClient`: successful requests tracked by a closed
   circuit breaker.
+- `authStaticTokenClient`: requests authorized by the authentication plugin
+  with a static token.
+- `retryOnceClient`: requests that fail once and retry immediately.
+- `loggerNoopClient`: request and response logging through a synchronous
+  no-op logger.
 - `fetchAdapterClient`: complete FetchAdapter lifecycle against an in-memory
   Fetch response, without network latency.
 - `fetchAdapterCompleteResponse`: the same Fetch lifecycle while preserving

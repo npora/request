@@ -475,7 +475,11 @@ function notifyStateChange(
   }
 
   try {
-    void Promise.resolve(observer(event)).catch(ignoreObserverError)
+    const result = observer(event)
+
+    if (isPromiseLike(result)) {
+      void Promise.resolve(result).catch(ignoreObserverError)
+    }
   } catch {
     // State observers must not affect request behavior.
   }
