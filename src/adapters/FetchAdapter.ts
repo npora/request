@@ -61,6 +61,11 @@ export class FetchAdapter implements Adapter {
 
       const responseType = resolveResponseType(response, config)
       const streaming = isStreamingResponseType(responseType)
+      const bodyless =
+        config.method === 'HEAD' ||
+        response.status === 204 ||
+        response.status === 205 ||
+        response.status === 304
 
       if (streaming) {
         response = finalizeStreamingResponse(
@@ -73,6 +78,7 @@ export class FetchAdapter implements Adapter {
       }
 
       const parseTarget =
+        bodyless ||
         streaming ||
         (
           !preserveRaw &&

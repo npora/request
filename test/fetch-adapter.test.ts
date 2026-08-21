@@ -222,37 +222,43 @@ describe('FetchAdapter', () => {
     })
   })
 
-  it('should return undefined for empty responses', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue(
-        new Response(null, {
-          status: 204
-        })
+  it.each([204, 205])(
+    'should return undefined without cloning a %i response',
+    async status => {
+      const raw = new Response(null, {
+        status
+      })
+      const clone = vi.spyOn(raw, 'clone')
+
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue(raw)
       )
-    )
 
-    const adapter = new FetchAdapter()
+      const adapter = new FetchAdapter()
 
-    const response = await adapter.request({
-      url: 'https://api.example.com/empty'
-    })
+      const response = await adapter.request({
+        url: 'https://api.example.com/empty'
+      })
 
-    expect(response.data).toBeUndefined()
-  })
+      expect(response.data).toBeUndefined()
+      expect(clone).not.toHaveBeenCalled()
+    }
+  )
 
   it('should preserve HTTP_ERROR for a bodyless 304 response', async () => {
+    const raw = new Response(null, {
+      status: 304,
+      statusText: 'Not Modified',
+      headers: {
+        'content-type': 'application/json'
+      }
+    })
+    const clone = vi.spyOn(raw, 'clone')
+
     vi.stubGlobal(
       'fetch',
-      vi.fn().mockResolvedValue(
-        new Response(null, {
-          status: 304,
-          statusText: 'Not Modified',
-          headers: {
-            'content-type': 'application/json'
-          }
-        })
-      )
+      vi.fn().mockResolvedValue(raw)
     )
 
     await expect(
@@ -268,6 +274,7 @@ describe('FetchAdapter', () => {
         data: undefined
       }
     })
+    expect(clone).not.toHaveBeenCalled()
   })
 
   it('should classify validateStatus callback failures as config errors', async () => {
@@ -406,17 +413,18 @@ describe('FetchAdapter', () => {
   })
 
   it('should not parse a HEAD response body', async () => {
+    const raw = new Response(null, {
+      status: 200,
+      headers: {
+        'content-type': 'application/json',
+        'content-length': '128'
+      }
+    })
+    const clone = vi.spyOn(raw, 'clone')
+
     vi.stubGlobal(
       'fetch',
-      vi.fn().mockResolvedValue(
-        new Response(null, {
-          status: 200,
-          headers: {
-            'content-type': 'application/json',
-            'content-length': '128'
-          }
-        })
-      )
+      vi.fn().mockResolvedValue(raw)
     )
 
     const adapter = new FetchAdapter()
@@ -427,6 +435,7 @@ describe('FetchAdapter', () => {
 
     expect(response.data).toBeUndefined()
     expect(response.headers.get('content-length')).toBe('128')
+    expect(clone).not.toHaveBeenCalled()
   })
 
   it('should expose RequestError instances', async () => {
