@@ -1,5 +1,17 @@
 # @npora/request
 
+## 1.14.3
+
+### Patch Changes
+
+- e8fd170: Bypass general configuration merging for method shortcuts without client or
+  request options, and reuse the native own-property intrinsic across request
+  configuration and serialization hot paths.
+- e8fd170: Reduce request configuration merge work by inheriting default body modes directly and clearing them only when the request supplies an explicit body mode.
+- e8fd170: Reduce validation overhead for valid request bodies by reserving body-mode collection work for conflicting configurations.
+- e8fd170: Reduce query, Fetch option, and single-sided header merge overhead by removing duplicate empty-input checks from internal merge helpers.
+- e8fd170: Dispatch single plugin hooks directly so synchronous hooks skip generic iteration and asynchronous hooks avoid an empty recursive continuation.
+
 ## 1.14.2
 
 ### Patch Changes
