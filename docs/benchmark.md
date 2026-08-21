@@ -150,6 +150,11 @@ standards-based origin parsing without using expected exceptions as control
 flow. Repeated isolation checks for the same exact URL and base URL reuse a
 single bounded successful-origin entry.
 
+Immediately admitted concurrency requests reuse their isolation record as
+lifecycle admission state. Retention order is refreshed when the record becomes
+inactive, avoiding per-request admission objects and redundant Map writes while
+active and queued records remain protected from eviction.
+
 Request construction avoids success-path body-field arrays and iterates query,
 form and FormData records without intermediate entry arrays. URL joining uses
 relative-path fast paths while query encoding remains delegated to

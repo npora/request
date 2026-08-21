@@ -54,13 +54,9 @@ export interface ConcurrencyPlugin extends Plugin {
 }
 
 interface ConcurrencyRecord {
+  key: string
   active: number
   queue: QueueEntry[]
-}
-
-interface Admission {
-  key: string
-  record: ConcurrencyRecord
 }
 
 interface QueueEntry {
@@ -98,7 +94,7 @@ export function concurrencyPlugin(
     },
 
     install(context) {
-      const admissions = new WeakMap<object, Admission>()
+      const admissions = new WeakMap<object, ConcurrencyRecord>()
       let active = true
 
       context.hooks.onRequest(requestContext => {
@@ -118,10 +114,7 @@ export function concurrencyPlugin(
 
         if (record.active < normalized.maxConcurrent) {
           record.active += 1
-          admissions.set(requestContext, {
-            key,
-            record
-          })
+          admissions.set(requestContext, record)
           return
         }
 
@@ -152,28 +145,28 @@ export function concurrencyPlugin(
       })
 
       context.hooks.onSettled(requestContext => {
-        const admission = admissions.get(requestContext)
+        const record = admissions.get(requestContext)
 
-        if (!admission) {
+        if (!record) {
           return
         }
 
         admissions.delete(requestContext)
 
-        if (!active || records.get(admission.key) !== admission.record) {
+        if (!active || records.get(record.key) !== record) {
           return
         }
 
-        releaseNext(admission.record, entry => {
-          admissions.set(entry.context, admission)
+        releaseNext(record, entry => {
+          admissions.set(entry.context, record)
           entry.resolve()
         })
 
         if (
-          admission.record.active === 0 &&
-          admission.record.queue.length === 0
+          record.active === 0 &&
+          record.queue.length === 0
         ) {
-          touchRecord(records, admission.key, admission.record)
+          touchRecord(records, record.key, record)
           trimRecords(records, normalized.maxKeys)
         }
       })
@@ -301,13 +294,13 @@ function getRecord(
   const existing = records.get(key)
 
   if (existing) {
-    touchRecord(records, key, existing)
     return existing
   }
 
   trimRecords(records, Math.max(0, maxKeys - 1))
 
   const record: ConcurrencyRecord = {
+    key,
     active: 0,
     queue: []
   }

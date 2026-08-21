@@ -36,7 +36,9 @@ deduplication key when persisting or discarding a cache miss response instead
 of serializing the same request identity twice. Skip transient response
 snapshots for non-persistent cache misses unless a concurrent follower needs
 the result, and allocate the shared completion Promise only when the first
-follower arrives.
+follower arrives. Reuse concurrency isolation records as admission state and
+refresh their retention order only when they become inactive, avoiding a
+temporary admission object and redundant Map writes on successful requests.
 Rely on native ES2020 error subclassing instead of repairing the request-error
 prototype on every failure. Avoid exception-driven origin resolution for
 relative concurrency and circuit-breaker request URLs, and reuse the last exact
