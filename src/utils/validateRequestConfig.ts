@@ -191,44 +191,39 @@ function validateHeaders(config: RequestConfig): Headers {
 }
 
 function validateBody(config: RequestConfig): void {
-  if (
-    config.body == null &&
-    config.json == null &&
-    config.form == null &&
-    config.formData == null
-  ) {
-    return
+  let hasBody = config.body != null
+
+  if (config.json != null) {
+    if (hasBody) {
+      throwBodyConflict(config)
+    }
+
+    hasBody = true
   }
 
-  let activeField: typeof BODY_FIELDS[number] | undefined
-
-  for (const key of BODY_FIELDS) {
-    const value = config[key]
-
-    if (value === undefined || value === null) {
-      continue
+  if (config.form != null) {
+    if (hasBody) {
+      throwBodyConflict(config)
     }
 
-    if (activeField) {
-      const activeFields = BODY_FIELDS.filter(field => {
-        const fieldValue = config[field]
+    hasBody = true
+  }
 
-        return fieldValue !== undefined && fieldValue !== null
-      })
-
-      throw configError(
-        `Request body options are mutually exclusive: ${activeFields.join(', ')}`,
-        config
-      )
+  if (config.formData != null) {
+    if (hasBody) {
+      throwBodyConflict(config)
     }
 
-    activeField = key
+    hasBody = true
+  }
+
+  if (!hasBody) {
+    return
   }
 
   const method = config.method ?? 'GET'
 
   if (
-    activeField &&
     (method === 'GET' || method === 'HEAD')
   ) {
     throw configError(
@@ -236,6 +231,19 @@ function validateBody(config: RequestConfig): void {
       config
     )
   }
+}
+
+function throwBodyConflict(config: RequestConfig): never {
+  const activeFields = BODY_FIELDS.filter(field => {
+    const value = config[field]
+
+    return value !== undefined && value !== null
+  })
+
+  throw configError(
+    `Request body options are mutually exclusive: ${activeFields.join(', ')}`,
+    config
+  )
 }
 
 function configError(

@@ -269,6 +269,26 @@ describe('ConfigMerger', () => {
     })
   })
 
+  it('should inherit the default body mode when the request supplies none', () => {
+    const defaultJson = {
+      source: 'default'
+    }
+    const config = ConfigMerger.merge(
+      {
+        json: defaultJson
+      },
+      {
+        url: '/submit',
+        method: 'POST'
+      }
+    )
+
+    expect(config.json).toBe(defaultJson)
+    expect(config.body).toBeUndefined()
+    expect(config.form).toBeUndefined()
+    expect(config.formData).toBeUndefined()
+  })
+
   it('should clear a default body mode when explicitly set to undefined', () => {
     const config = ConfigMerger.merge(
       {

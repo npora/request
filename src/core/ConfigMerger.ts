@@ -1,4 +1,5 @@
 import type { RequestConfig } from '../types'
+import { hasOwnProperty } from '../utils/hasOwnProperty'
 import { isURLSearchParams } from '../utils/isURLSearchParams'
 
 /**
@@ -67,11 +68,8 @@ export class ConfigMerger {
       )
     }
 
-    if (
-      this.hasBodyConfig(defaults) ||
-      this.hasBodyConfig(config)
-    ) {
-      this.mergeBodyConfig(result, defaults, config)
+    if (this.hasBodyConfig(config)) {
+      this.mergeBodyConfig(result, config)
     }
 
     return result
@@ -111,10 +109,6 @@ export class ConfigMerger {
     defaults?: RequestConfig['fetchOptions'],
     options?: RequestConfig['fetchOptions']
   ): RequestConfig['fetchOptions'] {
-    if (!defaults && !options) {
-      return undefined
-    }
-
     return {
       ...defaults,
       ...options
@@ -127,27 +121,23 @@ export class ConfigMerger {
   private static mergeHeaders(
     defaults?: HeadersInit,
     headers?: HeadersInit
-  ): HeadersInit | undefined {
-    if (!defaults && !headers) {
-      return undefined
-    }
-
+  ): HeadersInit {
     const result: Record<string, string> = {}
 
-    this.appendHeaders(result, defaults)
-    this.appendHeaders(result, headers)
+    if (defaults) {
+      this.appendHeaders(result, defaults)
+    }
+    if (headers) {
+      this.appendHeaders(result, headers)
+    }
 
     return result
   }
 
   private static appendHeaders(
     result: Record<string, string>,
-    headers?: HeadersInit
+    headers: HeadersInit
   ): void {
-    if (!headers) {
-      return
-    }
-
     if (headers instanceof Headers) {
       headers.forEach((value, key) => {
         setHeader(result, key, value)
@@ -170,7 +160,7 @@ export class ConfigMerger {
 
     for (const key in headers) {
       if (
-        Object.prototype.hasOwnProperty.call(headers, key)
+        hasOwnProperty.call(headers, key)
       ) {
         setHeader(
           result,
@@ -182,13 +172,9 @@ export class ConfigMerger {
   }
 
   private static mergeObject<T extends object>(
-    defaults?: T,
-    value?: T
-  ): T | undefined {
-    if (!defaults && !value) {
-      return undefined
-    }
-
+    defaults: T | undefined,
+    value: T
+  ): T {
     return {
       ...defaults,
       ...value
@@ -215,7 +201,7 @@ export class ConfigMerger {
     }
     for (const key in extensions) {
       if (
-        !Object.prototype.hasOwnProperty.call(
+        !hasOwnProperty.call(
           extensions,
           key
         )
@@ -244,32 +230,17 @@ export class ConfigMerger {
     config: Partial<RequestConfig>
   ): boolean {
     return (
-      Object.prototype.hasOwnProperty.call(config, 'body') ||
-      Object.prototype.hasOwnProperty.call(config, 'json') ||
-      Object.prototype.hasOwnProperty.call(config, 'form') ||
-      Object.prototype.hasOwnProperty.call(config, 'formData')
+      hasOwnProperty.call(config, 'body') ||
+      hasOwnProperty.call(config, 'json') ||
+      hasOwnProperty.call(config, 'form') ||
+      hasOwnProperty.call(config, 'formData')
     )
   }
 
   private static mergeBodyConfig(
     result: Partial<RequestConfig>,
-    defaults: Partial<RequestConfig>,
     config: Partial<RequestConfig>
   ): void {
-    const hasRequestBodyConfig =
-      Object.prototype.hasOwnProperty.call(config, 'body') ||
-      Object.prototype.hasOwnProperty.call(config, 'json') ||
-      Object.prototype.hasOwnProperty.call(config, 'form') ||
-      Object.prototype.hasOwnProperty.call(config, 'formData')
-
-    if (!hasRequestBodyConfig) {
-      result.body = defaults.body
-      result.json = defaults.json
-      result.form = defaults.form
-      result.formData = defaults.formData
-      return
-    }
-
     result.body = config.body
     result.json = config.json
     result.form = config.form

@@ -45,6 +45,11 @@ const bareRequestConfig: RequestConfig = {
   url: '/benchmark',
   method: 'GET'
 }
+const jsonBodyRequestConfig = {
+  json: {
+    source: 'request'
+  }
+}
 const client = createClient({
   adapter,
   headers: {
@@ -52,9 +57,18 @@ const client = createClient({
   }
 })
 const bareClient = createClient({ adapter })
+const jsonBodyClient = createClient({
+  adapter,
+  json: {
+    source: 'default'
+  }
+})
 const pipelineClient = createClient({
   adapter
 }).use(createBenchmarkPlugin())
+const singleAsyncHookLifecycleClient = createClient({
+  adapter
+}).use(createAsyncHookBenchmarkPlugin())
 const cacheClient = createClient({
   adapter
 }).use(cachePlugin())
@@ -158,9 +172,17 @@ const bareSequential = await runSequential(
   options.operations,
   () => bareClient.get('/benchmark')
 )
+const jsonBodySequential = await runSequential(
+  options.operations,
+  () => jsonBodyClient.post('/benchmark', jsonBodyRequestConfig)
+)
 const sequentialPluginPipeline = await runSequential(
   options.operations,
   () => pipelineClient.get('/benchmark', requestConfig)
+)
+const singleAsyncHookLifecycle = await runSequential(
+  options.operations,
+  () => singleAsyncHookLifecycleClient.get('/benchmark')
 )
 const concurrent = await runConcurrent(
   options.operations,
@@ -294,7 +316,9 @@ const report = {
     directAdapter: direct,
     sequentialClient: sequential,
     bareSequentialClient: bareSequential,
+    jsonBodySequentialClient: jsonBodySequential,
     sequentialPluginPipeline,
+    singleAsyncHookLifecycleClient: singleAsyncHookLifecycle,
     concurrentClient: concurrent,
     concurrentPluginPipeline: pluginPipeline,
     cacheHitClient,
@@ -337,7 +361,9 @@ async function warmUp(iterations: number): Promise<void> {
   for (let index = 0; index < iterations; index += 1) {
     await client.get('/benchmark', requestConfig)
     await bareClient.get('/benchmark')
+    await jsonBodyClient.post('/benchmark', jsonBodyRequestConfig)
     await pipelineClient.get('/benchmark', requestConfig)
+    await singleAsyncHookLifecycleClient.get('/benchmark')
     await concurrencyClient.get('/benchmark', requestConfig)
     await circuitBreakerClient.get('/benchmark', requestConfig)
     await concurrencyBaseClient.get('/benchmark', requestConfig)
@@ -412,6 +438,21 @@ function createBenchmarkPlugin(): Plugin {
       hooks.onRequest(() => {})
       hooks.onResponse(() => {})
       interceptors.response.use(response => response)
+    }
+  }
+}
+
+function createAsyncHookBenchmarkPlugin(): Plugin {
+  const resolvedHook = () => Promise.resolve()
+
+  return {
+    name: 'async-hook-lifecycle',
+
+    install({ hooks }) {
+      hooks.onRequest(resolvedHook)
+      hooks.onTransport(resolvedHook)
+      hooks.onResponse(resolvedHook)
+      hooks.onSettled(resolvedHook)
     }
   }
 }

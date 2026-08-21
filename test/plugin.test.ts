@@ -411,6 +411,42 @@ describe('plugin', () => {
     })
   })
 
+  it.each([false, true])(
+    'should isolate a single settled hook failure (async=%s)',
+    async asynchronous => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue(
+          new Response(JSON.stringify({ ok: true }), {
+            status: 200,
+            headers: {
+              'content-type': 'application/json'
+            }
+          })
+        )
+      )
+
+      const request = createClient().use({
+        name: `single-settled-${asynchronous}`,
+        install({ hooks }) {
+          const settledHook = asynchronous
+            ? async () => {
+                throw new Error('async settled observer failed')
+              }
+            : () => {
+                throw new Error('settled observer failed')
+              }
+
+          hooks.onSettled(settledHook)
+        }
+      })
+
+      await expect(request.get('/single-settled')).resolves.toEqual({
+        ok: true
+      })
+    }
+  )
+
   it('should rollback scoped registrations when installation fails', async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       new Response(JSON.stringify({ ok: true }), {

@@ -31,8 +31,14 @@ pnpm benchmark -- \
 
 - `directAdapter`: adapter-only control measurement.
 - `sequentialClient`: complete client pipeline, one request at a time.
+- `bareSequentialClient`: method shortcut without client defaults or request
+  options, measuring the minimum validated Client path.
+- `jsonBodySequentialClient`: method shortcut replacing a default JSON body
+  with a request JSON body.
 - `sequentialPluginPipeline`: sequential client with synchronous request and
   response interceptors plus request and response plugin hooks.
+- `singleAsyncHookLifecycleClient`: sequential client with one asynchronous
+  request, transport, response, and settled hook per lifecycle stage.
 - `concurrentClient`: complete client pipeline with bounded concurrency.
 - `concurrentPluginPipeline`: concurrent client with request/response
   interceptors and request/response plugin hooks.
@@ -115,21 +121,32 @@ interceptors and plugin hooks remain on the synchronous lifecycle path until a
 Promise requires continuation. This keeps plugin ordering deterministic without
 allocating and sorting collections on every request. Error notification and
 final rejection likewise stay synchronous until an asynchronous hook or
-interceptor requires continuation. Requests without any hooks, interceptors, or
-response schema dispatch directly after validation without allocating lifecycle
-context, timestamps, or an adopting Pipeline Promise. Method shortcuts merge
-their configuration once before dispatch.
+interceptor requires continuation. Lifecycle stages with one hook dispatch it
+directly, avoiding an empty recursive continuation after asynchronous hooks.
+Requests without any hooks, interceptors, or response schema dispatch directly
+after validation without allocating lifecycle context, timestamps, or an
+adopting Pipeline Promise. Method shortcuts merge their configuration once
+before dispatch.
 
 Configuration merging creates nested values only when either side supplies
 them. Header normalization writes directly into one case-insensitive result
 instead of building intermediate entry arrays and objects. Request-specific
-headers remain isolated from reusable client defaults. Body-mode detection
-checks only the four own configuration fields, avoiding duplicate value and
-ownership probes on body-free requests.
+headers remain isolated from reusable client defaults. Nested merge helpers
+reuse their caller's presence checks, and single-sided headers skip the absent
+input entirely. Body-mode detection checks only the four own configuration
+fields, avoiding duplicate value and ownership probes on body-free requests.
+
+Method shortcuts without client defaults or request options reuse an internal
+empty configuration marker and construct only the final URL and method pair.
+Explicit request options continue through the full isolation merge. Request
+configuration and record serializers cache the native own-property intrinsic
+instead of resolving its prototype chain for every field.
 
 Request method and response-type validation use direct branch dispatch instead
-of scanning constant option arrays. Retry decisions skip elapsed-time and event
-bookkeeping when jitter, elapsed-time limits and retry observers are all absent.
+of scanning constant option arrays. Valid request bodies likewise use direct
+mode checks, reserving field collection for the conflicting-body error path.
+Retry decisions skip elapsed-time and event bookkeeping when jitter,
+elapsed-time limits and retry observers are all absent.
 
 Cache entries retain isolation cloning for objects and binary values. Immutable
 primitive data bypasses `structuredClone`, avoiding exception or clone overhead

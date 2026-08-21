@@ -170,6 +170,10 @@ function runHooks(
   context: RequestContext<unknown>,
   startIndex = 0
 ): void | Promise<void> {
+  if (startIndex === 0 && hooks.length === 1) {
+    return hooks[0]?.(context)
+  }
+
   for (let index = startIndex; index < hooks.length; index += 1) {
     const result = hooks[index]?.(context)
 
@@ -186,6 +190,10 @@ function runTransportHooks(
   context: RequestContext<unknown>,
   startIndex = 0
 ): void | Promise<void> {
+  if (startIndex === 0 && hooks.length === 1) {
+    return hooks[0]?.(context)
+  }
+
   for (let index = startIndex; index < hooks.length; index += 1) {
     const result = hooks[index]?.(context)
 
@@ -208,6 +216,18 @@ function runSettledHooks(
   context: RequestContext<unknown>,
   startIndex = 0
 ): void | Promise<void> {
+  if (startIndex === 0 && hooks.length === 1) {
+    try {
+      const result = hooks[0]?.(context)
+
+      return isPromiseLike(result)
+        ? Promise.resolve(result).catch(ignoreSettledError)
+        : undefined
+    } catch {
+      return
+    }
+  }
+
   for (let index = startIndex; index < hooks.length; index += 1) {
     try {
       const result = hooks[index]?.(context)
