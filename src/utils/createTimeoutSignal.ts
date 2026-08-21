@@ -9,7 +9,7 @@ export function createTimeoutSignal(
   signal?: AbortSignal,
   timeout?: number
 ): TimeoutSignalResult {
-  if (!timeout || timeout <= 0) {
+  if (!timeout || timeout <= 0 || signal?.aborted) {
     return {
       signal,
       clear: noop
@@ -33,40 +33,33 @@ export function createTimeoutSignal(
   }
 
   if (signal) {
-    if (signal.aborted) {
-      clear()
-      controller.abort(signal.reason)
-    } else {
-      onAbort = () => {
-        clear()
-        controller.abort(
-          signal.reason ??
-          new RequestError('Request aborted', {
-            code: 'ABORT_ERROR'
-          })
-        )
-      }
-
-      signal.addEventListener(
-        'abort',
-        onAbort,
-        {
-          once: true
-        }
-      )
-    }
-  }
-
-  if (!controller.signal.aborted) {
-    timer = setTimeout(() => {
+    onAbort = () => {
       clear()
       controller.abort(
-        new RequestError(`Request timeout after ${timeout}ms`, {
-          code: 'TIMEOUT_ERROR'
+        signal.reason ??
+        new RequestError('Request aborted', {
+          code: 'ABORT_ERROR'
         })
       )
-    }, timeout)
+    }
+
+    signal.addEventListener(
+      'abort',
+      onAbort,
+      {
+        once: true
+      }
+    )
   }
+
+  timer = setTimeout(() => {
+    clear()
+    controller.abort(
+      new RequestError(`Request timeout after ${timeout}ms`, {
+        code: 'TIMEOUT_ERROR'
+      })
+    )
+  }, timeout)
 
   return {
     signal: controller.signal,

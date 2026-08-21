@@ -76,3 +76,5 @@ entries, preventing resource leaks when listener setup fails.
 Parse Retry-After delay seconds as decimal digits only and reject date formats
 without an HTTP weekday prefix, falling back to the configured retry delay for
 invalid negative, fractional, ISO, or month-name date values.
+Reuse pre-aborted external signals without allocating a timeout controller,
+listener, timer, or cleanup closure.

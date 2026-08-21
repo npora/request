@@ -92,6 +92,11 @@ describe('createTimeoutSignal', () => {
       const controller = new AbortController()
 
       controller.abort('already-aborted')
+      const abortController = vi.fn(() => {
+        throw new Error('AbortController should not be created')
+      })
+
+      vi.stubGlobal('AbortController', abortController)
 
       const result = createTimeoutSignal(
         controller.signal,
@@ -100,8 +105,11 @@ describe('createTimeoutSignal', () => {
 
       expect(result.signal?.aborted).toBe(true)
       expect(result.signal?.reason).toBe('already-aborted')
+      expect(result.signal).toBe(controller.signal)
+      expect(abortController).not.toHaveBeenCalled()
       expect(vi.getTimerCount()).toBe(0)
     } finally {
+      vi.unstubAllGlobals()
       vi.useRealTimers()
     }
   })
