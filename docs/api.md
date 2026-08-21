@@ -320,6 +320,9 @@ method/body combinations and body configuration conflicts throw a
 Configuration is validated again after plugin request hooks, including when a
 custom adapter is used.
 
+Native `ReadableStream` request bodies automatically use Fetch half-duplex
+mode, as required by Node's Fetch implementation for streaming uploads.
+
 ---
 
 # MockAdapter
@@ -419,6 +422,10 @@ request.interceptors.error.use(error => error)
 ```
 
 Interceptors are user-level extension points.
+
+Synchronous interceptors remain on the synchronous lifecycle path. If an
+interceptor returns a Promise, the remaining interceptors continue
+asynchronously in the same deterministic order.
 
 Errors thrown by request or response interceptors follow the same error
 lifecycle as adapter failures. Plugin error hooks run before user error

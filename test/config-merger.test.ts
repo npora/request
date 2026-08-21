@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import type { RequestConfig } from '../src'
 import { ConfigMerger } from '../src/core/ConfigMerger'
 
 describe('ConfigMerger', () => {
@@ -221,6 +222,31 @@ describe('ConfigMerger', () => {
     })
   })
 
+  it('should isolate single-sided extension containers', () => {
+    const requestExtensions = {
+      cache: {
+        enabled: true
+      }
+    }
+    const defaultExtensions = {
+      retry: {
+        retries: 2
+      }
+    }
+    const requestConfig = ConfigMerger.merge({}, {
+      url: '/request',
+      extensions: requestExtensions
+    })
+    const defaultConfig = ConfigMerger.mergeDefaults({
+      extensions: defaultExtensions
+    }, {})
+
+    expect(requestConfig.extensions).toEqual(requestExtensions)
+    expect(requestConfig.extensions).not.toBe(requestExtensions)
+    expect(defaultConfig.extensions).toEqual(defaultExtensions)
+    expect(defaultConfig.extensions).not.toBe(defaultExtensions)
+  })
+
   it('should replace the default body mode when a request supplies one', () => {
     const config = ConfigMerger.merge(
       {
@@ -261,5 +287,23 @@ describe('ConfigMerger', () => {
     expect(config.body).toBeUndefined()
     expect(config.form).toBeUndefined()
     expect(config.formData).toBeUndefined()
+  })
+
+  it('should ignore body fields inherited from the request prototype', () => {
+    const request = Object.assign(
+      Object.create({
+        json: {
+          source: 'prototype'
+        }
+      }) as Record<string, unknown>,
+      {
+        url: '/submit',
+        method: 'POST'
+      }
+    ) as RequestConfig
+    const config = ConfigMerger.merge({}, request)
+
+    expect(config.json).toBeUndefined()
+    expect(Object.keys(config)).toEqual(['url', 'method'])
   })
 })

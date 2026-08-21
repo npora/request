@@ -73,7 +73,5 @@ export class RequestError<T = unknown> extends Error {
     this.response = options.response
     this.config = options.config ?? options.response?.config
     this.cause = options.cause
-
-    Object.setPrototypeOf(this, new.target.prototype)
   }
 }

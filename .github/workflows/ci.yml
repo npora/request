@@ -54,7 +54,7 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
 
       - name: Run unit and integration tests
-        run: pnpm test:run
+        run: pnpm test
 
       - name: Build
         run: pnpm build

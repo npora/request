@@ -5,6 +5,7 @@ import type {
   RequestConfig
 } from '../types'
 import type { Plugin } from './Plugin'
+import { isPromiseLike } from '../utils/isPromiseLike'
 import { resolveRequestOrigin } from '../utils/resolveRequestOrigin'
 import { resolveExtensionConfig } from './resolveExtensionConfig'
 
@@ -182,7 +183,7 @@ export function circuitBreakerPlugin(
         })
       })
 
-      context.hooks.onSettled(async requestContext => {
+      context.hooks.onSettled(requestContext => {
         const admission = admissions.get(requestContext)
 
         if (!admission) {
@@ -194,65 +195,73 @@ export function circuitBreakerPlugin(
         const record = admission.record
 
         if (!active) {
-          record.activeRequests = Math.max(0, record.activeRequests - 1)
+          finishSettlement(record, circuits, normalized.maxCircuits)
           return
         }
 
-        try {
-          if (
-            circuits.get(admission.key) !== record ||
-            record.generation !== admission.generation
-          ) {
-            return
-          }
+        if (
+          circuits.get(admission.key) !== record ||
+          record.generation !== admission.generation
+        ) {
+          finishSettlement(record, circuits, normalized.maxCircuits)
+          return
+        }
 
-          if (admission.probe) {
-            record.probes = Math.max(0, record.probes - 1)
-          }
+        if (admission.probe) {
+          record.probes = Math.max(0, record.probes - 1)
+        }
 
-          if (!requestContext.error && requestContext.response) {
-            record.failures = 0
+        if (!requestContext.error && requestContext.response) {
+          record.failures = 0
 
-            if (admission.probe && record.state === 'half-open') {
-              record.successes += 1
+          if (admission.probe && record.state === 'half-open') {
+            record.successes += 1
 
-              if (record.successes >= normalized.successThreshold) {
-                transition(record, admission.key, 'closed', normalized)
-              }
+            if (record.successes >= normalized.successThreshold) {
+              transition(record, admission.key, 'closed', normalized)
             }
-
-            return
           }
 
-          const counted = await normalized.shouldCountFailure(
+          finishSettlement(record, circuits, normalized.maxCircuits)
+          return
+        }
+
+        let counted: boolean | Promise<boolean>
+
+        try {
+          counted = normalized.shouldCountFailure(
             requestContext.error,
             requestContext.config
           )
+        } catch (error) {
+          finishSettlement(record, circuits, normalized.maxCircuits)
+          throw error
+        }
 
-          if (
-            !active ||
-            circuits.get(admission.key) !== record ||
-            record.generation !== admission.generation ||
-            !counted
-          ) {
-            return
-          }
+        if (isPromiseLike(counted)) {
+          return Promise.resolve(counted)
+            .then(result => {
+              applyFailure(
+                result,
+                active,
+                circuits,
+                admission,
+                normalized
+              )
+            })
+            .finally(() => {
+              finishSettlement(
+                record,
+                circuits,
+                normalized.maxCircuits
+              )
+            })
+        }
 
-          if (admission.probe && record.state === 'half-open') {
-            transition(record, admission.key, 'open', normalized)
-            return
-          }
-
-          if (record.state === 'closed') {
-            record.failures += 1
-
-            if (record.failures >= normalized.failureThreshold) {
-              transition(record, admission.key, 'open', normalized)
-            }
-          }
+        try {
+          applyFailure(counted, active, circuits, admission, normalized)
         } finally {
-          record.activeRequests = Math.max(0, record.activeRequests - 1)
-          trimCircuits(circuits, normalized.maxCircuits)
+          finishSettlement(record, circuits, normalized.maxCircuits)
         }
       })
 
@@ -264,6 +273,47 @@ export function circuitBreakerPlugin(
   }
 
   return plugin
+}
+
+function applyFailure(
+  counted: boolean,
+  active: boolean,
+  circuits: Map<string, CircuitRecord>,
+  admission: Admission,
+  options: NormalizedOptions
+): void {
+  const record = admission.record
+
+  if (
+    !active ||
+    circuits.get(admission.key) !== record ||
+    record.generation !== admission.generation ||
+    !counted
+  ) {
+    return
+  }
+
+  if (admission.probe && record.state === 'half-open') {
+    transition(record, admission.key, 'open', options)
+    return
+  }
+
+  if (record.state === 'closed') {
+    record.failures += 1
+
+    if (record.failures >= options.failureThreshold) {
+      transition(record, admission.key, 'open', options)
+    }
+  }
+}
+
+function finishSettlement(
+  record: CircuitRecord,
+  circuits: Map<string, CircuitRecord>,
+  maxCircuits: number
+): void {
+  record.activeRequests = Math.max(0, record.activeRequests - 1)
+  trimCircuits(circuits, maxCircuits)
 }
 
 function normalizeOptions(
@@ -425,7 +475,11 @@ function notifyStateChange(
   }
 
   try {
-    void Promise.resolve(observer(event)).catch(ignoreObserverError)
+    const result = observer(event)
+
+    if (isPromiseLike(result)) {
+      void Promise.resolve(result).catch(ignoreObserverError)
+    }
   } catch {
     // State observers must not affect request behavior.
   }

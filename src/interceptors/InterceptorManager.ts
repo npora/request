@@ -1,3 +1,5 @@
+import { isPromiseLike } from '../utils/isPromiseLike'
+
 export type Interceptor<T> = (value: T) => T | Promise<T>
 
 export interface InterceptorOptions {
@@ -54,10 +56,31 @@ export class InterceptorManager<T> {
   }
 
   async run(value: T): Promise<T> {
+    return this.runMaybeAsync(value)
+  }
+
+  private runMaybeAsync(
+    value: T,
+    startIndex = 0
+  ): T | Promise<T> {
     let result = value
 
-    for (const entry of this.orderedInterceptors) {
-      result = await entry.interceptor(result)
+    for (
+      let index = startIndex;
+      index < this.orderedInterceptors.length;
+      index += 1
+    ) {
+      const entry = this.orderedInterceptors[index] as InterceptorEntry<T>
+
+      const next = entry.interceptor(result)
+
+      if (isPromiseLike(next)) {
+        return Promise.resolve(next).then(resolved => {
+          return this.runMaybeAsync(resolved, index + 1)
+        })
+      }
+
+      result = next
     }
 
     return result

@@ -1,4 +1,5 @@
 import type { RequestContext } from '../core/RequestContext'
+import { isPromiseLike } from '../utils/isPromiseLike'
 
 export interface RetryDecision {
   retry: boolean
@@ -43,6 +44,17 @@ export class PluginHooks {
   private readonly settledHooks = new HookRegistry<RequestHook>()
 
   private readonly retryHooks = new HookRegistry<RetryHook>()
+
+  get active(): boolean {
+    return (
+      this.requestHooks.active ||
+      this.transportHooks.active ||
+      this.responseHooks.active ||
+      this.errorHooks.active ||
+      this.settledHooks.active ||
+      this.retryHooks.active
+    )
+  }
 
   get hasRequestHooks(): boolean {
     return this.requestHooks.active
@@ -110,62 +122,138 @@ export class PluginHooks {
     return this.settledHooks.register(hook, options)
   }
 
-  async runRequest(context: RequestContext<unknown>): Promise<void> {
-    for (const hook of this.requestHooks.values()) {
-      await hook(context)
-    }
+  runRequest(context: RequestContext<unknown>): void | Promise<void> {
+    return runHooks(this.requestHooks.values(), context)
   }
 
-  async runResponse(context: RequestContext<unknown>): Promise<void> {
-    for (const hook of this.responseHooks.values()) {
-      await hook(context)
-    }
+  runResponse(context: RequestContext<unknown>): void | Promise<void> {
+    return runHooks(this.responseHooks.values(), context)
   }
 
-  async runTransport(context: RequestContext<unknown>): Promise<void> {
-    for (const hook of this.transportHooks.values()) {
-      await hook(context)
-
-      if (context.response) {
-        return
-      }
-    }
+  runTransport(context: RequestContext<unknown>): void | Promise<void> {
+    return runTransportHooks(
+      this.transportHooks.values(),
+      context
+    )
   }
 
-  async runError(context: RequestContext<unknown>): Promise<void> {
-    for (const hook of this.errorHooks.values()) {
-      await hook(context)
-    }
+  runError(context: RequestContext<unknown>): void | Promise<void> {
+    return runHooks(this.errorHooks.values(), context)
   }
 
-  async runSettled(context: RequestContext<unknown>): Promise<void> {
-    for (const hook of this.settledHooks.values()) {
-      try {
-        await hook(context)
-      } catch {
-        // Final observers are isolated from each other and the request result.
-      }
-    }
+  runSettled(context: RequestContext<unknown>): void | Promise<void> {
+    return runSettledHooks(
+      this.settledHooks.values(),
+      context
+    )
   }
 
-  async resolveRetry(
+  resolveRetry(
     context: RequestContext<unknown>,
     attempt: number
-  ): Promise<RetryDecision> {
-    for (const hook of this.retryHooks.values()) {
-      const decision = await hook(context, attempt)
+  ): RetryDecision | Promise<RetryDecision> {
+    return resolveRetryHooks(
+      this.retryHooks.values(),
+      context,
+      attempt
+    )
+  }
+}
 
-      if (decision) {
-        return decision
-      }
-    }
+const NO_RETRY_DECISION: RetryDecision = {
+  retry: false,
+  delay: 0
+}
 
-    return {
-      retry: false,
-      delay: 0
+function runHooks(
+  hooks: readonly RequestHook[],
+  context: RequestContext<unknown>,
+  startIndex = 0
+): void | Promise<void> {
+  for (let index = startIndex; index < hooks.length; index += 1) {
+    const result = hooks[index]?.(context)
+
+    if (isPromiseLike(result)) {
+      return Promise.resolve(result).then(() => {
+        return runHooks(hooks, context, index + 1)
+      })
     }
   }
 }
+
+function runTransportHooks(
+  hooks: readonly RequestHook[],
+  context: RequestContext<unknown>,
+  startIndex = 0
+): void | Promise<void> {
+  for (let index = startIndex; index < hooks.length; index += 1) {
+    const result = hooks[index]?.(context)
+
+    if (isPromiseLike(result)) {
+      return Promise.resolve(result).then(() => {
+        return context.response
+          ? undefined
+          : runTransportHooks(hooks, context, index + 1)
+      })
+    }
+
+    if (context.response) {
+      return
+    }
+  }
+}
+
+function runSettledHooks(
+  hooks: readonly RequestHook[],
+  context: RequestContext<unknown>,
+  startIndex = 0
+): void | Promise<void> {
+  for (let index = startIndex; index < hooks.length; index += 1) {
+    try {
+      const result = hooks[index]?.(context)
+
+      if (isPromiseLike(result)) {
+        return Promise.resolve(result)
+          .catch(ignoreSettledError)
+          .then(() => {
+            return runSettledHooks(hooks, context, index + 1)
+          })
+      }
+    } catch {
+      // Final observers are isolated from each other and the request result.
+    }
+  }
+}
+
+function resolveRetryHooks(
+  hooks: readonly RetryHook[],
+  context: RequestContext<unknown>,
+  attempt: number,
+  startIndex = 0
+): RetryDecision | Promise<RetryDecision> {
+  for (let index = startIndex; index < hooks.length; index += 1) {
+    const result = hooks[index]?.(context, attempt)
+
+    if (isPromiseLike(result)) {
+      return Promise.resolve(result).then(decision => {
+        return decision ?? resolveRetryHooks(
+          hooks,
+          context,
+          attempt,
+          index + 1
+        )
+      })
+    }
+
+    if (result) {
+      return result
+    }
+  }
+
+  return NO_RETRY_DECISION
+}
+
+function ignoreSettledError(): void {}
 
 interface HookEntry<Hook> {
   id: number

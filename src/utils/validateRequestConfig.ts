@@ -1,10 +1,7 @@
 import { RequestError } from '../errors'
-import type {
-  HttpMethod,
-  RequestConfig,
-  ResponseType
-} from '../types'
+import type { RequestConfig } from '../types'
 import { isURLSearchParams } from './isURLSearchParams'
+import { MAX_TIMER_DELAY } from './maxTimerDelay'
 
 const BODY_FIELDS = [
   'body',
@@ -13,30 +10,13 @@ const BODY_FIELDS = [
   'formData'
 ] as const
 
-const RESPONSE_TYPES: readonly ResponseType[] = [
-  'json',
-  'text',
-  'blob',
-  'arrayBuffer',
-  'stream',
-  'sse',
-  'ndjson'
-]
-
-const HTTP_METHODS: readonly HttpMethod[] = [
-  'GET',
-  'POST',
-  'PUT',
-  'PATCH',
-  'DELETE',
-  'HEAD',
-  'OPTIONS'
-]
-
 /**
  * Validate configuration before request hooks or adapters act on it.
  */
-export function validateRequestConfig(config: RequestConfig): Headers {
+export function validateRequestConfig(
+  config: RequestConfig,
+  headersRequired: boolean
+): Headers | undefined {
   validateURL(config)
   validateMethod(config)
   validateTimeout(config)
@@ -44,7 +24,9 @@ export function validateRequestConfig(config: RequestConfig): Headers {
   validateQuery(config)
   validateResponseOptions(config)
   validateSchema(config)
-  const headers = validateHeaders(config)
+  const headers = headersRequired || config.headers !== undefined
+    ? validateHeaders(config)
+    : undefined
   validateBody(config)
 
   return headers
@@ -70,20 +52,36 @@ function validateQuery(config: RequestConfig): void {
 }
 
 function validateMethod(config: RequestConfig): void {
-  if (
-    config.method !== undefined &&
-    !HTTP_METHODS.includes(config.method)
-  ) {
-    throw configError('Request method is invalid', config)
+  switch (config.method) {
+    case undefined:
+    case 'GET':
+    case 'POST':
+    case 'PUT':
+    case 'PATCH':
+    case 'DELETE':
+    case 'HEAD':
+    case 'OPTIONS':
+      return
+
+    default:
+      throw configError('Request method is invalid', config)
   }
 }
 
 function validateResponseOptions(config: RequestConfig): void {
-  if (
-    config.responseType !== undefined &&
-    !RESPONSE_TYPES.includes(config.responseType)
-  ) {
-    throw configError('Request responseType is invalid', config)
+  switch (config.responseType) {
+    case undefined:
+    case 'json':
+    case 'text':
+    case 'blob':
+    case 'arrayBuffer':
+    case 'stream':
+    case 'sse':
+    case 'ndjson':
+      break
+
+    default:
+      throw configError('Request responseType is invalid', config)
   }
 
   if (
@@ -172,9 +170,13 @@ function validateTimeout(config: RequestConfig): void {
     return
   }
 
-  if (!Number.isFinite(config.timeout) || config.timeout < 0) {
+  if (
+    !Number.isFinite(config.timeout) ||
+    config.timeout < 0 ||
+    config.timeout > MAX_TIMER_DELAY
+  ) {
     throw configError(
-      'Request timeout must be a finite, non-negative number',
+      'Request timeout is out of range',
       config
     )
   }
@@ -189,6 +191,15 @@ function validateHeaders(config: RequestConfig): Headers {
 }
 
 function validateBody(config: RequestConfig): void {
+  if (
+    config.body == null &&
+    config.json == null &&
+    config.form == null &&
+    config.formData == null
+  ) {
+    return
+  }
+
   let activeField: typeof BODY_FIELDS[number] | undefined
 
   for (const key of BODY_FIELDS) {

@@ -1,4 +1,5 @@
 import { RequestError } from '../errors'
+import { MAX_TIMER_DELAY } from '../utils/maxTimerDelay'
 import type { RequestConfig } from '../types'
 import type { Plugin } from './Plugin'
 import { resolveRequestOrigin } from '../utils/resolveRequestOrigin'
@@ -54,13 +55,9 @@ export interface ConcurrencyPlugin extends Plugin {
 }
 
 interface ConcurrencyRecord {
+  key: string
   active: number
   queue: QueueEntry[]
-}
-
-interface Admission {
-  key: string
-  record: ConcurrencyRecord
 }
 
 interface QueueEntry {
@@ -98,10 +95,10 @@ export function concurrencyPlugin(
     },
 
     install(context) {
-      const admissions = new WeakMap<object, Admission>()
+      const admissions = new WeakMap<object, ConcurrencyRecord>()
       let active = true
 
-      context.hooks.onRequest(async requestContext => {
+      context.hooks.onRequest(requestContext => {
         const requestOptions = resolveExtensionConfig(
           requestContext.config,
           'concurrency'
@@ -118,10 +115,7 @@ export function concurrencyPlugin(
 
         if (record.active < normalized.maxConcurrent) {
           record.active += 1
-          admissions.set(requestContext, {
-            key,
-            record
-          })
+          admissions.set(requestContext, record)
           return
         }
 
@@ -144,36 +138,36 @@ export function concurrencyPlugin(
           normalized.queueTimeout
         )
 
-        await enqueue(record, requestContext, timeout)
-
-        if (!active) {
-          throw createRemovedError(requestContext.config)
-        }
+        return enqueue(record, requestContext, timeout).then(() => {
+          if (!active) {
+            throw createRemovedError(requestContext.config)
+          }
+        })
       })
 
       context.hooks.onSettled(requestContext => {
-        const admission = admissions.get(requestContext)
+        const record = admissions.get(requestContext)
 
-        if (!admission) {
+        if (!record) {
           return
         }
 
         admissions.delete(requestContext)
 
-        if (!active || records.get(admission.key) !== admission.record) {
+        if (!active || records.get(record.key) !== record) {
           return
         }
 
-        releaseNext(admission.record, entry => {
-          admissions.set(entry.context, admission)
+        releaseNext(record, entry => {
+          admissions.set(entry.context, record)
           entry.resolve()
         })
 
         if (
-          admission.record.active === 0 &&
-          admission.record.queue.length === 0
+          record.active === 0 &&
+          record.queue.length === 0
         ) {
-          touchRecord(records, admission.key, admission.record)
+          touchRecord(records, record.key, record)
           trimRecords(records, normalized.maxKeys)
         }
       })
@@ -262,7 +256,6 @@ function enqueue(
       cleanup
     }
 
-    record.queue.push(entry)
     signal?.addEventListener('abort', onAbort, {
       once: true
     })
@@ -275,6 +268,8 @@ function enqueue(
         )
       }, timeout)
     }
+
+    record.queue.push(entry)
   })
 }
 
@@ -301,13 +296,13 @@ function getRecord(
   const existing = records.get(key)
 
   if (existing) {
-    touchRecord(records, key, existing)
     return existing
   }
 
   trimRecords(records, Math.max(0, maxKeys - 1))
 
   const record: ConcurrencyRecord = {
+    key,
     active: 0,
     queue: []
   }
@@ -390,7 +385,7 @@ function normalizeDuration(
     return value > 0 ? Number.POSITIVE_INFINITY : 0
   }
 
-  return Math.max(0, value)
+  return Math.min(Math.max(0, value), MAX_TIMER_DELAY)
 }
 
 function normalizeKey(key: string): string {

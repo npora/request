@@ -96,6 +96,40 @@ describe('pipeline error lifecycle', () => {
     )
   })
 
+  it('should pass an async error hook failure to the error interceptor', async () => {
+    const events: string[] = []
+    const plugin: Plugin = {
+      name: 'broken-async-error-hook',
+      install({ hooks }) {
+        hooks.onError(async () => {
+          events.push('hook:start')
+          await Promise.resolve()
+          events.push('hook:end')
+          throw new Error('async error hook failed')
+        })
+      }
+    }
+    const request = createClient().use(plugin)
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockRejectedValue(new Error('network failed'))
+    )
+    request.interceptors.error.use(error => {
+      events.push('error-interceptor')
+      return new Error(`handled: ${(error as Error).message}`)
+    })
+
+    await expect(request.get('/user')).rejects.toThrow(
+      'handled: async error hook failed'
+    )
+    expect(events).toEqual([
+      'hook:start',
+      'hook:end',
+      'error-interceptor'
+    ])
+  })
+
   it('should route retry hook failures through the error lifecycle', async () => {
     const observedErrors: string[] = []
     const errorInterceptor = vi.fn(error => error)

@@ -5,6 +5,7 @@ import type {
   RequestLogger
 } from '../types'
 import type { Plugin } from './Plugin'
+import { isPromiseLike } from '../utils/isPromiseLike'
 import { resolveExtensionConfig } from './resolveExtensionConfig'
 
 export function loggerPlugin(defaultOptions: LoggerOptions = {}): Plugin {
@@ -26,11 +27,14 @@ export function loggerPlugin(defaultOptions: LoggerOptions = {}): Plugin {
           return
         }
 
+        const url = requestContext.config.url
         const state: LoggerState = {
           requestId:
             options.createRequestId?.() ??
             `request-${++nextRequestId}`,
-          options
+          options,
+          url,
+          redactedURL: redactURL(url)
         }
 
         states.set(requestContext, state)
@@ -40,7 +44,7 @@ export function loggerPlugin(defaultOptions: LoggerOptions = {}): Plugin {
           requestId: state.requestId,
           timestamp: requestContext.startTime,
           method: requestContext.config.method ?? 'GET',
-          url: redactURL(requestContext.config.url)
+          url: state.redactedURL
         })
       })
 
@@ -60,7 +64,7 @@ export function loggerPlugin(defaultOptions: LoggerOptions = {}): Plugin {
           duration: Math.max(0, timestamp - requestContext.startTime),
           attempts: requestContext.attempt + 1,
           method: requestContext.config.method ?? 'GET',
-          url: redactURL(requestContext.config.url),
+          url: resolveRedactedURL(state, requestContext.config.url),
           status: requestContext.response.status
         })
       })
@@ -79,11 +83,14 @@ export function loggerPlugin(defaultOptions: LoggerOptions = {}): Plugin {
             return
           }
 
+          const url = requestContext.config.url
           state = {
             requestId:
               options.createRequestId?.() ??
               `request-${++nextRequestId}`,
-            options
+            options,
+            url,
+            redactedURL: redactURL(url)
           }
           states.set(requestContext, state)
 
@@ -92,7 +99,7 @@ export function loggerPlugin(defaultOptions: LoggerOptions = {}): Plugin {
             requestId: state.requestId,
             timestamp: requestContext.startTime,
             method: requestContext.config.method ?? 'GET',
-            url: redactURL(requestContext.config.url)
+            url: state.redactedURL
           })
         }
 
@@ -107,7 +114,7 @@ export function loggerPlugin(defaultOptions: LoggerOptions = {}): Plugin {
             Math.max(0, timestamp - requestContext.startTime),
             requestContext.attempt + 1,
             requestContext.config.method ?? 'GET',
-            redactURL(requestContext.config.url)
+            resolveRedactedURL(state, requestContext.config.url)
           )
         )
       })
@@ -119,6 +126,16 @@ interface LoggerState {
   requestId: string
 
   options: LoggerOptions
+
+  url: string
+
+  redactedURL: string
+}
+
+function resolveRedactedURL(state: LoggerState, url: string): string {
+  return url === state.url
+    ? state.redactedURL
+    : redactURL(url)
 }
 
 const consoleLogger: RequestLogger = {
@@ -140,9 +157,11 @@ function emitInfo(
   entry: Parameters<RequestLogger['info']>[1]
 ): void {
   try {
-    void Promise.resolve(
-      resolveLogger(options).info('[Npora Request]', entry)
-    ).catch(ignoreLoggerError)
+    const result = resolveLogger(options).info('[Npora Request]', entry)
+
+    if (isPromiseLike(result)) {
+      void Promise.resolve(result).catch(ignoreLoggerError)
+    }
   } catch {
     // Logging must not change the request lifecycle.
   }
@@ -153,9 +172,11 @@ function emitError(
   entry: ErrorLogEntry
 ): void {
   try {
-    void Promise.resolve(
-      resolveLogger(options).error('[Npora Request]', entry)
-    ).catch(ignoreLoggerError)
+    const result = resolveLogger(options).error('[Npora Request]', entry)
+
+    if (isPromiseLike(result)) {
+      void Promise.resolve(result).catch(ignoreLoggerError)
+    }
   } catch {
     // Logging must not replace the original request error.
   }
@@ -198,7 +219,7 @@ function redactURL(url: string): string {
     hashIndex === -1 ? '' : safeURL.slice(hashIndex)
   const params = new URLSearchParams(query)
 
-  for (const key of [...params.keys()]) {
+  for (const key of params.keys()) {
     if (SENSITIVE_QUERY_KEYS.has(key.toLowerCase())) {
       params.set(key, '[REDACTED]')
     }

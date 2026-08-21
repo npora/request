@@ -5,6 +5,9 @@ import type { PluginHooks } from '../interceptors/PluginHooks'
 import type { Adapter, NporaResponse, RequestConfig } from '../types'
 import { RequestError, SchemaValidationError } from '../errors'
 import { validateRequestConfig } from '../utils'
+import { throwIfAborted } from '../utils/createAbortError'
+import { isPromiseLike } from '../utils/isPromiseLike'
+import { MAX_TIMER_DELAY } from '../utils/maxTimerDelay'
 import { RequestContext } from './RequestContext'
 
 export interface PipelineInterceptors {
@@ -25,26 +28,78 @@ export class Pipeline {
     private readonly hooks: PluginHooks
   ) {}
 
-  async execute<T = unknown>(
+  execute<T = unknown>(
     config: RequestConfig,
     preserveRaw = true
   ): Promise<NporaResponse<T>> {
+    if (
+      !config.schema &&
+      !this.hooks.active &&
+      !this.interceptors.request.active &&
+      !this.interceptors.response.active &&
+      !this.interceptors.error.active
+    ) {
+      try {
+        const headers = validateRequestConfig(
+          config,
+          !!this.adapter.requestValidated
+        )
+
+        throwIfAborted(config)
+
+        return this.adapter.requestValidated
+          ? this.adapter.requestValidated<T>(
+              config,
+              headers!,
+              preserveRaw
+            )
+          : this.adapter.request<T>(config)
+      } catch (error) {
+        return Promise.reject(error)
+      }
+    }
+
+    return this.executeLifecycle<T>(config, preserveRaw)
+  }
+
+  private async executeLifecycle<T>(
+    config: RequestConfig,
+    preserveRaw: boolean
+  ): Promise<NporaResponse<T>> {
     const context = new RequestContext<T>(config)
+    const headersRequired = !!this.adapter.requestValidated
     let validatedHeaders: Headers | undefined
 
     try {
       try {
         if (this.interceptors.request.active) {
-          context.config = await this.interceptors.request.run(
-            context.config
-          )
+          const intercepted = (
+            this.interceptors.request as unknown as InternalInterceptorManager<
+              RequestConfig
+            >
+          ).runMaybeAsync(context.config)
+
+          context.config = isPromiseLike(intercepted)
+            ? await intercepted
+            : intercepted
         }
 
-        let headers = validateRequestConfig(context.config)
+        let headers = validateRequestConfig(
+          context.config,
+          headersRequired
+        )
 
         if (this.hooks.hasRequestHooks) {
-          await this.hooks.runRequest(context)
-          headers = validateRequestConfig(context.config)
+          const hooks = this.hooks.runRequest(context)
+
+          if (isPromiseLike(hooks)) {
+            await hooks
+          }
+
+          headers = validateRequestConfig(
+            context.config,
+            headersRequired
+          )
         }
 
         validatedHeaders = headers
@@ -54,7 +109,10 @@ export class Pipeline {
 
       if (context.response) {
         try {
-          return await this.processResponse(context)
+          const response = this.processResponse(context)
+          return isPromiseLike(response)
+            ? await response
+            : response
         } catch (error) {
           return this.fail(context, error)
         }
@@ -68,8 +126,14 @@ export class Pipeline {
 
           validatedHeaders = undefined
 
+          throwIfAborted(context.config)
+
           if (this.hooks.hasTransportHooks) {
-            await this.hooks.runTransport(context)
+            const hooks = this.hooks.runTransport(context)
+
+            if (isPromiseLike(hooks)) {
+              await hooks
+            }
           }
 
           if (!context.response) {
@@ -87,12 +151,18 @@ export class Pipeline {
                   )
           }
 
-          return await this.processResponse(context)
+          const response = this.processResponse(context)
+          return isPromiseLike(response)
+            ? await response
+            : response
         } catch (error) {
-          const errorHooksSucceeded = await this.notifyError(
+          const errorHooks = this.notifyError(
             context,
             error
           )
+          const errorHooksSucceeded = isPromiseLike(errorHooks)
+            ? await errorHooks
+            : errorHooks
 
           if (!errorHooksSucceeded) {
             return this.fail(context, context.error, false)
@@ -105,7 +175,11 @@ export class Pipeline {
           let decision
 
           try {
-            decision = await this.hooks.resolveRetry(context, attempt)
+            const resolved = this.hooks.resolveRetry(context, attempt)
+
+            decision = isPromiseLike(resolved)
+              ? await resolved
+              : resolved
           } catch (retryError) {
             return this.fail(context, retryError)
           }
@@ -120,10 +194,14 @@ export class Pipeline {
           context.attempt = attempt
 
           try {
-            await waitForRetry(
+            const wait = waitForRetry(
               decision.delay ?? 0,
               context.config
             )
+
+            if (wait) {
+              await wait
+            }
           } catch (waitError) {
             return this.fail(context, waitError)
           }
@@ -134,7 +212,11 @@ export class Pipeline {
 
       if (this.hooks.hasSettledHooks) {
         try {
-          await this.hooks.runSettled(context)
+          const hooks = this.hooks.runSettled(context)
+
+          if (isPromiseLike(hooks)) {
+            await hooks
+          }
         } catch {
           // Final observers must not replace the request result.
         }
@@ -142,19 +224,53 @@ export class Pipeline {
     }
   }
 
-  private async processResponse<T>(
+  private processResponse<T>(
     context: RequestContext<T>
-  ): Promise<NporaResponse<T>> {
+  ): NporaResponse<T> | Promise<NporaResponse<T>> {
     if (this.hooks.hasResponseHooks) {
-      await this.hooks.runResponse(context)
+      const hooks = this.hooks.runResponse(context)
+
+      if (isPromiseLike(hooks)) {
+        return Promise.resolve(hooks).then(() => {
+          return this.processValidatedResponse(context)
+        })
+      }
     }
 
-    await this.validateResponseSchema(context)
+    return this.processValidatedResponse(context)
+  }
 
+  private processValidatedResponse<T>(
+    context: RequestContext<T>
+  ): NporaResponse<T> | Promise<NporaResponse<T>> {
+    if (context.config.schema && context.response) {
+      return this.validateResponseSchema(context).then(() => {
+        return this.processResponseInterceptors(context)
+      })
+    }
+
+    return this.processResponseInterceptors(context)
+  }
+
+  private processResponseInterceptors<T>(
+    context: RequestContext<T>
+  ): NporaResponse<T> | Promise<NporaResponse<T>> {
     if (this.interceptors.response.active) {
-      context.response = (await this.interceptors.response.run(
-        context.response as NporaResponse
-      )) as NporaResponse<T>
+      const intercepted = (
+        this.interceptors.response as unknown as InternalInterceptorManager<
+          NporaResponse
+        >
+      ).runMaybeAsync(context.response as NporaResponse)
+
+      if (isPromiseLike(intercepted)) {
+        return Promise.resolve(intercepted).then(response => {
+          context.response = response as NporaResponse<T>
+          return context.response
+        })
+      }
+
+      context.response = intercepted as NporaResponse<T>
+      return context.response
     }
 
     return context.response as NporaResponse<T>
@@ -238,15 +354,26 @@ export class Pipeline {
     }
   }
 
-  private async notifyError<T>(
+  private notifyError<T>(
     context: RequestContext<T>,
     error: unknown
-  ): Promise<boolean> {
+  ): boolean | Promise<boolean> {
     context.error = error
 
     if (this.hooks.hasErrorHooks) {
       try {
-        await this.hooks.runError(context)
+        const hooks = this.hooks.runError(context)
+
+        if (isPromiseLike(hooks)) {
+          return Promise.resolve(hooks).then(
+            () => true,
+            hookError => {
+              context.error = hookError
+              return false
+            }
+          )
+        }
+
         return true
       } catch (hookError) {
         context.error = hookError
@@ -257,31 +384,59 @@ export class Pipeline {
     return true
   }
 
-  private async fail<T>(
+  private fail<T>(
     context: RequestContext<T>,
     error: unknown,
     notifyHooks = true
-  ): Promise<never> {
+  ): never | Promise<never> {
     if (notifyHooks) {
-      await this.notifyError(context, error)
+      const hooks = this.notifyError(context, error)
+
+      if (isPromiseLike(hooks)) {
+        return Promise.resolve(hooks).then(() => {
+          return this.completeFailure(context)
+        })
+      }
     } else {
       context.error = error
     }
 
+    return this.completeFailure(context)
+  }
+
+  private completeFailure<T>(
+    context: RequestContext<T>
+  ): never | Promise<never> {
     if (this.interceptors.error.active) {
-      context.error = await this.interceptors.error.run(
-        context.error
-      )
+      const intercepted = (
+        this.interceptors.error as unknown as InternalInterceptorManager<
+          unknown
+        >
+      ).runMaybeAsync(context.error)
+
+      if (isPromiseLike(intercepted)) {
+        return Promise.resolve(intercepted).then(error => {
+          context.error = error
+          throw context.error
+        })
+      }
+
+      context.error = intercepted
+      throw context.error
     }
 
     throw context.error
   }
 }
 
+interface InternalInterceptorManager<T> {
+  runMaybeAsync(value: T): T | Promise<T>
+}
+
 function waitForRetry(
   milliseconds: number,
   config: RequestConfig
-): Promise<void> {
+): Promise<void> | undefined {
   const signal = config.signal
 
   if (signal?.aborted) {
@@ -289,14 +444,11 @@ function waitForRetry(
   }
 
   if (milliseconds <= 0) {
-    return Promise.resolve()
+    return undefined
   }
 
   return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => {
-      cleanup()
-      resolve()
-    }, milliseconds)
+    let timer: ReturnType<typeof setTimeout>
 
     const onAbort = () => {
       clearTimeout(timer)
@@ -311,6 +463,11 @@ function waitForRetry(
     signal?.addEventListener('abort', onAbort, {
       once: true
     })
+
+    timer = setTimeout(() => {
+      cleanup()
+      resolve()
+    }, Math.min(milliseconds, MAX_TIMER_DELAY))
   })
 }
 

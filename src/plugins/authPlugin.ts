@@ -1,6 +1,8 @@
 import { RequestError } from '../errors'
+import type { RequestContext } from '../core/RequestContext'
 import type { RequestConfig } from '../types'
 import type { Plugin } from './Plugin'
+import { isPromiseLike } from '../utils/isPromiseLike'
 import { resolveExtensionConfig } from './resolveExtensionConfig'
 
 type MaybePromise<T> = T | Promise<T>
@@ -69,12 +71,14 @@ export function authPlugin(options: AuthPluginOptions = {}): Plugin {
     name: 'auth',
 
     install(context) {
-      context.interceptors.request.use(async config => {
+      context.interceptors.request.use(config => {
         return applyAuthorization(config, options)
       })
 
-      context.hooks.onRetry(async requestContext => {
-        if (!options.refreshToken || !requestContext.error) {
+      context.hooks.onRetry(requestContext => {
+        const refreshToken = options.refreshToken
+
+        if (!refreshToken || !requestContext.error) {
           return undefined
         }
 
@@ -84,24 +88,43 @@ export function authPlugin(options: AuthPluginOptions = {}): Plugin {
 
         const shouldRefresh =
           options.shouldRefresh ?? defaultShouldRefresh
+        const refresh = shouldRefresh(requestContext.error)
 
-        if (!(await shouldRefresh(requestContext.error))) {
+        if (isPromiseLike(refresh)) {
+          return Promise.resolve(refresh).then(shouldRefreshToken => {
+            return shouldRefreshToken
+              ? refreshRequest(requestContext, refreshToken)
+              : undefined
+          })
+        }
+
+        if (!refresh) {
           return undefined
         }
 
+        return refreshRequest(requestContext, refreshToken)
+      })
+
+      async function refreshRequest(
+        requestContext: RequestContext<unknown>,
+        refreshToken: NonNullable<AuthPluginOptions['refreshToken']>
+      ): Promise<{ retry: true; delay: 0 } | undefined> {
         refreshedContexts.add(requestContext)
 
         try {
           const refreshedToken = await refreshAccessToken(
-            options.refreshToken
+            refreshToken
           )
-          const authorization = await resolveAuthorization(
+          const resolvedAuthorization = resolveAuthorization(
             requestContext.config,
             options,
             typeof refreshedToken === 'string'
               ? refreshedToken
               : undefined
           )
+          const authorization = isPromiseLike(resolvedAuthorization)
+            ? await resolvedAuthorization
+            : resolvedAuthorization
 
           if (!authorization.token) {
             return undefined
@@ -120,7 +143,7 @@ export function authPlugin(options: AuthPluginOptions = {}): Plugin {
         } catch {
           return undefined
         }
-      })
+      }
     }
   }
 
@@ -129,9 +152,15 @@ export function authPlugin(options: AuthPluginOptions = {}): Plugin {
   ): Promise<string | void> {
     if (!refreshPromise) {
       refreshPromise = Promise.resolve(refreshToken())
-        .then(async token => {
-          if (token) {
-            await options.storage?.set(token)
+        .then(token => {
+          if (!token) {
+            return token
+          }
+
+          const write = options.storage?.set(token)
+
+          if (isPromiseLike(write)) {
+            return Promise.resolve(write).then(() => token)
           }
 
           return token
@@ -145,12 +174,37 @@ export function authPlugin(options: AuthPluginOptions = {}): Plugin {
   }
 }
 
-async function applyAuthorization(
+function applyAuthorization(
   config: RequestConfig,
   options: AuthPluginOptions
-): Promise<RequestConfig> {
-  const authorization = await resolveAuthorization(config, options)
+): MaybePromise<RequestConfig> {
+  if (
+    typeof options.token === 'string' &&
+    options.token &&
+    config.extensions?.auth === undefined
+  ) {
+    return setAuthorizationHeader(
+      config,
+      options.token,
+      options.scheme
+    )
+  }
 
+  const authorization = resolveAuthorization(config, options)
+
+  if (isPromiseLike(authorization)) {
+    return Promise.resolve(authorization).then(resolved => {
+      return applyResolvedAuthorization(config, resolved)
+    })
+  }
+
+  return applyResolvedAuthorization(config, authorization)
+}
+
+function applyResolvedAuthorization(
+  config: RequestConfig,
+  authorization: ResolvedAuthorization
+): RequestConfig {
   if (!authorization.token) {
     return config
   }
@@ -162,27 +216,35 @@ async function applyAuthorization(
   )
 }
 
-async function resolveAuthorization(
+function resolveAuthorization(
   config: RequestConfig,
   options: AuthPluginOptions,
   tokenOverride?: string
-): Promise<ResolvedAuthorization> {
+): MaybePromise<ResolvedAuthorization> {
   const requestAuth = resolveExtensionConfig(
     config,
     'auth'
   )
 
-  const token =
+  const resolvedToken =
     tokenOverride ??
     (
       requestAuth?.token
-        ? await resolveToken(requestAuth.token)
-        : await resolvePluginToken(options)
+        ? resolveToken(requestAuth.token)
+        : resolvePluginToken(options)
     )
+  const scheme = requestAuth?.scheme ?? options.scheme
+
+  if (isPromiseLike(resolvedToken)) {
+    return Promise.resolve(resolvedToken).then(token => ({
+      token,
+      scheme
+    }))
+  }
 
   return {
-    token,
-    scheme: requestAuth?.scheme ?? options.scheme
+    token: resolvedToken,
+    scheme
   }
 }
 
@@ -191,29 +253,45 @@ interface ResolvedAuthorization {
   scheme?: string
 }
 
-async function resolvePluginToken(
+function resolvePluginToken(
   options: AuthPluginOptions
-): Promise<string> {
-  const configuredToken = await resolveToken(options.token)
+): MaybePromise<string> {
+  const configuredToken = resolveToken(options.token)
+
+  if (isPromiseLike(configuredToken)) {
+    return Promise.resolve(configuredToken).then(token => {
+      return token || resolveStoredToken(options.storage)
+    })
+  }
 
   if (configuredToken) {
     return configuredToken
   }
 
-  const storedToken = await options.storage?.get()
+  return resolveStoredToken(options.storage)
+}
+
+function resolveStoredToken(
+  storage: AuthTokenStorage | undefined
+): MaybePromise<string> {
+  const storedToken = storage?.get()
+
+  if (isPromiseLike(storedToken)) {
+    return Promise.resolve(storedToken).then(token => token ?? '')
+  }
 
   return storedToken ?? ''
 }
 
-async function resolveToken(
+function resolveToken(
   token?: string | (() => MaybePromise<string>)
-): Promise<string> {
+): MaybePromise<string> {
   if (!token) {
     return ''
   }
 
   return typeof token === 'function'
-    ? await token()
+    ? token()
     : token
 }
 
@@ -222,9 +300,20 @@ function setAuthorizationHeader(
   token: string,
   scheme = 'Bearer'
 ): RequestConfig {
+  const authorization = `${scheme} ${token}`
+
+  if (config.headers === undefined) {
+    return {
+      ...config,
+      headers: {
+        authorization
+      }
+    }
+  }
+
   const headers = new Headers(config.headers)
 
-  headers.set('authorization', `${scheme} ${token}`)
+  headers.set('authorization', authorization)
 
   return {
     ...config,

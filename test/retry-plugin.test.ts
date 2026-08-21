@@ -231,6 +231,42 @@ describe('retryPlugin', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2)
   })
 
+  it('should not retry a streaming request body', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response('Busy', {
+        status: 503
+      })
+    )
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient().use(
+      retryPlugin({
+        retries: 1,
+        methods: ['POST'],
+        delay: 0
+      })
+    )
+    const body = new ReadableStream({
+      start(controller) {
+        controller.close()
+      }
+    })
+
+    await expect(request.post('/upload', {
+      body,
+      responseType: 'text'
+    })).rejects.toMatchObject({
+      code: 'HTTP_ERROR',
+      status: 503
+    })
+
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(fetchMock.mock.calls[0]?.[1]).toMatchObject({
+      duplex: 'half'
+    })
+  })
+
   it('should respect Retry-After and maxDelay', async () => {
     vi.useFakeTimers()
 
@@ -276,6 +312,127 @@ describe('retryPlugin', () => {
       ok: true
     })
     expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it.each([
+    '-1',
+    '2099-01-01T00:00:00Z',
+    'November 6, 2099 08:49:37 GMT'
+  ])('should ignore invalid Retry-After value %s', async retryAfter => {
+    vi.useFakeTimers()
+
+    const controller = new AbortController()
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response('Busy', {
+          status: 503,
+          headers: {
+            'retry-after': retryAfter
+          }
+        })
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ ok: true }), {
+          status: 200,
+          headers: {
+            'content-type': 'application/json'
+          }
+        })
+      )
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient().use(
+      retryPlugin({ retries: 1, delay: 100 })
+    )
+    const outcome = request.get('/busy', {
+      signal: controller.signal
+    }).catch(error => error)
+
+    await vi.advanceTimersByTimeAsync(99)
+    const callsBeforeDelay = fetchMock.mock.calls.length
+
+    await vi.advanceTimersByTimeAsync(1)
+    const callsAfterDelay = fetchMock.mock.calls.length
+
+    controller.abort()
+    await outcome
+
+    expect(callsBeforeDelay).toBe(1)
+    expect(callsAfterDelay).toBe(2)
+  })
+
+  it('should respect a valid Retry-After HTTP date', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-08-21T00:00:00Z'))
+
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response('Busy', {
+          status: 503,
+          headers: {
+            'retry-after': new Date(Date.now() + 1000).toUTCString()
+          }
+        })
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ ok: true }), {
+          status: 200,
+          headers: {
+            'content-type': 'application/json'
+          }
+        })
+      )
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient().use(
+      retryPlugin({ retries: 1, delay: 0 })
+    )
+    const promise = request.get('/busy')
+
+    await vi.advanceTimersByTimeAsync(999)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+
+    await vi.advanceTimersByTimeAsync(1)
+    await expect(promise).resolves.toEqual({ ok: true })
+  })
+
+  it('should cap retry delays at the platform timer limit', async () => {
+    vi.useFakeTimers()
+
+    const controller = new AbortController()
+    let observeDelay!: (delay: number) => void
+    const scheduled = new Promise<number>(resolve => {
+      observeDelay = resolve
+    })
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response('Busy', { status: 503 })
+    )
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient().use(
+      retryPlugin({
+        retries: 1,
+        delay: Number.MAX_SAFE_INTEGER,
+        maxDelay: Number.MAX_SAFE_INTEGER,
+        onRetry(event) {
+          observeDelay(event.delay)
+        }
+      })
+    )
+    const outcome = request.get('/busy', {
+      signal: controller.signal
+    }).catch(error => error)
+    const delay = await scheduled
+
+    controller.abort()
+
+    await outcome
+    expect(delay).toBe(2_147_483_647)
   })
 
   it('should apply custom jitter and emit a retry event', async () => {
@@ -556,5 +713,31 @@ describe('retryPlugin', () => {
       message: 'Cancelled by user'
     })
     expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('should not retain a retry timer when listener setup fails', async () => {
+    vi.useFakeTimers()
+
+    const signal = {
+      aborted: false,
+      addEventListener() {
+        throw new Error('listener setup failed')
+      },
+      removeEventListener: vi.fn()
+    } as unknown as AbortSignal
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response('Busy', { status: 503 })
+    )
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient().use(
+      retryPlugin({ retries: 1, delay: 1000 })
+    )
+
+    await expect(request.get('/busy', { signal })).rejects.toThrow(
+      'listener setup failed'
+    )
+    expect(vi.getTimerCount()).toBe(0)
   })
 })

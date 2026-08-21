@@ -8,12 +8,27 @@ import {
 import type { Plugin } from '../src'
 import { createClient, MockAdapter } from '../src'
 import { buildRequest } from '../src/utils/buildRequest'
+import { validateRequestConfig } from '../src/utils/validateRequestConfig'
 
 afterEach(() => {
+  vi.useRealTimers()
   vi.unstubAllGlobals()
 })
 
 describe('request config', () => {
+  it('should only materialize optional headers when needed', () => {
+    expect(validateRequestConfig({
+      url: '/users'
+    }, false)).toBeUndefined()
+
+    expect(validateRequestConfig({
+      url: '/users',
+      headers: {
+        accept: 'application/json'
+      }
+    }, false)).toBeInstanceOf(Headers)
+  })
+
   it('should build url with baseURL and query', () => {
     const { url } = buildRequest({
       baseURL: 'https://api.example.com',
@@ -130,6 +145,60 @@ describe('request config', () => {
       redirect: 'manual',
       cache: 'no-store'
     })
+    expect(init).not.toHaveProperty('duplex')
+  })
+
+  it('should enable half duplex for streaming request bodies', () => {
+    const body = new ReadableStream<Uint8Array>()
+    const request = buildRequest({
+      url: 'https://api.example.com/upload',
+      method: 'POST',
+      body
+    })
+
+    expect(
+      (request.init as RequestInit & { duplex?: string }).duplex
+    ).toBe('half')
+    expect(() => new Request(request.url, request.init)).not.toThrow()
+  })
+
+  it('should skip timeout controller allocation when timeout is disabled', () => {
+    const abortController = vi.fn(() => {
+      throw new Error('AbortController should not be created')
+    })
+
+    vi.stubGlobal('AbortController', abortController)
+
+    const request = buildRequest({
+      url: '/users',
+      timeout: 0
+    })
+
+    expect(request.init.signal).toBeUndefined()
+    expect(abortController).not.toHaveBeenCalled()
+    expect(() => request.clear()).not.toThrow()
+  })
+
+  it('should not retain a timeout when request serialization fails', () => {
+    vi.useFakeTimers()
+    const signal = new AbortController().signal
+    const addEventListener = vi.spyOn(signal, 'addEventListener')
+
+    expect(() => buildRequest({
+      url: '/users',
+      timeout: 1000,
+      signal,
+      query: {
+        invalid: {
+          toString() {
+            throw new Error('serialization failed')
+          }
+        } as never
+      }
+    })).toThrow('serialization failed')
+
+    expect(vi.getTimerCount()).toBe(0)
+    expect(addEventListener).not.toHaveBeenCalled()
   })
 
   it('should serialize json body', () => {
@@ -402,7 +471,10 @@ describe('request config', () => {
     expect(requestSpy).not.toHaveBeenCalled()
   })
 
-  it('should reject invalid timeout values', async () => {
+  it.each([
+    Number.POSITIVE_INFINITY,
+    2_147_483_648
+  ])('should reject invalid timeout value %s', async timeout => {
     const fetchMock = vi.fn()
 
     vi.stubGlobal('fetch', fetchMock)
@@ -411,7 +483,7 @@ describe('request config', () => {
 
     await expect(
       request.get('/users', {
-        timeout: Number.POSITIVE_INFINITY
+        timeout
       })
     ).rejects.toMatchObject({
       code: 'CONFIG_ERROR'
@@ -523,6 +595,31 @@ describe('request config', () => {
       message: 'Failed to build request'
     })
 
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('should abort before serializing a request body', async () => {
+    const controller = new AbortController()
+    const serialize = vi.fn(() => {
+      throw new Error('serialization should not run')
+    })
+    const fetchMock = vi.fn()
+
+    controller.abort('already cancelled')
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient()
+
+    await expect(request.post('/users', {
+      json: {
+        toJSON: serialize
+      },
+      signal: controller.signal
+    })).rejects.toMatchObject({
+      code: 'ABORT_ERROR'
+    })
+
+    expect(serialize).not.toHaveBeenCalled()
     expect(fetchMock).not.toHaveBeenCalled()
   })
 })

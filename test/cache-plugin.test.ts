@@ -385,6 +385,121 @@ describe('cachePlugin', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 
+  it('should preserve the default headerless cache key', async () => {
+    const capturedKeys: string[] = []
+    const store: CacheStore = {
+      get(key) {
+        capturedKeys.push(key)
+        return undefined
+      },
+      set() {},
+      delete() {},
+      clear() {}
+    }
+    const fetchMock = vi.fn().mockImplementation(() => {
+      return Promise.resolve(createJsonResponse({ ok: true }))
+    })
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient().use(cachePlugin({ store }))
+
+    await request.get('/headerless', {
+      extensions: {
+        cache: {
+          enabled: true
+        }
+      }
+    })
+    await request.get('/headerless', {
+      extensions: {
+        cache: {
+          enabled: true
+        }
+      }
+    })
+    await request.get('/other', {
+      extensions: {
+        cache: {
+          enabled: true
+        }
+      }
+    })
+    await request.get('/other', {
+      extensions: {
+        cache: {
+          enabled: true
+        }
+      },
+      responseType: 'text'
+    })
+
+    expect(capturedKeys[0]).toBe(JSON.stringify({
+      method: 'GET',
+      url: '/headerless',
+      query: [],
+      responseType: 'auto',
+      headers: [
+        ['accept', null],
+        ['accept-language', null],
+        ['authorization', null],
+        ['cookie', null]
+      ]
+    }))
+    expect(capturedKeys[1]).toBe(capturedKeys[0])
+    expect(capturedKeys[2]).not.toBe(capturedKeys[1])
+    expect(capturedKeys[3]).not.toBe(capturedKeys[2])
+  })
+
+  it('should persist a deduplicated miss under its request cache key', async () => {
+    const readKeys: string[] = []
+    const writtenKeys: string[] = []
+    const store: CacheStore = {
+      get(key) {
+        readKeys.push(key)
+        return undefined
+      },
+      set(key) {
+        writtenKeys.push(key)
+      },
+      delete() {},
+      clear() {}
+    }
+    const changeCacheKey: Plugin = {
+      name: 'change-cache-key',
+      install({ hooks }) {
+        hooks.onTransport(context => {
+          const cache = context.config.extensions?.cache
+
+          if (cache) {
+            cache.key = 'response-key'
+          }
+        })
+      }
+    }
+    const fetchMock = vi.fn().mockResolvedValue(
+      createJsonResponse({ ok: true })
+    )
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient()
+      .use(cachePlugin({ store }))
+      .use(changeCacheKey)
+
+    await request.get('/stable-key', {
+      extensions: {
+        cache: {
+          enabled: true,
+          key: 'request-key'
+        }
+      }
+    })
+
+    expect(readKeys).toEqual(['request-key'])
+    expect(writtenKeys).toEqual(['request-key'])
+  })
+
   it('should normalize query key order in the default cache key', async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       createJsonResponse({
@@ -498,6 +613,60 @@ describe('cachePlugin', () => {
     expect(text).toBe('Npora')
     expect(new TextDecoder().decode(buffer)).toBe('Npora')
     expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('should reuse immutable cached values without structured cloning', async () => {
+    const cloneSpy = vi.fn(globalThis.structuredClone)
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response('Npora', {
+        headers: {
+          'content-type': 'text/plain'
+        }
+      })
+    )
+
+    vi.stubGlobal('structuredClone', cloneSpy)
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient().use(cachePlugin())
+    const config = {
+      extensions: {
+        cache: {
+          enabled: true
+        }
+      },
+      responseType: 'text' as const
+    }
+
+    await expect(request.get('/document', config)).resolves.toBe('Npora')
+    await expect(request.get('/document', config)).resolves.toBe('Npora')
+
+    expect(cloneSpy).not.toHaveBeenCalled()
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('should skip cache snapshots for an unshared non-persistent miss', async () => {
+    const cloneSpy = vi.fn(globalThis.structuredClone)
+    const fetchMock = vi.fn().mockResolvedValue(
+      createJsonResponse({ ok: true })
+    )
+
+    vi.stubGlobal('structuredClone', cloneSpy)
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient().use(cachePlugin())
+
+    await expect(request.get('/transient', {
+      extensions: {
+        cache: {
+          enabled: true,
+          ttl: 0
+        }
+      }
+    })).resolves.toEqual({ ok: true })
+
+    expect(cloneSpy).not.toHaveBeenCalled()
+    expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 
   it('should isolate cache stores between plugin instances', async () => {
@@ -804,7 +973,8 @@ describe('cachePlugin', () => {
     const config = {
       extensions: {
         cache: {
-          enabled: true
+          enabled: true,
+          ttl: 0
         }
       }
     }
@@ -815,20 +985,25 @@ describe('cachePlugin', () => {
     })
 
     const second = request.get<{ value: number }>('/shared', config)
+    const third = request.get<{ value: number }>('/shared', config)
 
     await Promise.resolve()
     expect(fetchMock).toHaveBeenCalledTimes(1)
 
     resolveFetch(createJsonResponse({ value: 1 }))
 
-    const [firstData, secondData] = await Promise.all([
+    const [firstData, secondData, thirdData] = await Promise.all([
       first,
-      second
+      second,
+      third
     ])
 
     firstData.value = 2
 
     expect(secondData).toEqual({
+      value: 1
+    })
+    expect(thirdData).toEqual({
       value: 1
     })
     expect(fetchMock).toHaveBeenCalledTimes(1)

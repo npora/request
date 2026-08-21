@@ -1,21 +1,39 @@
 import type { RequestConfig } from '../types'
 
+let cachedURL: string | undefined
+let cachedBaseURL: string | undefined
+let cachedOrigin: string | undefined
+
+function parseOrigin(url: string, baseURL?: string): string | undefined {
+  if (url === cachedURL && baseURL === cachedBaseURL)
+    return cachedOrigin
+
+  try {
+    const origin = baseURL === undefined
+      ? new URL(url).origin
+      : new URL(url, baseURL).origin
+
+    cachedURL = url
+    cachedBaseURL = baseURL
+    cachedOrigin = origin
+    return origin
+  } catch {
+    return undefined
+  }
+}
+
 /**
  * Resolve the isolation origin shared by stateful request plugins.
  */
 export function resolveRequestOrigin(config: RequestConfig): string {
-  try {
-    return new URL(config.url).origin
-  } catch {
-    // Resolve a relative request only when its base is absolute.
+  if (config.url.includes(':')) {
+    const origin = parseOrigin(config.url)
+    if (origin !== undefined)
+      return origin
   }
 
-  try {
-    if (config.baseURL) {
-      return new URL(config.url, config.baseURL).origin
-    }
-  } catch {
-    // Relative bases do not provide a safe origin isolation key.
+  if (config.baseURL) {
+    return parseOrigin(config.url, config.baseURL) ?? 'default'
   }
 
   return 'default'

@@ -4,12 +4,35 @@ import {
   InterceptorManager,
   RequestError
 } from '../src'
+import { PluginHooks } from '../src/interceptors/PluginHooks'
 
 afterEach(() => {
   vi.unstubAllGlobals()
 })
 
 describe('interceptors', () => {
+  it('should track active plugin hooks for pipeline dispatch', () => {
+    const hooks = new PluginHooks()
+
+    expect(hooks.active).toBe(false)
+
+    const dispose = hooks.onResponse(() => {})
+
+    expect(hooks.active).toBe(true)
+
+    dispose()
+
+    expect(hooks.active).toBe(false)
+
+    const disposeRetry = hooks.onRetry(() => undefined)
+
+    expect(hooks.active).toBe(true)
+
+    disposeRetry()
+
+    expect(hooks.active).toBe(false)
+  })
+
   it('should track whether the optimized interceptor path is active', () => {
     const interceptors = new InterceptorManager<number>()
 
@@ -59,6 +82,33 @@ describe('interceptors', () => {
     const headers = init.headers as Headers
 
     expect(headers.get('authorization')).toBe('Bearer token')
+  })
+
+  it('should dispatch without an extra continuation after synchronous request interceptors', async () => {
+    let dispatched = false
+    const request = createClient({
+      adapter: {
+        async request(config) {
+          dispatched = true
+
+          return {
+            data: { ok: true },
+            status: 200,
+            statusText: 'OK',
+            headers: new Headers(),
+            config,
+            raw: new Response()
+          }
+        }
+      }
+    })
+
+    request.interceptors.request.use(config => config)
+
+    const result = request.get('/user')
+
+    expect(dispatched).toBe(true)
+    await expect(result).resolves.toEqual({ ok: true })
   })
 
   it('should run response interceptor', async () => {
@@ -218,6 +268,32 @@ describe('interceptors', () => {
       'high-first',
       'high-second',
       'normal-first'
+    ])
+  })
+
+  it('should preserve mixed synchronous and asynchronous interceptor order', async () => {
+    const interceptors = new InterceptorManager<number>()
+    const order: string[] = []
+
+    interceptors.use(value => {
+      order.push('sync-first')
+      return value + 1
+    })
+    interceptors.use(async value => {
+      await Promise.resolve()
+      order.push('async')
+      return value * 2
+    })
+    interceptors.use(value => {
+      order.push('sync-last')
+      return value + 3
+    })
+
+    await expect(interceptors.run(1)).resolves.toBe(7)
+    expect(order).toEqual([
+      'sync-first',
+      'async',
+      'sync-last'
     ])
   })
 })

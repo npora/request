@@ -5,6 +5,7 @@ import type {
   NporaResponse
 } from '../types'
 import type { Plugin } from './Plugin'
+import { isBodylessResponse } from '../utils/parseResponse'
 import { resolveExtensionConfig } from './resolveExtensionConfig'
 import { xhrRequest } from './xhrTransport'
 import { createTransferProgressTracker } from './transferProgress'
@@ -132,7 +133,10 @@ export function downloadPlugin(
         if (download.output === 'stream') {
           if (
             stream === undefined &&
-            isBodylessResponse(response)
+            isBodylessResponse(
+              response.config.method,
+              response.status
+            )
           ) {
             stream = createEmptyDownloadStream()
           }
@@ -176,15 +180,6 @@ export function downloadPlugin(
       })
     }
   }
-}
-
-function isBodylessResponse(response: NporaResponse): boolean {
-  return (
-    response.config.method === 'HEAD' ||
-    response.status === 204 ||
-    response.status === 205 ||
-    response.status === 304
-  )
 }
 
 function createEmptyDownloadStream(): ReadableStream<Uint8Array> {

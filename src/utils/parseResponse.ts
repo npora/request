@@ -5,6 +5,19 @@ import {
   parseServerSentEvents
 } from './parseStreamingResponse'
 
+const TEXT_DECODER = new TextDecoder()
+
+/** Classify responses that cannot expose an HTTP message body. */
+export function isBodylessResponse(
+  method: RequestConfig['method'],
+  status: number
+): boolean {
+  return method === 'HEAD' ||
+    status === 204 ||
+    status === 205 ||
+    status === 304
+}
+
 /**
  * Bound a Fetch response before it can be cloned into multiple body branches.
  */
@@ -159,27 +172,21 @@ export function finalizeStreamingResponse(
 }
 
 /**
- * Parse a Fetch response according to the request configuration.
+ * Parse a Fetch response with a body according to the request configuration.
+ * Transports short-circuit bodyless responses before calling this function.
  */
 export async function parseResponse<T = unknown>(
   response: Response,
-  config: RequestConfig
+  config: RequestConfig,
+  resolvedResponseType?: ResponseType
 ): Promise<T> {
-  if (
-    config.method === 'HEAD' ||
-    response.status === 204 ||
-    response.status === 205 ||
-    response.status === 304
-  ) {
-    return undefined as T
-  }
-
-  const responseType = resolveResponseType(response, config)
+  const responseType =
+    resolvedResponseType ?? resolveResponseType(response, config)
   const maxSize = config.maxResponseSize
 
   try {
     if (maxSize !== undefined && Number.isFinite(maxSize)) {
-      await rejectOversizedContentLength(response, maxSize, config)
+      rejectOversizedContentLength(response, maxSize, config)
 
       if (isStreamingResponseType(responseType)) {
         const stream = limitResponseStream(response, maxSize, config)
@@ -235,11 +242,11 @@ export async function parseResponse<T = unknown>(
   }
 }
 
-async function rejectOversizedContentLength(
+function rejectOversizedContentLength(
   response: Response,
   maxSize: number,
   config: RequestConfig
-): Promise<void> {
+): void {
   const contentLength = Number(response.headers.get('content-length'))
 
   if (!Number.isFinite(contentLength) || contentLength <= maxSize) {
@@ -311,7 +318,7 @@ function parseBufferedResponse<T>(
 ): T {
   switch (responseType) {
     case 'json':
-      return JSON.parse(new TextDecoder().decode(bytes)) as T
+      return JSON.parse(TEXT_DECODER.decode(bytes)) as T
 
     case 'blob':
       return new Blob([toArrayBuffer(bytes)], {
@@ -325,7 +332,7 @@ function parseBufferedResponse<T>(
       ) as T
 
     default:
-      return new TextDecoder().decode(bytes) as T
+      return TEXT_DECODER.decode(bytes) as T
   }
 }
 
@@ -424,7 +431,11 @@ function limitResponseStream(
         if (size > maxSize) {
           const error = createSizeError(response, maxSize, config)
 
-          await reader.cancel(error)
+          try {
+            await reader.cancel(error)
+          } catch {
+            // Preserve the stable size-limit error.
+          }
           release()
           controller.error(error)
           return
@@ -503,7 +514,16 @@ function copyResponseMetadata(source: Response, target: Response): void {
 }
 
 function detectResponseType(response: Response): ResponseType {
-  const contentType = response.headers.get('content-type') ?? ''
+  const contentType = response.headers.get('content-type')
+
+  if (!contentType || contentType === 'text/plain') {
+    return 'text'
+  }
+
+  if (contentType === 'application/json') {
+    return 'json'
+  }
+
   const parameterStart = contentType.indexOf(';')
   const mediaType = contentType
     .slice(0, parameterStart === -1 ? undefined : parameterStart)

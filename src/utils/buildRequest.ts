@@ -25,18 +25,38 @@ export function buildRequestWithHeaders(
   headers: Headers
 ): BuiltRequest {
   const body = buildBody(config, headers)
-  const timeoutSignal = createTimeoutSignal(config.signal, config.timeout)
+  const url = buildURL(config)
+  const init: RequestInit = {
+    ...config.fetchOptions,
+    method: config.method ?? 'GET',
+    headers,
+    body,
+    signal: config.signal
+  }
+
+  if (
+    body &&
+    typeof ReadableStream !== 'undefined' &&
+    body instanceof ReadableStream
+  ) {
+    (init as RequestInit & { duplex: 'half' }).duplex = 'half'
+  }
+
+  const timeoutEnabled = Boolean(
+    config.timeout && config.timeout > 0
+  )
+  const timeoutSignal = timeoutEnabled
+    ? createTimeoutSignal(config.signal, config.timeout)
+    : undefined
+
+  if (timeoutSignal) {
+    init.signal = timeoutSignal.signal
+  }
 
   return {
-    url: buildURL(config),
-    init: {
-      ...config.fetchOptions,
-      method: config.method ?? 'GET',
-      headers,
-      body,
-      signal: timeoutSignal.signal
-    },
-    clear: timeoutSignal.clear
+    url,
+    init,
+    clear: timeoutSignal?.clear ?? noop
   }
 }
 
@@ -294,3 +314,5 @@ function setContentType(headers: Headers, value: string): void {
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return Object.prototype.toString.call(value) === '[object Object]'
 }
+
+function noop(): void {}

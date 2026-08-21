@@ -10,7 +10,7 @@ Requirements:
 ```sh
 pnpm install --frozen-lockfile
 pnpm typecheck
-pnpm test:run
+pnpm test
 ```
 
 ## Making changes

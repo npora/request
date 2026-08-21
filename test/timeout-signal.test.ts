@@ -92,6 +92,11 @@ describe('createTimeoutSignal', () => {
       const controller = new AbortController()
 
       controller.abort('already-aborted')
+      const abortController = vi.fn(() => {
+        throw new Error('AbortController should not be created')
+      })
+
+      vi.stubGlobal('AbortController', abortController)
 
       const result = createTimeoutSignal(
         controller.signal,
@@ -100,6 +105,30 @@ describe('createTimeoutSignal', () => {
 
       expect(result.signal?.aborted).toBe(true)
       expect(result.signal?.reason).toBe('already-aborted')
+      expect(result.signal).toBe(controller.signal)
+      expect(abortController).not.toHaveBeenCalled()
+      expect(vi.getTimerCount()).toBe(0)
+    } finally {
+      vi.unstubAllGlobals()
+      vi.useRealTimers()
+    }
+  })
+
+  it('should not retain a timer when listener registration fails', () => {
+    vi.useFakeTimers()
+
+    try {
+      const signal = {
+        aborted: false,
+        addEventListener() {
+          throw new Error('listener registration failed')
+        },
+        removeEventListener() {}
+      } as unknown as AbortSignal
+
+      expect(() => createTimeoutSignal(signal, 1000)).toThrow(
+        'listener registration failed'
+      )
       expect(vi.getTimerCount()).toBe(0)
     } finally {
       vi.useRealTimers()
