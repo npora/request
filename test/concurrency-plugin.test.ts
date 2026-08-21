@@ -166,6 +166,40 @@ describe('concurrencyPlugin', () => {
     expect(adapter.started).not.toContain('/aborted')
   })
 
+  it('should release queue state when listener setup fails', async () => {
+    const adapter = new ControlledAdapter()
+    const concurrency = concurrencyPlugin({ maxConcurrent: 1 })
+    const request = createClient({ adapter }).use(concurrency)
+    const signal = {
+      aborted: false,
+      addEventListener() {
+        throw new Error('listener setup failed')
+      },
+      removeEventListener: vi.fn()
+    } as unknown as AbortSignal
+
+    const active = request.get('/active')
+    const queuedError = request.get('/queued', { signal }).catch(
+      error => error
+    )
+
+    await flush()
+    const error = await queuedError
+    const queuedState = concurrency.getState('default')
+
+    adapter.complete('/active')
+    await active
+
+    expect(error).toMatchObject({
+      message: 'listener setup failed'
+    })
+    expect(queuedState.queued).toBe(0)
+    expect(concurrency.getState('default')).toEqual({
+      active: 0,
+      queued: 0
+    })
+  })
+
   it('should time out while waiting without consuming a permit', async () => {
     vi.useFakeTimers()
 

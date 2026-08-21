@@ -628,4 +628,30 @@ describe('retryPlugin', () => {
     })
     expect(fetchMock).toHaveBeenCalledTimes(1)
   })
+
+  it('should not retain a retry timer when listener setup fails', async () => {
+    vi.useFakeTimers()
+
+    const signal = {
+      aborted: false,
+      addEventListener() {
+        throw new Error('listener setup failed')
+      },
+      removeEventListener: vi.fn()
+    } as unknown as AbortSignal
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response('Busy', { status: 503 })
+    )
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient().use(
+      retryPlugin({ retries: 1, delay: 1000 })
+    )
+
+    await expect(request.get('/busy', { signal })).rejects.toThrow(
+      'listener setup failed'
+    )
+    expect(vi.getTimerCount()).toBe(0)
+  })
 })

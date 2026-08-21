@@ -256,7 +256,6 @@ function enqueue(
       cleanup
     }
 
-    record.queue.push(entry)
     signal?.addEventListener('abort', onAbort, {
       once: true
     })
@@ -269,6 +268,8 @@ function enqueue(
         )
       }, timeout)
     }
+
+    record.queue.push(entry)
   })
 }
 

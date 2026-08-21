@@ -443,10 +443,7 @@ function waitForRetry(
   }
 
   return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => {
-      cleanup()
-      resolve()
-    }, Math.min(milliseconds, MAX_TIMER_DELAY))
+    let timer: ReturnType<typeof setTimeout>
 
     const onAbort = () => {
       clearTimeout(timer)
@@ -461,6 +458,11 @@ function waitForRetry(
     signal?.addEventListener('abort', onAbort, {
       once: true
     })
+
+    timer = setTimeout(() => {
+      cleanup()
+      resolve()
+    }, Math.min(milliseconds, MAX_TIMER_DELAY))
   })
 }
 
