@@ -288,9 +288,20 @@ function setAuthorizationHeader(
   token: string,
   scheme = 'Bearer'
 ): RequestConfig {
+  const authorization = `${scheme} ${token}`
+
+  if (config.headers === undefined) {
+    return {
+      ...config,
+      headers: {
+        authorization
+      }
+    }
+  }
+
   const headers = new Headers(config.headers)
 
-  headers.set('authorization', `${scheme} ${token}`)
+  headers.set('authorization', authorization)
 
   return {
     ...config,

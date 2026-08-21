@@ -51,6 +51,8 @@ pnpm benchmark -- \
   against an absolute base URL.
 - `authStaticTokenClient`: requests authorized by the authentication plugin
   with a static token.
+- `authBareTokenClient`: static-token authentication without pre-existing
+  request headers.
 - `retryOnceClient`: requests that fail once and retry immediately.
 - `httpErrorClient`: rejected requests without error hooks, retry hooks, or
   error interceptors.
@@ -94,6 +96,10 @@ Logger lifecycle state reuses a redacted URL while the effective URL remains
 unchanged, re-runs redaction if another plugin modifies it, and iterates query
 keys without first copying them into an array. The two logger scenarios keep
 both the inexpensive and sensitive-query paths visible.
+
+Static authentication creates a single-field header initializer directly when
+the request has no existing headers. The two authentication scenarios keep the
+bare fast path and full header-merge path visible.
 
 CI stores the JSON report as a build artifact. Correctness and resource
 cleanup remain enforced separately by unit, integration and browser stress

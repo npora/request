@@ -1,5 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { authPlugin, createClient } from '../src'
+import {
+  authPlugin,
+  createClient,
+  type Adapter
+} from '../src'
 
 function createJsonResponse(
   data: unknown,
@@ -21,6 +25,35 @@ afterEach(() => {
 })
 
 describe('authPlugin refresh token', () => {
+  it('should pass bare authorization headers to custom adapters', async () => {
+    let receivedHeaders: Headers | undefined
+    const adapter: Adapter = {
+      async request(config) {
+        receivedHeaders = new Headers(config.headers)
+
+        return {
+          data: { ok: true },
+          status: 200,
+          statusText: 'OK',
+          headers: new Headers(),
+          config,
+          raw: new Response()
+        }
+      }
+    }
+    const request = createClient({ adapter }).use(
+      authPlugin({
+        token: 'bare-token'
+      })
+    )
+
+    await request.get('/user')
+
+    expect(receivedHeaders?.get('authorization')).toBe(
+      'Bearer bare-token'
+    )
+  })
+
   it('should read request auth options from extensions', async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       createJsonResponse({

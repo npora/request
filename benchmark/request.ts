@@ -41,6 +41,10 @@ const requestConfig: RequestConfig = {
     mode: 'benchmark'
   }
 }
+const bareRequestConfig: RequestConfig = {
+  url: '/benchmark',
+  method: 'GET'
+}
 const client = createClient({
   adapter,
   headers: {
@@ -195,6 +199,10 @@ const authStaticTokenClientResult = await runSequential(
   options.operations,
   () => authStaticTokenClient.get('/benchmark', requestConfig)
 )
+const authBareTokenClientResult = await runSequential(
+  options.operations,
+  () => authStaticTokenClient.get('/benchmark', bareRequestConfig)
+)
 const retryOnceClientResult = await runSequential(
   options.operations,
   () => retryOnceClient.get('/benchmark', requestConfig)
@@ -287,6 +295,7 @@ const report = {
     concurrencyBaseClient: concurrencyBaseClientResult,
     circuitBreakerBaseClient: circuitBreakerBaseClientResult,
     authStaticTokenClient: authStaticTokenClientResult,
+    authBareTokenClient: authBareTokenClientResult,
     retryOnceClient: retryOnceClientResult,
     httpErrorClient: httpErrorClientResult,
     loggerNoopClient: loggerNoopClientResult,
@@ -322,6 +331,7 @@ async function warmUp(iterations: number): Promise<void> {
     await concurrencyBaseClient.get('/benchmark', requestConfig)
     await circuitBreakerBaseClient.get('/benchmark', requestConfig)
     await authStaticTokenClient.get('/benchmark', requestConfig)
+    await authStaticTokenClient.get('/benchmark', bareRequestConfig)
     await httpErrorClient.get('/benchmark', requestConfig)
       .catch(ignoreBenchmarkError)
     await loggerNoopClient.get('/benchmark', requestConfig)
