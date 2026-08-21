@@ -10,7 +10,9 @@ jitter functions, and zero-delay retries. Reuse normalized retry options for
 each logical request, and skip response-schema validation setup when no schema
 is configured. Keep synchronous response processing and fully synchronous
 plugin hook chains on the synchronous path while preserving asynchronous
-continuation and hook ordering. Avoid
+continuation and hook ordering. Keep error notification and final failure on
+the synchronous path until an asynchronous hook or interceptor requires a
+continuation. Avoid
 allocating observer Promises for synchronous logger, retry, and circuit-breaker
 callbacks. Resolve Fetch response types once and avoid double-wrapping bounded
 data-only response streams. Keep synchronous memory-cache reads, writes,

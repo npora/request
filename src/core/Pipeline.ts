@@ -105,10 +105,13 @@ export class Pipeline {
             ? await response
             : response
         } catch (error) {
-          const errorHooksSucceeded = await this.notifyError(
+          const errorHooks = this.notifyError(
             context,
             error
           )
+          const errorHooksSucceeded = isPromiseLike(errorHooks)
+            ? await errorHooks
+            : errorHooks
 
           if (!errorHooksSucceeded) {
             return this.fail(context, context.error, false)
@@ -291,10 +294,10 @@ export class Pipeline {
     }
   }
 
-  private async notifyError<T>(
+  private notifyError<T>(
     context: RequestContext<T>,
     error: unknown
-  ): Promise<boolean> {
+  ): boolean | Promise<boolean> {
     context.error = error
 
     if (this.hooks.hasErrorHooks) {
@@ -302,7 +305,13 @@ export class Pipeline {
         const hooks = this.hooks.runError(context)
 
         if (isPromiseLike(hooks)) {
-          await hooks
+          return Promise.resolve(hooks).then(
+            () => true,
+            hookError => {
+              context.error = hookError
+              return false
+            }
+          )
         }
 
         return true
@@ -315,21 +324,36 @@ export class Pipeline {
     return true
   }
 
-  private async fail<T>(
+  private fail<T>(
     context: RequestContext<T>,
     error: unknown,
     notifyHooks = true
-  ): Promise<never> {
+  ): never | Promise<never> {
     if (notifyHooks) {
-      await this.notifyError(context, error)
+      const hooks = this.notifyError(context, error)
+
+      if (isPromiseLike(hooks)) {
+        return Promise.resolve(hooks).then(() => {
+          return this.completeFailure(context)
+        })
+      }
     } else {
       context.error = error
     }
 
+    return this.completeFailure(context)
+  }
+
+  private completeFailure<T>(
+    context: RequestContext<T>
+  ): never | Promise<never> {
     if (this.interceptors.error.active) {
-      context.error = await this.interceptors.error.run(
+      return this.interceptors.error.run(
         context.error
-      )
+      ).then(error => {
+        context.error = error
+        throw context.error
+      })
     }
 
     throw context.error

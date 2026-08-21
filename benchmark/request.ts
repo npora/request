@@ -81,6 +81,9 @@ const retryOnceClient = createClient({
   retries: 1,
   delay: 0
 }))
+const httpErrorClient = createClient({
+  adapter: createErrorBenchmarkAdapter(500)
+})
 const loggerNoopClient = createClient({
   adapter
 }).use(loggerPlugin({
@@ -189,6 +192,11 @@ const retryOnceClientResult = await runSequential(
   options.operations,
   () => retryOnceClient.get('/benchmark', requestConfig)
 )
+const httpErrorClientResult = await runSequential(
+  options.operations,
+  () => httpErrorClient.get('/benchmark', requestConfig)
+    .catch(ignoreBenchmarkError)
+)
 const loggerNoopClientResult = await runSequential(
   options.operations,
   () => loggerNoopClient.get('/benchmark', requestConfig)
@@ -265,6 +273,7 @@ const report = {
     circuitBreakerBaseClient: circuitBreakerBaseClientResult,
     authStaticTokenClient: authStaticTokenClientResult,
     retryOnceClient: retryOnceClientResult,
+    httpErrorClient: httpErrorClientResult,
     loggerNoopClient: loggerNoopClientResult,
     authNonRefreshErrorClient: authNonRefreshErrorClientResult,
     fetchAdapterClient,
@@ -296,6 +305,8 @@ async function warmUp(iterations: number): Promise<void> {
     await concurrencyBaseClient.get('/benchmark', requestConfig)
     await circuitBreakerBaseClient.get('/benchmark', requestConfig)
     await authStaticTokenClient.get('/benchmark', requestConfig)
+    await httpErrorClient.get('/benchmark', requestConfig)
+      .catch(ignoreBenchmarkError)
     await loggerNoopClient.get('/benchmark', requestConfig)
     await fetchClient.get('/benchmark', {
       responseType: 'text'
