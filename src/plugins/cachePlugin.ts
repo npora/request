@@ -241,7 +241,7 @@ export function cachePlugin(
           return
         }
 
-        const key = createCacheKey(
+        const key = leaders.get(requestContext) ?? createCacheKey(
           requestContext.config,
           cache,
           varyHeaders,

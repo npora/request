@@ -426,6 +426,55 @@ describe('cachePlugin', () => {
     }))
   })
 
+  it('should persist a deduplicated miss under its request cache key', async () => {
+    const readKeys: string[] = []
+    const writtenKeys: string[] = []
+    const store: CacheStore = {
+      get(key) {
+        readKeys.push(key)
+        return undefined
+      },
+      set(key) {
+        writtenKeys.push(key)
+      },
+      delete() {},
+      clear() {}
+    }
+    const changeCacheKey: Plugin = {
+      name: 'change-cache-key',
+      install({ hooks }) {
+        hooks.onTransport(context => {
+          const cache = context.config.extensions?.cache
+
+          if (cache) {
+            cache.key = 'response-key'
+          }
+        })
+      }
+    }
+    const fetchMock = vi.fn().mockResolvedValue(
+      createJsonResponse({ ok: true })
+    )
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient()
+      .use(cachePlugin({ store }))
+      .use(changeCacheKey)
+
+    await request.get('/stable-key', {
+      extensions: {
+        cache: {
+          enabled: true,
+          key: 'request-key'
+        }
+      }
+    })
+
+    expect(readKeys).toEqual(['request-key'])
+    expect(writtenKeys).toEqual(['request-key'])
+  })
+
   it('should normalize query key order in the default cache key', async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       createJsonResponse({
