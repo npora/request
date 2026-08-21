@@ -52,6 +52,8 @@ export class MemoryCacheStore implements CacheStore {
 
   private readonly maxEntries: number
 
+  private newestKey: string | undefined
+
   constructor(options: MemoryCacheStoreOptions = {}) {
     this.maxEntries = normalizeMaxEntries(options.maxEntries)
   }
@@ -65,11 +67,19 @@ export class MemoryCacheStore implements CacheStore {
 
     if (isExpired(entry.expiresAt)) {
       this.entries.delete(key)
+
+      if (this.newestKey === key) {
+        this.newestKey = undefined
+      }
+
       return undefined
     }
 
-    this.entries.delete(key)
-    this.entries.set(key, entry)
+    if (this.newestKey !== key) {
+      this.entries.delete(key)
+      this.entries.set(key, entry)
+      this.newestKey = key
+    }
 
     return entry
   }
@@ -92,14 +102,20 @@ export class MemoryCacheStore implements CacheStore {
     }
 
     this.entries.set(key, entry)
+    this.newestKey = key
   }
 
   delete(key: string): void {
     this.entries.delete(key)
+
+    if (this.newestKey === key) {
+      this.newestKey = undefined
+    }
   }
 
   clear(): void {
     this.entries.clear()
+    this.newestKey = undefined
   }
 }
 

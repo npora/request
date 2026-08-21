@@ -26,8 +26,10 @@ temporary key array. Resolve Fetch response types once and avoid
 double-wrapping bounded data-only response streams. Keep synchronous
 memory-cache reads, writes,
 deletions, hits, and miss registration off the asynchronous hook path, and
-reuse immutable primitive cache values without structured cloning. Keep
-non-refreshing authentication errors and synchronous refresh policy decisions
+reuse immutable primitive cache values without structured cloning. Avoid
+rewriting the in-memory LRU order when the requested entry is already newest.
+Keep non-refreshing authentication errors and synchronous refresh policy
+decisions
 off the asynchronous retry path. Merge query and body configuration directly
 into the request result without temporary objects. Normalize cache vary-header
 names once, avoid per-request Map allocation while creating cache keys, and
