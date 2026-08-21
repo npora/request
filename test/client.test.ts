@@ -5,6 +5,7 @@ import type {
   RequestConfig
 } from '../src'
 import { createClient } from '../src'
+import { ConfigMerger } from '../src/core/ConfigMerger'
 
 describe('client', () => {
   it('should create client instance', () => {
@@ -66,6 +67,27 @@ describe('client', () => {
         method: 'GET'
       })
     )
+  })
+
+  it('should bypass config merging for bare method shortcuts', async () => {
+    const merge = vi.spyOn(ConfigMerger, 'merge')
+    const client = createClient({
+      adapter: createAdapter('bare')
+    })
+
+    await expect(client.get('/bare')).resolves.toEqual({
+      source: 'bare'
+    })
+    await expect(client.getResponse('/bare-response')).resolves.toMatchObject({
+      data: { source: 'bare' }
+    })
+    expect(merge).not.toHaveBeenCalled()
+
+    await expect(client.get('/configured', {
+      responseType: 'text'
+    })).resolves.toEqual({ source: 'bare' })
+    expect(merge).toHaveBeenCalledTimes(1)
+    merge.mockRestore()
   })
 
   it('should reject synchronous adapter failures through the Promise API', async () => {

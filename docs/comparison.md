@@ -10,7 +10,7 @@ Snapshot date: 2026-08-21.
 
 | Project | Version | GitHub stars | Runtime focus | Runtime dependencies | npm unpacked size |
 | --- | ---: | ---: | --- | ---: | ---: |
-| Npora Request | 1.14.1 | 0 | Browser, Node, and Worker; Fetch-first resilient client | 0 | 208 kB |
+| Npora Request | 1.14.2 | 0 | Browser, Node, and Worker; Fetch-first resilient client | 0 | 224 kB |
 | [Axios](https://github.com/axios/axios) | 1.19.0 | 109,198 | Browser and Node; multi-adapter full client | 4 | 1,868 kB |
 | [Ky](https://github.com/sindresorhus/ky) | 2.0.2 | 17,032 | Modern Fetch runtimes; compact typed client | 0 | 405 kB |
 | [Got](https://github.com/sindresorhus/got) | 15.1.0 | 14,930 | Node; feature-rich native HTTP client | 12 | 371 kB |

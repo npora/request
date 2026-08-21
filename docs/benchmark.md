@@ -31,6 +31,8 @@ pnpm benchmark -- \
 
 - `directAdapter`: adapter-only control measurement.
 - `sequentialClient`: complete client pipeline, one request at a time.
+- `bareSequentialClient`: method shortcut without client defaults or request
+  options, measuring the minimum validated Client path.
 - `sequentialPluginPipeline`: sequential client with synchronous request and
   response interceptors plus request and response plugin hooks.
 - `concurrentClient`: complete client pipeline with bounded concurrency.
@@ -126,6 +128,12 @@ instead of building intermediate entry arrays and objects. Request-specific
 headers remain isolated from reusable client defaults. Body-mode detection
 checks only the four own configuration fields, avoiding duplicate value and
 ownership probes on body-free requests.
+
+Method shortcuts without client defaults or request options reuse an internal
+empty configuration marker and construct only the final URL and method pair.
+Explicit request options continue through the full isolation merge. Request
+configuration and record serializers cache the native own-property intrinsic
+instead of resolving its prototype chain for every field.
 
 Request method and response-type validation use direct branch dispatch instead
 of scanning constant option arrays. Retry decisions skip elapsed-time and event

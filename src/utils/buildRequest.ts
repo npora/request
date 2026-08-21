@@ -1,5 +1,6 @@
 import type { QueryParams, RequestConfig } from '../types'
 import { createTimeoutSignal } from './createTimeoutSignal'
+import { hasOwnProperty } from './hasOwnProperty'
 import { isURLSearchParams } from './isURLSearchParams'
 
 export interface BuiltRequest {
@@ -133,7 +134,7 @@ function stringifyQuery(query: QueryParams): string {
 
   for (const key in query) {
     if (
-      Object.prototype.hasOwnProperty.call(query, key)
+      hasOwnProperty.call(query, key)
     ) {
       appendQuery(params, key, query[key])
     }
@@ -212,7 +213,7 @@ function buildURLSearchParams(
 
   for (const key in form) {
     if (
-      Object.prototype.hasOwnProperty.call(form, key)
+      hasOwnProperty.call(form, key)
     ) {
       appendQuery(params, key, form[key])
     }
@@ -234,7 +235,7 @@ function buildFormData(
 
   for (const key in input) {
     if (
-      Object.prototype.hasOwnProperty.call(input, key)
+      hasOwnProperty.call(input, key)
     ) {
       appendFormDataValue(
         formData,

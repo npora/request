@@ -20,6 +20,8 @@ import type {
 
 type MethodConfig = Omit<RequestConfig, 'url' | 'method'>
 
+const EMPTY_METHOD_CONFIG: MethodConfig = {}
+
 type SchemaMethodConfig<Schema extends StandardSchemaV1> = Omit<
   MethodConfig,
   'schema'
@@ -50,7 +52,9 @@ export class Client {
   constructor(options: ClientOptions = {}) {
     const { adapter = new FetchAdapter(), ...defaults } = options
 
-    this.defaults = defaults
+    this.defaults = Reflect.ownKeys(defaults).length === 0
+      ? EMPTY_METHOD_CONFIG
+      : defaults
     this.adapter = adapter
     this.pipeline = this.createPipeline(adapter)
   }
@@ -194,7 +198,7 @@ export class Client {
 
   get<T = unknown>(
     url: string,
-    config: MethodConfig = {}
+    config: MethodConfig = EMPTY_METHOD_CONFIG
   ): Promise<T> {
     return this.requestMethod<T>(url, 'GET', config)
   }
@@ -211,7 +215,7 @@ export class Client {
 
   getResponse<T = unknown>(
     url: string,
-    config: MethodConfig = {}
+    config: MethodConfig = EMPTY_METHOD_CONFIG
   ): Promise<NporaResponse<T>> {
     return this.requestMethodResponse<T>(url, 'GET', config)
   }
@@ -228,7 +232,7 @@ export class Client {
 
   post<T = unknown>(
     url: string,
-    config: MethodConfig = {}
+    config: MethodConfig = EMPTY_METHOD_CONFIG
   ): Promise<T> {
     return this.requestMethod<T>(url, 'POST', config)
   }
@@ -245,7 +249,7 @@ export class Client {
 
   postResponse<T = unknown>(
     url: string,
-    config: MethodConfig = {}
+    config: MethodConfig = EMPTY_METHOD_CONFIG
   ): Promise<NporaResponse<T>> {
     return this.requestMethodResponse<T>(url, 'POST', config)
   }
@@ -262,7 +266,7 @@ export class Client {
 
   put<T = unknown>(
     url: string,
-    config: MethodConfig = {}
+    config: MethodConfig = EMPTY_METHOD_CONFIG
   ): Promise<T> {
     return this.requestMethod<T>(url, 'PUT', config)
   }
@@ -279,7 +283,7 @@ export class Client {
 
   putResponse<T = unknown>(
     url: string,
-    config: MethodConfig = {}
+    config: MethodConfig = EMPTY_METHOD_CONFIG
   ): Promise<NporaResponse<T>> {
     return this.requestMethodResponse<T>(url, 'PUT', config)
   }
@@ -296,7 +300,7 @@ export class Client {
 
   patch<T = unknown>(
     url: string,
-    config: MethodConfig = {}
+    config: MethodConfig = EMPTY_METHOD_CONFIG
   ): Promise<T> {
     return this.requestMethod<T>(url, 'PATCH', config)
   }
@@ -313,7 +317,7 @@ export class Client {
 
   patchResponse<T = unknown>(
     url: string,
-    config: MethodConfig = {}
+    config: MethodConfig = EMPTY_METHOD_CONFIG
   ): Promise<NporaResponse<T>> {
     return this.requestMethodResponse<T>(url, 'PATCH', config)
   }
@@ -330,7 +334,7 @@ export class Client {
 
   delete<T = unknown>(
     url: string,
-    config: MethodConfig = {}
+    config: MethodConfig = EMPTY_METHOD_CONFIG
   ): Promise<T> {
     return this.requestMethod<T>(url, 'DELETE', config)
   }
@@ -347,21 +351,21 @@ export class Client {
 
   deleteResponse<T = unknown>(
     url: string,
-    config: MethodConfig = {}
+    config: MethodConfig = EMPTY_METHOD_CONFIG
   ): Promise<NporaResponse<T>> {
     return this.requestMethodResponse<T>(url, 'DELETE', config)
   }
 
   head(
     url: string,
-    config: Omit<MethodConfig, 'schema'> = {}
+    config: Omit<MethodConfig, 'schema'> = EMPTY_METHOD_CONFIG
   ): Promise<void> {
     return this.requestMethod<void>(url, 'HEAD', config)
   }
 
   headResponse(
     url: string,
-    config: Omit<MethodConfig, 'schema'> = {}
+    config: Omit<MethodConfig, 'schema'> = EMPTY_METHOD_CONFIG
   ): Promise<NporaResponse<void>> {
     return this.requestMethodResponse<void>(url, 'HEAD', config)
   }
@@ -378,7 +382,7 @@ export class Client {
 
   options<T = unknown>(
     url: string,
-    config: MethodConfig = {}
+    config: MethodConfig = EMPTY_METHOD_CONFIG
   ): Promise<T> {
     return this.requestMethod<T>(url, 'OPTIONS', config)
   }
@@ -395,7 +399,7 @@ export class Client {
 
   optionsResponse<T = unknown>(
     url: string,
-    config: MethodConfig = {}
+    config: MethodConfig = EMPTY_METHOD_CONFIG
   ): Promise<NporaResponse<T>> {
     return this.requestMethodResponse<T>(url, 'OPTIONS', config)
   }
@@ -514,6 +518,13 @@ export class Client {
     method: HttpMethod,
     config: MethodConfig
   ): RequestConfig {
+    if (
+      this.defaults === EMPTY_METHOD_CONFIG &&
+      config === EMPTY_METHOD_CONFIG
+    ) {
+      return { url, method }
+    }
+
     const merged = ConfigMerger.merge(
       this.defaults,
       config as RequestConfig

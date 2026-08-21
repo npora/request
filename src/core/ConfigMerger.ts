@@ -1,4 +1,5 @@
 import type { RequestConfig } from '../types'
+import { hasOwnProperty } from '../utils/hasOwnProperty'
 import { isURLSearchParams } from '../utils/isURLSearchParams'
 
 /**
@@ -170,7 +171,7 @@ export class ConfigMerger {
 
     for (const key in headers) {
       if (
-        Object.prototype.hasOwnProperty.call(headers, key)
+        hasOwnProperty.call(headers, key)
       ) {
         setHeader(
           result,
@@ -215,7 +216,7 @@ export class ConfigMerger {
     }
     for (const key in extensions) {
       if (
-        !Object.prototype.hasOwnProperty.call(
+        !hasOwnProperty.call(
           extensions,
           key
         )
@@ -244,10 +245,10 @@ export class ConfigMerger {
     config: Partial<RequestConfig>
   ): boolean {
     return (
-      Object.prototype.hasOwnProperty.call(config, 'body') ||
-      Object.prototype.hasOwnProperty.call(config, 'json') ||
-      Object.prototype.hasOwnProperty.call(config, 'form') ||
-      Object.prototype.hasOwnProperty.call(config, 'formData')
+      hasOwnProperty.call(config, 'body') ||
+      hasOwnProperty.call(config, 'json') ||
+      hasOwnProperty.call(config, 'form') ||
+      hasOwnProperty.call(config, 'formData')
     )
   }
 
@@ -257,10 +258,10 @@ export class ConfigMerger {
     config: Partial<RequestConfig>
   ): void {
     const hasRequestBodyConfig =
-      Object.prototype.hasOwnProperty.call(config, 'body') ||
-      Object.prototype.hasOwnProperty.call(config, 'json') ||
-      Object.prototype.hasOwnProperty.call(config, 'form') ||
-      Object.prototype.hasOwnProperty.call(config, 'formData')
+      hasOwnProperty.call(config, 'body') ||
+      hasOwnProperty.call(config, 'json') ||
+      hasOwnProperty.call(config, 'form') ||
+      hasOwnProperty.call(config, 'formData')
 
     if (!hasRequestBodyConfig) {
       result.body = defaults.body
