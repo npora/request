@@ -57,10 +57,7 @@ export class ConfigMerger {
       defaults.searchParams ||
       config.searchParams
     ) {
-      Object.assign(
-        result,
-        this.mergeQueryConfig(defaults, config)
-      )
+      this.mergeQueryConfig(result, defaults, config)
     }
 
     if (defaults.extensions || config.extensions) {
@@ -74,48 +71,40 @@ export class ConfigMerger {
       this.hasBodyConfig(defaults) ||
       this.hasBodyConfig(config)
     ) {
-      Object.assign(
-        result,
-        this.mergeBodyConfig(defaults, config)
-      )
+      this.mergeBodyConfig(result, defaults, config)
     }
 
     return result
   }
 
   private static mergeQueryConfig(
+    result: Partial<RequestConfig>,
     defaults: Partial<RequestConfig>,
     config: Partial<RequestConfig>
-  ): Pick<RequestConfig, 'query' | 'searchParams'> {
+  ): void {
     if (config.searchParams !== undefined) {
-      return {
-        query: config.query,
-        searchParams:
-          isURLSearchParams(config.searchParams)
-            ? new URLSearchParams(config.searchParams)
-            : config.searchParams
-      }
+      result.query = config.query
+      result.searchParams = isURLSearchParams(config.searchParams)
+        ? new URLSearchParams(config.searchParams)
+        : config.searchParams
+      return
     }
 
     if (config.query !== undefined) {
-      return {
-        query: this.mergeObject(
-          defaults.searchParams ? undefined : defaults.query,
-          config.query
-        ),
-        searchParams: undefined
-      }
+      result.query = this.mergeObject(
+        defaults.searchParams ? undefined : defaults.query,
+        config.query
+      )
+      result.searchParams = undefined
+      return
     }
 
-    return {
-      query: defaults.query
-        ? { ...defaults.query }
-        : undefined,
-      searchParams:
-        isURLSearchParams(defaults.searchParams)
-          ? new URLSearchParams(defaults.searchParams)
-          : defaults.searchParams
-    }
+    result.query = defaults.query
+      ? { ...defaults.query }
+      : undefined
+    result.searchParams = isURLSearchParams(defaults.searchParams)
+      ? new URLSearchParams(defaults.searchParams)
+      : defaults.searchParams
   }
 
   private static mergeFetchOptions(
@@ -265,9 +254,10 @@ export class ConfigMerger {
   }
 
   private static mergeBodyConfig(
+    result: Partial<RequestConfig>,
     defaults: Partial<RequestConfig>,
     config: Partial<RequestConfig>
-  ): Pick<RequestConfig, 'body' | 'json' | 'form' | 'formData'> {
+  ): void {
     const hasRequestBodyConfig =
       Object.prototype.hasOwnProperty.call(config, 'body') ||
       Object.prototype.hasOwnProperty.call(config, 'json') ||
@@ -275,20 +265,17 @@ export class ConfigMerger {
       Object.prototype.hasOwnProperty.call(config, 'formData')
 
     if (!hasRequestBodyConfig) {
-      return {
-        body: defaults.body,
-        json: defaults.json,
-        form: defaults.form,
-        formData: defaults.formData
-      }
+      result.body = defaults.body
+      result.json = defaults.json
+      result.form = defaults.form
+      result.formData = defaults.formData
+      return
     }
 
-    return {
-      body: config.body,
-      json: config.json,
-      form: config.form,
-      formData: config.formData
-    }
+    result.body = config.body
+    result.json = config.json
+    result.form = config.form
+    result.formData = config.formData
   }
 }
 
