@@ -184,6 +184,13 @@ describe('loggerPlugin', () => {
   it('should redact sensitive URL values and omit secret config', async () => {
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const sensitiveURL =
+      '/error?access_token=url-secret&view=full' +
+      '&token=second-secret&secret=third-secret' +
+      '&access_token=duplicate-secret#details'
+    const redactedURL =
+      '/error?access_token=%5BREDACTED%5D&view=full' +
+      '&token=%5BREDACTED%5D&secret=%5BREDACTED%5D#details'
 
     vi.stubGlobal(
       'fetch',
@@ -194,7 +201,7 @@ describe('loggerPlugin', () => {
 
     await expect(
       request.get(
-        '/error?access_token=url-secret&view=full#details',
+        sensitiveURL,
         {
           headers: {
             authorization: 'Bearer header-secret',
@@ -219,14 +226,15 @@ describe('loggerPlugin', () => {
     })
 
     expect(requestEntry).toMatchObject({
-      url:
-        '/error?access_token=%5BREDACTED%5D&view=full#details'
+      url: redactedURL
     })
     expect(errorEntry).toMatchObject({
-      url:
-        '/error?access_token=%5BREDACTED%5D&view=full#details'
+      url: redactedURL
     })
     expect(serializedLogs).not.toContain('url-secret')
+    expect(serializedLogs).not.toContain('second-secret')
+    expect(serializedLogs).not.toContain('third-secret')
+    expect(serializedLogs).not.toContain('duplicate-secret')
     expect(serializedLogs).not.toContain('header-secret')
     expect(serializedLogs).not.toContain('cookie-secret')
     expect(serializedLogs).not.toContain('config-secret')

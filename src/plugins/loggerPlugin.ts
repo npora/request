@@ -219,7 +219,7 @@ function redactURL(url: string): string {
     hashIndex === -1 ? '' : safeURL.slice(hashIndex)
   const params = new URLSearchParams(query)
 
-  for (const key of [...params.keys()]) {
+  for (const key of params.keys()) {
     if (SENSITIVE_QUERY_KEYS.has(key.toLowerCase())) {
       params.set(key, '[REDACTED]')
     }

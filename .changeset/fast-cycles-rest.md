@@ -18,7 +18,8 @@ interceptors, or schemas directly after validation without allocating lifecycle
 context or timestamps. Avoid
 allocating observer Promises for synchronous logger, retry, and circuit-breaker
 callbacks, and reuse logger URL redaction across lifecycle entries while the
-effective URL is unchanged. Resolve Fetch response types once and avoid
+effective URL is unchanged. Iterate sensitive query keys directly without a
+temporary key array. Resolve Fetch response types once and avoid
 double-wrapping bounded data-only response streams. Keep synchronous
 memory-cache reads, writes,
 deletions, hits, and miss registration off the asynchronous hook path, and

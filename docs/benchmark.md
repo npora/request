@@ -91,8 +91,9 @@ so repeated key, snapshot and coordination setup remain visible in
 comparisons.
 
 Logger lifecycle state reuses a redacted URL while the effective URL remains
-unchanged, and re-runs redaction if another plugin modifies it. The two logger
-scenarios keep both the inexpensive and sensitive-query paths visible.
+unchanged, re-runs redaction if another plugin modifies it, and iterates query
+keys without first copying them into an array. The two logger scenarios keep
+both the inexpensive and sensitive-query paths visible.
 
 CI stores the JSON report as a build artifact. Correctness and resource
 cleanup remain enforced separately by unit, integration and browser stress
