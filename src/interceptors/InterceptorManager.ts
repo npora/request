@@ -1,3 +1,5 @@
+import { isPromiseLike } from '../utils/isPromiseLike'
+
 export type Interceptor<T> = (value: T) => T | Promise<T>
 
 export interface InterceptorOptions {
@@ -57,7 +59,11 @@ export class InterceptorManager<T> {
     let result = value
 
     for (const entry of this.orderedInterceptors) {
-      result = await entry.interceptor(result)
+      const next = entry.interceptor(result)
+
+      result = isPromiseLike(next)
+        ? await next
+        : next
     }
 
     return result

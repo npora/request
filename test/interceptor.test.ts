@@ -220,4 +220,30 @@ describe('interceptors', () => {
       'normal-first'
     ])
   })
+
+  it('should preserve mixed synchronous and asynchronous interceptor order', async () => {
+    const interceptors = new InterceptorManager<number>()
+    const order: string[] = []
+
+    interceptors.use(value => {
+      order.push('sync-first')
+      return value + 1
+    })
+    interceptors.use(async value => {
+      await Promise.resolve()
+      order.push('async')
+      return value * 2
+    })
+    interceptors.use(value => {
+      order.push('sync-last')
+      return value + 3
+    })
+
+    await expect(interceptors.run(1)).resolves.toBe(7)
+    expect(order).toEqual([
+      'sync-first',
+      'async',
+      'sync-last'
+    ])
+  })
 })

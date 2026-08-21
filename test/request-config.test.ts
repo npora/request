@@ -132,6 +132,23 @@ describe('request config', () => {
     })
   })
 
+  it('should skip timeout controller allocation when timeout is disabled', () => {
+    const abortController = vi.fn(() => {
+      throw new Error('AbortController should not be created')
+    })
+
+    vi.stubGlobal('AbortController', abortController)
+
+    const request = buildRequest({
+      url: '/users',
+      timeout: 0
+    })
+
+    expect(request.init.signal).toBeUndefined()
+    expect(abortController).not.toHaveBeenCalled()
+    expect(() => request.clear()).not.toThrow()
+  })
+
   it('should serialize json body', () => {
     const { init } = buildRequest({
       url: '/users',

@@ -1,4 +1,5 @@
 import type { RequestContext } from '../core/RequestContext'
+import { isPromiseLike } from '../utils/isPromiseLike'
 
 export interface RetryDecision {
   retry: boolean
@@ -112,19 +113,31 @@ export class PluginHooks {
 
   async runRequest(context: RequestContext<unknown>): Promise<void> {
     for (const hook of this.requestHooks.values()) {
-      await hook(context)
+      const result = hook(context)
+
+      if (isPromiseLike(result)) {
+        await result
+      }
     }
   }
 
   async runResponse(context: RequestContext<unknown>): Promise<void> {
     for (const hook of this.responseHooks.values()) {
-      await hook(context)
+      const result = hook(context)
+
+      if (isPromiseLike(result)) {
+        await result
+      }
     }
   }
 
   async runTransport(context: RequestContext<unknown>): Promise<void> {
     for (const hook of this.transportHooks.values()) {
-      await hook(context)
+      const result = hook(context)
+
+      if (isPromiseLike(result)) {
+        await result
+      }
 
       if (context.response) {
         return
@@ -134,14 +147,22 @@ export class PluginHooks {
 
   async runError(context: RequestContext<unknown>): Promise<void> {
     for (const hook of this.errorHooks.values()) {
-      await hook(context)
+      const result = hook(context)
+
+      if (isPromiseLike(result)) {
+        await result
+      }
     }
   }
 
   async runSettled(context: RequestContext<unknown>): Promise<void> {
     for (const hook of this.settledHooks.values()) {
       try {
-        await hook(context)
+        const result = hook(context)
+
+        if (isPromiseLike(result)) {
+          await result
+        }
       } catch {
         // Final observers are isolated from each other and the request result.
       }
@@ -153,7 +174,10 @@ export class PluginHooks {
     attempt: number
   ): Promise<RetryDecision> {
     for (const hook of this.retryHooks.values()) {
-      const decision = await hook(context, attempt)
+      const result = hook(context, attempt)
+      const decision = isPromiseLike(result)
+        ? await result
+        : result
 
       if (decision) {
         return decision

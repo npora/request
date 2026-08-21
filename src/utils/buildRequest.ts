@@ -25,7 +25,12 @@ export function buildRequestWithHeaders(
   headers: Headers
 ): BuiltRequest {
   const body = buildBody(config, headers)
-  const timeoutSignal = createTimeoutSignal(config.signal, config.timeout)
+  const timeoutEnabled = Boolean(
+    config.timeout && config.timeout > 0
+  )
+  const timeoutSignal = timeoutEnabled
+    ? createTimeoutSignal(config.signal, config.timeout)
+    : undefined
 
   return {
     url: buildURL(config),
@@ -34,9 +39,9 @@ export function buildRequestWithHeaders(
       method: config.method ?? 'GET',
       headers,
       body,
-      signal: timeoutSignal.signal
+      signal: timeoutSignal?.signal ?? config.signal
     },
-    clear: timeoutSignal.clear
+    clear: timeoutSignal?.clear ?? noop
   }
 }
 
@@ -294,3 +299,5 @@ function setContentType(headers: Headers, value: string): void {
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return Object.prototype.toString.call(value) === '[object Object]'
 }
+
+function noop(): void {}

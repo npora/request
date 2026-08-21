@@ -268,16 +268,11 @@ export class ConfigMerger {
     defaults: Partial<RequestConfig>,
     config: Partial<RequestConfig>
   ): Pick<RequestConfig, 'body' | 'json' | 'form' | 'formData'> {
-    const keys = [
-      'body',
-      'json',
-      'form',
-      'formData'
-    ] as const
-
-    const hasRequestBodyConfig = keys.some(key => {
-      return Object.prototype.hasOwnProperty.call(config, key)
-    })
+    const hasRequestBodyConfig =
+      Object.prototype.hasOwnProperty.call(config, 'body') ||
+      Object.prototype.hasOwnProperty.call(config, 'json') ||
+      Object.prototype.hasOwnProperty.call(config, 'form') ||
+      Object.prototype.hasOwnProperty.call(config, 'formData')
 
     if (!hasRequestBodyConfig) {
       return {
