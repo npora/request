@@ -73,3 +73,5 @@ Cap retry and concurrency queue delays at the same platform limit, including
 delays returned by custom retry hooks, so oversized waits cannot wrap to 1ms.
 Register abort listeners before retaining retry timers or concurrency queue
 entries, preventing resource leaks when listener setup fails.
+Parse Retry-After delay seconds as decimal digits only, falling back to the
+configured retry delay for invalid negative or fractional values.

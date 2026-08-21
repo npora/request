@@ -314,6 +314,42 @@ describe('retryPlugin', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2)
   })
 
+  it('should ignore an invalid numeric Retry-After value', async () => {
+    vi.useFakeTimers()
+
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response('Busy', {
+          status: 503,
+          headers: {
+            'retry-after': '-1'
+          }
+        })
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ ok: true }), {
+          status: 200,
+          headers: {
+            'content-type': 'application/json'
+          }
+        })
+      )
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient().use(
+      retryPlugin({ retries: 1, delay: 100 })
+    )
+    const promise = request.get('/busy')
+
+    await vi.advanceTimersByTimeAsync(99)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+
+    await vi.advanceTimersByTimeAsync(1)
+    await expect(promise).resolves.toEqual({ ok: true })
+  })
+
   it('should cap retry delays at the platform timer limit', async () => {
     vi.useFakeTimers()
 

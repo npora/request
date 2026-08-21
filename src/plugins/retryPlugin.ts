@@ -474,10 +474,12 @@ function parseRetryAfter(error: unknown): number | undefined {
     return undefined
   }
 
-  const seconds = Number(value)
+  if (/^\d+$/.test(value)) {
+    return Number(value) * 1000
+  }
 
-  if (Number.isFinite(seconds)) {
-    return Math.max(0, seconds * 1000)
+  if (!value.includes(':')) {
+    return undefined
   }
 
   const date = Date.parse(value)
