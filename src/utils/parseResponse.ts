@@ -511,7 +511,16 @@ function copyResponseMetadata(source: Response, target: Response): void {
 }
 
 function detectResponseType(response: Response): ResponseType {
-  const contentType = response.headers.get('content-type') ?? ''
+  const contentType = response.headers.get('content-type')
+
+  if (!contentType || contentType === 'text/plain') {
+    return 'text'
+  }
+
+  if (contentType === 'application/json') {
+    return 'json'
+  }
+
   const parameterStart = contentType.indexOf(';')
   const mediaType = contentType
     .slice(0, parameterStart === -1 ? undefined : parameterStart)

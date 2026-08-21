@@ -237,6 +237,10 @@ const fetchAdapterClient = await runSequential(
     responseType: 'text'
   })
 )
+const fetchAdapterAutoTextClient = await runSequential(
+  options.operations,
+  () => fetchClient.get('/benchmark')
+)
 const fetchAdapterCompleteResponse = await runSequential(
   options.operations,
   () => fetchClient.getResponse('/benchmark', {
@@ -302,6 +306,7 @@ const report = {
     loggerSensitiveQueryClient: loggerSensitiveQueryClientResult,
     authNonRefreshErrorClient: authNonRefreshErrorClientResult,
     fetchAdapterClient,
+    fetchAdapterAutoTextClient,
     fetchAdapterCompleteResponse,
     fetchAdapterBoundedClient,
     fetchAdapterQueryClient
@@ -342,6 +347,7 @@ async function warmUp(iterations: number): Promise<void> {
     await fetchClient.get('/benchmark', {
       responseType: 'text'
     })
+    await fetchClient.get('/benchmark')
   }
 }
 

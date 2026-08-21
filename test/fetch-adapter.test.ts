@@ -102,6 +102,21 @@ describe('FetchAdapter', () => {
     expect(response.data).toBe(source)
   })
 
+  it('should default responses without a content type to text', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(new TextEncoder().encode('plain response'))
+      )
+    )
+
+    const response = await new FetchAdapter().request<string>({
+      url: 'https://api.example.com/plain'
+    })
+
+    expect(response.data).toBe('plain response')
+  })
+
   it('should throw HTTP_ERROR when status is invalid', async () => {
     vi.stubGlobal(
       'fetch',
