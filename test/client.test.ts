@@ -68,6 +68,40 @@ describe('client', () => {
     )
   })
 
+  it('should reject synchronous adapter failures through the Promise API', async () => {
+    const client = createClient({
+      adapter: {
+        request(): Promise<NporaResponse> {
+          throw new Error('synchronous adapter failure')
+        }
+      }
+    })
+
+    const result = client.get('/user')
+
+    await expect(result).rejects.toThrow(
+      'synchronous adapter failure'
+    )
+  })
+
+  it('should reject method configuration merge failures through the Promise API', async () => {
+    const invalidConfig = new Proxy({}, {
+      ownKeys() {
+        throw new Error('configuration merge failure')
+      }
+    })
+    const client = createClient({
+      adapter: createAdapter('unused')
+    })
+
+    await expect(
+      client.get('/user', invalidConfig)
+    ).rejects.toThrow('configuration merge failure')
+    await expect(
+      client.getResponse('/user', invalidConfig)
+    ).rejects.toThrow('configuration merge failure')
+  })
+
   it('should expose the complete response when requested', async () => {
     const adapter: Adapter = {
       async request<T = unknown>(
@@ -92,6 +126,26 @@ describe('client', () => {
     expect(response.data).toEqual({ name: 'Npora' })
     expect(response.status).toBe(201)
     expect(response.headers.get('x-request-id')).toBe('request-1')
+  })
+
+  it('should preserve overridden request dispatch for method shortcuts', async () => {
+    const client = createClient({
+      adapter: createAdapter('shortcut')
+    })
+    const requestSpy = vi.spyOn(client, 'request')
+    const responseSpy = vi.spyOn(client, 'requestResponse')
+
+    await client.get('/data')
+    await client.getResponse('/response')
+
+    expect(requestSpy).toHaveBeenCalledWith({
+      url: '/data',
+      method: 'GET'
+    })
+    expect(responseSpy).toHaveBeenCalledWith({
+      url: '/response',
+      method: 'GET'
+    })
   })
 
   it('should extend client defaults without mutating the parent', async () => {

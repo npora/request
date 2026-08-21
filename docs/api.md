@@ -420,6 +420,10 @@ request.interceptors.error.use(error => error)
 
 Interceptors are user-level extension points.
 
+Synchronous interceptors remain on the synchronous lifecycle path. If an
+interceptor returns a Promise, the remaining interceptors continue
+asynchronously in the same deterministic order.
+
 Errors thrown by request or response interceptors follow the same error
 lifecycle as adapter failures. Plugin error hooks run before user error
 interceptors. Failures in request, error or retry hooks are also forwarded to

@@ -84,6 +84,33 @@ describe('interceptors', () => {
     expect(headers.get('authorization')).toBe('Bearer token')
   })
 
+  it('should dispatch without an extra continuation after synchronous request interceptors', async () => {
+    let dispatched = false
+    const request = createClient({
+      adapter: {
+        async request(config) {
+          dispatched = true
+
+          return {
+            data: { ok: true },
+            status: 200,
+            statusText: 'OK',
+            headers: new Headers(),
+            config,
+            raw: new Response()
+          }
+        }
+      }
+    })
+
+    request.interceptors.request.use(config => config)
+
+    const result = request.get('/user')
+
+    expect(dispatched).toBe(true)
+    await expect(result).resolves.toEqual({ ok: true })
+  })
+
   it('should run response interceptor', async () => {
     vi.stubGlobal(
       'fetch',

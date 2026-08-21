@@ -39,6 +39,11 @@ the result, and allocate the shared completion Promise only when the first
 follower arrives. Reuse concurrency isolation records as admission state and
 refresh their retention order only when they become inactive, avoiding a
 temporary admission object and redundant Map writes on successful requests.
+Return hook-free adapter Promises directly, merge method-shortcut configuration
+once, and keep synchronous interceptors on the synchronous lifecycle path until
+a Promise requires continuation. Validate request methods and response types by
+direct branching, and skip retry event and elapsed-time bookkeeping when no
+jitter, elapsed-time budget, or retry observer needs it.
 Rely on native ES2020 error subclassing instead of repairing the request-error
 prototype on every failure. Avoid exception-driven origin resolution for
 relative concurrency and circuit-breaker request URLs, and reuse the last exact

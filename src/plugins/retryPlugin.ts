@@ -214,6 +214,18 @@ function finalizeRetryDecision(
     retryAfter ?? configuredDelay,
     options.maxDelay
   )
+
+  if (
+    (retryAfter !== undefined || options.jitter === false) &&
+    options.maxElapsedTime === Number.POSITIVE_INFINITY &&
+    !options.onRetry
+  ) {
+    return {
+      retry: true,
+      delay: baseDelay
+    }
+  }
+
   const elapsedTime = Math.max(0, Date.now() - startTime)
   const pendingEvent = {
     attempt: attempt + 1,

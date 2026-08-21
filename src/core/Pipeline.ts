@@ -26,7 +26,7 @@ export class Pipeline {
     private readonly hooks: PluginHooks
   ) {}
 
-  async execute<T = unknown>(
+  execute<T = unknown>(
     config: RequestConfig,
     preserveRaw = true
   ): Promise<NporaResponse<T>> {
@@ -37,26 +37,43 @@ export class Pipeline {
       !this.interceptors.response.active &&
       !this.interceptors.error.active
     ) {
-      const headers = validateRequestConfig(config)
+      try {
+        const headers = validateRequestConfig(config)
 
-      return this.adapter.requestValidated
-        ? this.adapter.requestValidated<T>(
-            config,
-            headers,
-            preserveRaw
-          )
-        : this.adapter.request<T>(config)
+        return this.adapter.requestValidated
+          ? this.adapter.requestValidated<T>(
+              config,
+              headers,
+              preserveRaw
+            )
+          : this.adapter.request<T>(config)
+      } catch (error) {
+        return Promise.reject(error)
+      }
     }
 
+    return this.executeLifecycle<T>(config, preserveRaw)
+  }
+
+  private async executeLifecycle<T>(
+    config: RequestConfig,
+    preserveRaw: boolean
+  ): Promise<NporaResponse<T>> {
     const context = new RequestContext<T>(config)
     let validatedHeaders: Headers | undefined
 
     try {
       try {
         if (this.interceptors.request.active) {
-          context.config = await this.interceptors.request.run(
-            context.config
-          )
+          const intercepted = (
+            this.interceptors.request as unknown as InternalInterceptorManager<
+              RequestConfig
+            >
+          ).runMaybeAsync(context.config)
+
+          context.config = isPromiseLike(intercepted)
+            ? await intercepted
+            : intercepted
         }
 
         let headers = validateRequestConfig(context.config)
@@ -223,12 +240,21 @@ export class Pipeline {
     context: RequestContext<T>
   ): NporaResponse<T> | Promise<NporaResponse<T>> {
     if (this.interceptors.response.active) {
-      return this.interceptors.response.run(
-        context.response as NporaResponse
-      ).then(response => {
-        context.response = response as NporaResponse<T>
-        return context.response
-      })
+      const intercepted = (
+        this.interceptors.response as unknown as InternalInterceptorManager<
+          NporaResponse
+        >
+      ).runMaybeAsync(context.response as NporaResponse)
+
+      if (isPromiseLike(intercepted)) {
+        return Promise.resolve(intercepted).then(response => {
+          context.response = response as NporaResponse<T>
+          return context.response
+        })
+      }
+
+      context.response = intercepted as NporaResponse<T>
+      return context.response
     }
 
     return context.response as NporaResponse<T>
@@ -366,16 +392,29 @@ export class Pipeline {
     context: RequestContext<T>
   ): never | Promise<never> {
     if (this.interceptors.error.active) {
-      return this.interceptors.error.run(
-        context.error
-      ).then(error => {
-        context.error = error
-        throw context.error
-      })
+      const intercepted = (
+        this.interceptors.error as unknown as InternalInterceptorManager<
+          unknown
+        >
+      ).runMaybeAsync(context.error)
+
+      if (isPromiseLike(intercepted)) {
+        return Promise.resolve(intercepted).then(error => {
+          context.error = error
+          throw context.error
+        })
+      }
+
+      context.error = intercepted
+      throw context.error
     }
 
     throw context.error
   }
+}
+
+interface InternalInterceptorManager<T> {
+  runMaybeAsync(value: T): T | Promise<T>
 }
 
 function waitForRetry(

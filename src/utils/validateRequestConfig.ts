@@ -1,9 +1,5 @@
 import { RequestError } from '../errors'
-import type {
-  HttpMethod,
-  RequestConfig,
-  ResponseType
-} from '../types'
+import type { RequestConfig } from '../types'
 import { isURLSearchParams } from './isURLSearchParams'
 
 const BODY_FIELDS = [
@@ -12,26 +8,6 @@ const BODY_FIELDS = [
   'form',
   'formData'
 ] as const
-
-const RESPONSE_TYPES: readonly ResponseType[] = [
-  'json',
-  'text',
-  'blob',
-  'arrayBuffer',
-  'stream',
-  'sse',
-  'ndjson'
-]
-
-const HTTP_METHODS: readonly HttpMethod[] = [
-  'GET',
-  'POST',
-  'PUT',
-  'PATCH',
-  'DELETE',
-  'HEAD',
-  'OPTIONS'
-]
 
 /**
  * Validate configuration before request hooks or adapters act on it.
@@ -70,20 +46,36 @@ function validateQuery(config: RequestConfig): void {
 }
 
 function validateMethod(config: RequestConfig): void {
-  if (
-    config.method !== undefined &&
-    !HTTP_METHODS.includes(config.method)
-  ) {
-    throw configError('Request method is invalid', config)
+  switch (config.method) {
+    case undefined:
+    case 'GET':
+    case 'POST':
+    case 'PUT':
+    case 'PATCH':
+    case 'DELETE':
+    case 'HEAD':
+    case 'OPTIONS':
+      return
+
+    default:
+      throw configError('Request method is invalid', config)
   }
 }
 
 function validateResponseOptions(config: RequestConfig): void {
-  if (
-    config.responseType !== undefined &&
-    !RESPONSE_TYPES.includes(config.responseType)
-  ) {
-    throw configError('Request responseType is invalid', config)
+  switch (config.responseType) {
+    case undefined:
+    case 'json':
+    case 'text':
+    case 'blob':
+    case 'arrayBuffer':
+    case 'stream':
+    case 'sse':
+    case 'ndjson':
+      break
+
+    default:
+      throw configError('Request responseType is invalid', config)
   }
 
   if (

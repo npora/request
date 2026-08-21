@@ -110,14 +110,15 @@ tests.
 
 Interceptor and plugin-hook priority is recalculated only when registrations
 change. Requests iterate cached ordered arrays, and clients without active
-interceptors or hooks skip those async stages entirely. Synchronous response
-hooks and hook-free responses remain on the synchronous response-processing
-path until a schema, interceptor, or Promise requires continuation. This keeps
-plugin ordering deterministic without allocating and sorting collections on
-every request. Error notification and final rejection likewise stay synchronous
-until an asynchronous error hook or error interceptor requires continuation.
-Requests without any hooks, interceptors, or response schema dispatch directly
-after validation without allocating lifecycle context or timestamps.
+interceptors or hooks skip those async stages entirely. Synchronous
+interceptors and plugin hooks remain on the synchronous lifecycle path until a
+Promise requires continuation. This keeps plugin ordering deterministic without
+allocating and sorting collections on every request. Error notification and
+final rejection likewise stay synchronous until an asynchronous hook or
+interceptor requires continuation. Requests without any hooks, interceptors, or
+response schema dispatch directly after validation without allocating lifecycle
+context, timestamps, or an adopting Pipeline Promise. Method shortcuts merge
+their configuration once before dispatch.
 
 Configuration merging creates nested values only when either side supplies
 them. Header normalization writes directly into one case-insensitive result
@@ -125,6 +126,10 @@ instead of building intermediate entry arrays and objects. Request-specific
 headers remain isolated from reusable client defaults. Body-mode detection
 checks only the four own configuration fields, avoiding duplicate value and
 ownership probes on body-free requests.
+
+Request method and response-type validation use direct branch dispatch instead
+of scanning constant option arrays. Retry decisions skip elapsed-time and event
+bookkeeping when jitter, elapsed-time limits and retry observers are all absent.
 
 Cache entries retain isolation cloning for objects and binary values. Immutable
 primitive data bypasses `structuredClone`, avoiding exception or clone overhead

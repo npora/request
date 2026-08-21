@@ -11,6 +11,7 @@ import { createPluginScope } from '../plugins/PluginScope'
 import type {
   Adapter,
   ClientOptions,
+  HttpMethod,
   NporaResponse,
   RequestConfig,
   ServerSentEvent,
@@ -170,11 +171,15 @@ export class Client {
     config: RequestConfig
   ): Promise<NporaResponse<T>>
 
-  async requestResponse<T = unknown>(
+  requestResponse<T = unknown>(
     config: RequestConfig
   ): Promise<NporaResponse<T>> {
-    const mergedConfig = ConfigMerger.merge(this.defaults, config)
-    return this.pipeline.execute<T>(mergedConfig)
+    try {
+      const mergedConfig = ConfigMerger.merge(this.defaults, config)
+      return this.pipeline.execute<T>(mergedConfig)
+    } catch (error) {
+      return Promise.reject(error)
+    }
   }
 
   get<Schema extends StandardSchemaV1>(
@@ -191,11 +196,7 @@ export class Client {
     url: string,
     config: MethodConfig = {}
   ): Promise<T> {
-    return this.request<T>({
-      ...config,
-      url,
-      method: 'GET'
-    })
+    return this.requestMethod<T>(url, 'GET', config)
   }
 
   getResponse<Schema extends StandardSchemaV1>(
@@ -212,11 +213,7 @@ export class Client {
     url: string,
     config: MethodConfig = {}
   ): Promise<NporaResponse<T>> {
-    return this.requestResponse<T>({
-      ...config,
-      url,
-      method: 'GET'
-    })
+    return this.requestMethodResponse<T>(url, 'GET', config)
   }
 
   post<Schema extends StandardSchemaV1>(
@@ -233,11 +230,7 @@ export class Client {
     url: string,
     config: MethodConfig = {}
   ): Promise<T> {
-    return this.request<T>({
-      ...config,
-      url,
-      method: 'POST'
-    })
+    return this.requestMethod<T>(url, 'POST', config)
   }
 
   postResponse<Schema extends StandardSchemaV1>(
@@ -254,11 +247,7 @@ export class Client {
     url: string,
     config: MethodConfig = {}
   ): Promise<NporaResponse<T>> {
-    return this.requestResponse<T>({
-      ...config,
-      url,
-      method: 'POST'
-    })
+    return this.requestMethodResponse<T>(url, 'POST', config)
   }
 
   put<Schema extends StandardSchemaV1>(
@@ -275,11 +264,7 @@ export class Client {
     url: string,
     config: MethodConfig = {}
   ): Promise<T> {
-    return this.request<T>({
-      ...config,
-      url,
-      method: 'PUT'
-    })
+    return this.requestMethod<T>(url, 'PUT', config)
   }
 
   putResponse<Schema extends StandardSchemaV1>(
@@ -296,11 +281,7 @@ export class Client {
     url: string,
     config: MethodConfig = {}
   ): Promise<NporaResponse<T>> {
-    return this.requestResponse<T>({
-      ...config,
-      url,
-      method: 'PUT'
-    })
+    return this.requestMethodResponse<T>(url, 'PUT', config)
   }
 
   patch<Schema extends StandardSchemaV1>(
@@ -317,11 +298,7 @@ export class Client {
     url: string,
     config: MethodConfig = {}
   ): Promise<T> {
-    return this.request<T>({
-      ...config,
-      url,
-      method: 'PATCH'
-    })
+    return this.requestMethod<T>(url, 'PATCH', config)
   }
 
   patchResponse<Schema extends StandardSchemaV1>(
@@ -338,11 +315,7 @@ export class Client {
     url: string,
     config: MethodConfig = {}
   ): Promise<NporaResponse<T>> {
-    return this.requestResponse<T>({
-      ...config,
-      url,
-      method: 'PATCH'
-    })
+    return this.requestMethodResponse<T>(url, 'PATCH', config)
   }
 
   delete<Schema extends StandardSchemaV1>(
@@ -359,11 +332,7 @@ export class Client {
     url: string,
     config: MethodConfig = {}
   ): Promise<T> {
-    return this.request<T>({
-      ...config,
-      url,
-      method: 'DELETE'
-    })
+    return this.requestMethod<T>(url, 'DELETE', config)
   }
 
   deleteResponse<Schema extends StandardSchemaV1>(
@@ -380,33 +349,21 @@ export class Client {
     url: string,
     config: MethodConfig = {}
   ): Promise<NporaResponse<T>> {
-    return this.requestResponse<T>({
-      ...config,
-      url,
-      method: 'DELETE'
-    })
+    return this.requestMethodResponse<T>(url, 'DELETE', config)
   }
 
   head(
     url: string,
     config: Omit<MethodConfig, 'schema'> = {}
   ): Promise<void> {
-    return this.request<void>({
-      ...config,
-      url,
-      method: 'HEAD'
-    })
+    return this.requestMethod<void>(url, 'HEAD', config)
   }
 
   headResponse(
     url: string,
     config: Omit<MethodConfig, 'schema'> = {}
   ): Promise<NporaResponse<void>> {
-    return this.requestResponse<void>({
-      ...config,
-      url,
-      method: 'HEAD'
-    })
+    return this.requestMethodResponse<void>(url, 'HEAD', config)
   }
 
   options<Schema extends StandardSchemaV1>(
@@ -423,11 +380,7 @@ export class Client {
     url: string,
     config: MethodConfig = {}
   ): Promise<T> {
-    return this.request<T>({
-      ...config,
-      url,
-      method: 'OPTIONS'
-    })
+    return this.requestMethod<T>(url, 'OPTIONS', config)
   }
 
   optionsResponse<Schema extends StandardSchemaV1>(
@@ -444,11 +397,7 @@ export class Client {
     url: string,
     config: MethodConfig = {}
   ): Promise<NporaResponse<T>> {
-    return this.requestResponse<T>({
-      ...config,
-      url,
-      method: 'OPTIONS'
-    })
+    return this.requestMethodResponse<T>(url, 'OPTIONS', config)
   }
 
   /**
@@ -515,6 +464,67 @@ export class Client {
     })
   }
 
+  private requestMethod<T>(
+    url: string,
+    method: HttpMethod,
+    config: MethodConfig
+  ): Promise<T> {
+    if (this.request !== Client.prototype.request) {
+      return this.request<T>({
+        ...config,
+        url,
+        method
+      })
+    }
+
+    try {
+      return this.pipeline.execute<T>(
+        this.mergeMethodConfig(url, method, config),
+        false
+      ).then(readResponseData)
+    } catch (error) {
+      return Promise.reject(error)
+    }
+  }
+
+  private requestMethodResponse<T>(
+    url: string,
+    method: HttpMethod,
+    config: MethodConfig
+  ): Promise<NporaResponse<T>> {
+    if (this.requestResponse !== Client.prototype.requestResponse) {
+      return this.requestResponse<T>({
+        ...config,
+        url,
+        method
+      })
+    }
+
+    try {
+      return this.pipeline.execute<T>(
+        this.mergeMethodConfig(url, method, config)
+      )
+    } catch (error) {
+      return Promise.reject(error)
+    }
+  }
+
+  private mergeMethodConfig(
+    url: string,
+    method: HttpMethod,
+    config: MethodConfig
+  ): RequestConfig {
+    const merged = ConfigMerger.merge(
+      this.defaults,
+      config as RequestConfig
+    )
+
+    merged.url = url
+    merged.method = method
+
+    return merged
+  }
+
   private createPipeline(adapter: Adapter): Pipeline {
     return new Pipeline(adapter, this.interceptors, this.hooks)
   }
@@ -578,4 +588,8 @@ export class Client {
 interface InstalledPlugin {
   plugin: Plugin
   cleanup: PluginCleanup
+}
+
+function readResponseData<T>(response: NporaResponse<T>): T {
+  return response.data
 }
