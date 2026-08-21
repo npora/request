@@ -478,7 +478,10 @@ function parseRetryAfter(error: unknown): number | undefined {
     return Number(value) * 1000
   }
 
-  if (!value.includes(':')) {
+  if (
+    !value.includes(':') ||
+    !/^(Mo|T[uh]|We|Fr|S[au])/.test(value)
+  ) {
     return undefined
   }
 

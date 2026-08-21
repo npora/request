@@ -314,16 +314,21 @@ describe('retryPlugin', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2)
   })
 
-  it('should ignore an invalid numeric Retry-After value', async () => {
+  it.each([
+    '-1',
+    '2099-01-01T00:00:00Z',
+    'November 6, 2099 08:49:37 GMT'
+  ])('should ignore invalid Retry-After value %s', async retryAfter => {
     vi.useFakeTimers()
 
+    const controller = new AbortController()
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce(
         new Response('Busy', {
           status: 503,
           headers: {
-            'retry-after': '-1'
+            'retry-after': retryAfter
           }
         })
       )
@@ -341,9 +346,54 @@ describe('retryPlugin', () => {
     const request = createClient().use(
       retryPlugin({ retries: 1, delay: 100 })
     )
-    const promise = request.get('/busy')
+    const outcome = request.get('/busy', {
+      signal: controller.signal
+    }).catch(error => error)
 
     await vi.advanceTimersByTimeAsync(99)
+    const callsBeforeDelay = fetchMock.mock.calls.length
+
+    await vi.advanceTimersByTimeAsync(1)
+    const callsAfterDelay = fetchMock.mock.calls.length
+
+    controller.abort()
+    await outcome
+
+    expect(callsBeforeDelay).toBe(1)
+    expect(callsAfterDelay).toBe(2)
+  })
+
+  it('should respect a valid Retry-After HTTP date', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-08-21T00:00:00Z'))
+
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response('Busy', {
+          status: 503,
+          headers: {
+            'retry-after': new Date(Date.now() + 1000).toUTCString()
+          }
+        })
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ ok: true }), {
+          status: 200,
+          headers: {
+            'content-type': 'application/json'
+          }
+        })
+      )
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient().use(
+      retryPlugin({ retries: 1, delay: 0 })
+    )
+    const promise = request.get('/busy')
+
+    await vi.advanceTimersByTimeAsync(999)
     expect(fetchMock).toHaveBeenCalledTimes(1)
 
     await vi.advanceTimersByTimeAsync(1)
