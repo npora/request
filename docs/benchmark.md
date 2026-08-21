@@ -35,6 +35,10 @@ pnpm benchmark -- \
 - `concurrentPluginPipeline`: concurrent client with request/response
   interceptors and request/response plugin hooks.
 - `cacheHitClient`: repeated data reads from the default in-memory cache.
+- `concurrencyImmediateClient`: sequential requests admitted immediately by
+  the concurrency plugin without queueing.
+- `circuitBreakerSuccessClient`: successful requests tracked by a closed
+  circuit breaker.
 - `fetchAdapterClient`: complete FetchAdapter lifecycle against an in-memory
   Fetch response, without network latency.
 - `fetchAdapterCompleteResponse`: the same Fetch lifecycle while preserving

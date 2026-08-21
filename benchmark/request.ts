@@ -1,5 +1,7 @@
 import {
   cachePlugin,
+  circuitBreakerPlugin,
+  concurrencyPlugin,
   createClient,
   type Adapter,
   type NporaResponse,
@@ -47,6 +49,12 @@ const pipelineClient = createClient({
 const cacheClient = createClient({
   adapter
 }).use(cachePlugin())
+const concurrencyClient = createClient({
+  adapter
+}).use(concurrencyPlugin())
+const circuitBreakerClient = createClient({
+  adapter
+}).use(circuitBreakerPlugin())
 const cachedRequestConfig: RequestConfig = {
   url: '/benchmark-cache',
   method: 'GET',
@@ -98,6 +106,14 @@ const pluginPipeline = await runConcurrent(
 const cacheHitClient = await runSequential(
   options.operations,
   () => cacheClient.get('/benchmark-cache', cachedRequestConfig)
+)
+const concurrencyImmediateClient = await runSequential(
+  options.operations,
+  () => concurrencyClient.get('/benchmark', requestConfig)
+)
+const circuitBreakerSuccessClient = await runSequential(
+  options.operations,
+  () => circuitBreakerClient.get('/benchmark', requestConfig)
 )
 const fetchAdapterClient = await runSequential(
   options.operations,
@@ -158,6 +174,8 @@ const report = {
     concurrentClient: concurrent,
     concurrentPluginPipeline: pluginPipeline,
     cacheHitClient,
+    concurrencyImmediateClient,
+    circuitBreakerSuccessClient,
     fetchAdapterClient,
     fetchAdapterCompleteResponse,
     fetchAdapterBoundedClient,
@@ -182,6 +200,8 @@ async function warmUp(iterations: number): Promise<void> {
   for (let index = 0; index < iterations; index += 1) {
     await client.get('/benchmark', requestConfig)
     await pipelineClient.get('/benchmark', requestConfig)
+    await concurrencyClient.get('/benchmark', requestConfig)
+    await circuitBreakerClient.get('/benchmark', requestConfig)
     await fetchClient.get('/benchmark', {
       responseType: 'text'
     })

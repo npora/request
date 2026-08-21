@@ -101,7 +101,7 @@ export function concurrencyPlugin(
       const admissions = new WeakMap<object, Admission>()
       let active = true
 
-      context.hooks.onRequest(async requestContext => {
+      context.hooks.onRequest(requestContext => {
         const requestOptions = resolveExtensionConfig(
           requestContext.config,
           'concurrency'
@@ -144,11 +144,11 @@ export function concurrencyPlugin(
           normalized.queueTimeout
         )
 
-        await enqueue(record, requestContext, timeout)
-
-        if (!active) {
-          throw createRemovedError(requestContext.config)
-        }
+        return enqueue(record, requestContext, timeout).then(() => {
+          if (!active) {
+            throw createRemovedError(requestContext.config)
+          }
+        })
       })
 
       context.hooks.onSettled(requestContext => {
