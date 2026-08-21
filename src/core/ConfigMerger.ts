@@ -242,10 +242,6 @@ export class ConfigMerger {
     config: Partial<RequestConfig>
   ): boolean {
     return (
-      config.body !== undefined ||
-      config.json !== undefined ||
-      config.form !== undefined ||
-      config.formData !== undefined ||
       Object.prototype.hasOwnProperty.call(config, 'body') ||
       Object.prototype.hasOwnProperty.call(config, 'json') ||
       Object.prototype.hasOwnProperty.call(config, 'form') ||

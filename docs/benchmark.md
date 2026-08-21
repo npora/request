@@ -94,7 +94,9 @@ until an asynchronous error hook or error interceptor requires continuation.
 Configuration merging creates nested values only when either side supplies
 them. Header normalization writes directly into one case-insensitive result
 instead of building intermediate entry arrays and objects. Request-specific
-headers remain isolated from reusable client defaults.
+headers remain isolated from reusable client defaults. Body-mode detection
+checks only the four own configuration fields, avoiding duplicate value and
+ownership probes on body-free requests.
 
 The Pipeline passes its final validated `Headers` directly to the first
 adapter attempt. FetchAdapter reuses that instance for request construction;
