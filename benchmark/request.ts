@@ -143,6 +143,10 @@ const sequential = await runSequential(
   options.operations,
   () => client.get('/benchmark', requestConfig)
 )
+const sequentialPluginPipeline = await runSequential(
+  options.operations,
+  () => pipelineClient.get('/benchmark', requestConfig)
+)
 const concurrent = await runConcurrent(
   options.operations,
   options.concurrency,
@@ -250,6 +254,7 @@ const report = {
   scenarios: {
     directAdapter: direct,
     sequentialClient: sequential,
+    sequentialPluginPipeline,
     concurrentClient: concurrent,
     concurrentPluginPipeline: pluginPipeline,
     cacheHitClient,

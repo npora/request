@@ -60,7 +60,10 @@ export class Pipeline {
 
       if (context.response) {
         try {
-          return await this.processResponse(context)
+          const response = this.processResponse(context)
+          return isPromiseLike(response)
+            ? await response
+            : response
         } catch (error) {
           return this.fail(context, error)
         }
@@ -97,7 +100,10 @@ export class Pipeline {
                   )
           }
 
-          return await this.processResponse(context)
+          const response = this.processResponse(context)
+          return isPromiseLike(response)
+            ? await response
+            : response
         } catch (error) {
           const errorHooksSucceeded = await this.notifyError(
             context,
@@ -164,25 +170,44 @@ export class Pipeline {
     }
   }
 
-  private async processResponse<T>(
+  private processResponse<T>(
     context: RequestContext<T>
-  ): Promise<NporaResponse<T>> {
+  ): NporaResponse<T> | Promise<NporaResponse<T>> {
     if (this.hooks.hasResponseHooks) {
       const hooks = this.hooks.runResponse(context)
 
       if (isPromiseLike(hooks)) {
-        await hooks
+        return Promise.resolve(hooks).then(() => {
+          return this.processValidatedResponse(context)
+        })
       }
     }
 
+    return this.processValidatedResponse(context)
+  }
+
+  private processValidatedResponse<T>(
+    context: RequestContext<T>
+  ): NporaResponse<T> | Promise<NporaResponse<T>> {
     if (context.config.schema && context.response) {
-      await this.validateResponseSchema(context)
+      return this.validateResponseSchema(context).then(() => {
+        return this.processResponseInterceptors(context)
+      })
     }
 
+    return this.processResponseInterceptors(context)
+  }
+
+  private processResponseInterceptors<T>(
+    context: RequestContext<T>
+  ): NporaResponse<T> | Promise<NporaResponse<T>> {
     if (this.interceptors.response.active) {
-      context.response = (await this.interceptors.response.run(
+      return this.interceptors.response.run(
         context.response as NporaResponse
-      )) as NporaResponse<T>
+      ).then(response => {
+        context.response = response as NporaResponse<T>
+        return context.response
+      })
     }
 
     return context.response as NporaResponse<T>

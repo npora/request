@@ -8,8 +8,9 @@ circuit-breaker settlement overhead. Avoid Promise chains for synchronous
 authentication token providers, storage, retry policies, delay functions,
 jitter functions, and zero-delay retries. Reuse normalized retry options for
 each logical request, and skip response-schema validation setup when no schema
-is configured. Keep fully synchronous plugin hook chains on the synchronous
-path while preserving asynchronous continuation and hook ordering. Avoid
+is configured. Keep synchronous response processing and fully synchronous
+plugin hook chains on the synchronous path while preserving asynchronous
+continuation and hook ordering. Avoid
 allocating observer Promises for synchronous logger, retry, and circuit-breaker
 callbacks. Resolve Fetch response types once and avoid double-wrapping bounded
 data-only response streams. Keep synchronous memory-cache reads, writes,

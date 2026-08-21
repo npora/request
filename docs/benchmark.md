@@ -31,6 +31,8 @@ pnpm benchmark -- \
 
 - `directAdapter`: adapter-only control measurement.
 - `sequentialClient`: complete client pipeline, one request at a time.
+- `sequentialPluginPipeline`: sequential client with synchronous request and
+  response interceptors plus request and response plugin hooks.
 - `concurrentClient`: complete client pipeline with bounded concurrency.
 - `concurrentPluginPipeline`: concurrent client with request/response
   interceptors and request/response plugin hooks.
@@ -80,9 +82,11 @@ tests.
 
 Interceptor and plugin-hook priority is recalculated only when registrations
 change. Requests iterate cached ordered arrays, and clients without active
-interceptors or hooks skip those async stages entirely. This keeps plugin
-ordering deterministic without allocating and sorting collections on every
-request.
+interceptors or hooks skip those async stages entirely. Synchronous response
+hooks and hook-free responses remain on the synchronous response-processing
+path until a schema, interceptor, or Promise requires continuation. This keeps
+plugin ordering deterministic without allocating and sorting collections on
+every request.
 
 Configuration merging creates nested values only when either side supplies
 them. Header normalization writes directly into one case-insensitive result

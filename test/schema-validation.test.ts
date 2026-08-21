@@ -4,6 +4,7 @@ import {
   createClient,
   RequestError,
   SchemaValidationError,
+  type Plugin,
   type StandardSchemaV1
 } from '../src'
 
@@ -167,6 +168,54 @@ describe('response schema validation', () => {
         id: 42,
         name: 'Npora'
       }
+    ])
+  })
+
+  it('should preserve async response hook, schema, and interceptor order', async () => {
+    stubJsonResponse({ stage: 'adapter' })
+    const order: string[] = []
+    const plugin: Plugin = {
+      name: 'async-response-order',
+      install({ hooks }) {
+        hooks.onResponse(async context => {
+          order.push('hook:start')
+          await Promise.resolve()
+          order.push('hook:end')
+
+          if (context.response) {
+            context.response = {
+              ...context.response,
+              data: { stage: 'hook' }
+            }
+          }
+        })
+      }
+    }
+    const schema: StandardSchemaV1<unknown, { stage: string }> = {
+      '~standard': {
+        version: 1,
+        vendor: 'response-order',
+        validate(value) {
+          order.push('schema')
+          return { value: value as { stage: string } }
+        }
+      }
+    }
+    const request = createClient().use(plugin)
+
+    request.interceptors.response.use(response => {
+      order.push('interceptor')
+      return response
+    })
+
+    await expect(request.get('/ordered', { schema })).resolves.toEqual({
+      stage: 'hook'
+    })
+    expect(order).toEqual([
+      'hook:start',
+      'hook:end',
+      'schema',
+      'interceptor'
     ])
   })
 
