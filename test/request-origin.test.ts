@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { resolveRequestOrigin } from '../src/utils/resolveRequestOrigin'
 
 describe('resolveRequestOrigin', () => {
@@ -38,5 +38,26 @@ describe('resolveRequestOrigin', () => {
       baseURL: '/api',
       url: '/users'
     })).toBe('default')
+  })
+
+  it('should reuse the last exact successful origin parse', () => {
+    const NativeURL = URL
+    const URLSpy = vi.fn(function (url: string | URL, base?: string | URL) {
+      return new NativeURL(url, base)
+    })
+    vi.stubGlobal('URL', URLSpy)
+
+    try {
+      const config = {
+        baseURL: 'https://cache-test.example.com/v1',
+        url: '/cached-origin'
+      }
+
+      expect(resolveRequestOrigin(config)).toBe('https://cache-test.example.com')
+      expect(resolveRequestOrigin(config)).toBe('https://cache-test.example.com')
+      expect(URLSpy).toHaveBeenCalledTimes(1)
+    } finally {
+      vi.unstubAllGlobals()
+    }
   })
 })

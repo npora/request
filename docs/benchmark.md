@@ -41,6 +41,10 @@ pnpm benchmark -- \
   the concurrency plugin without queueing.
 - `circuitBreakerSuccessClient`: successful requests tracked by a closed
   circuit breaker.
+- `concurrencyBaseClient`: immediately admitted concurrency-plugin requests
+  resolved against an absolute base URL.
+- `circuitBreakerBaseClient`: successful circuit-breaker requests resolved
+  against an absolute base URL.
 - `authStaticTokenClient`: requests authorized by the authentication plugin
   with a static token.
 - `retryOnceClient`: requests that fail once and retry immediately.
@@ -102,7 +106,8 @@ path.
 Stateful isolation plugins resolve ordinary relative URLs without first
 attempting an absolute `URL` parse. Absolute and base-relative requests retain
 standards-based origin parsing without using expected exceptions as control
-flow.
+flow. Repeated isolation checks for the same exact URL and base URL reuse a
+single bounded successful-origin entry.
 
 Request construction avoids success-path body-field arrays and iterates query,
 form and FormData records without intermediate entry arrays. URL joining uses

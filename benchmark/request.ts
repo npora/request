@@ -62,6 +62,14 @@ const concurrencyClient = createClient({
 const circuitBreakerClient = createClient({
   adapter
 }).use(circuitBreakerPlugin())
+const concurrencyBaseClient = createClient({
+  adapter,
+  baseURL: 'https://benchmark.example.com'
+}).use(concurrencyPlugin())
+const circuitBreakerBaseClient = createClient({
+  adapter,
+  baseURL: 'https://benchmark.example.com'
+}).use(circuitBreakerPlugin())
 const authStaticTokenClient = createClient({
   adapter
 }).use(authPlugin({
@@ -161,6 +169,14 @@ const circuitBreakerSuccessClient = await runSequential(
   options.operations,
   () => circuitBreakerClient.get('/benchmark', requestConfig)
 )
+const concurrencyBaseClientResult = await runSequential(
+  options.operations,
+  () => concurrencyBaseClient.get('/benchmark', requestConfig)
+)
+const circuitBreakerBaseClientResult = await runSequential(
+  options.operations,
+  () => circuitBreakerBaseClient.get('/benchmark', requestConfig)
+)
 const authStaticTokenClientResult = await runSequential(
   options.operations,
   () => authStaticTokenClient.get('/benchmark', requestConfig)
@@ -240,6 +256,8 @@ const report = {
     cacheMissClient: cacheMissClientResult,
     concurrencyImmediateClient,
     circuitBreakerSuccessClient,
+    concurrencyBaseClient: concurrencyBaseClientResult,
+    circuitBreakerBaseClient: circuitBreakerBaseClientResult,
     authStaticTokenClient: authStaticTokenClientResult,
     retryOnceClient: retryOnceClientResult,
     loggerNoopClient: loggerNoopClientResult,
@@ -270,6 +288,8 @@ async function warmUp(iterations: number): Promise<void> {
     await pipelineClient.get('/benchmark', requestConfig)
     await concurrencyClient.get('/benchmark', requestConfig)
     await circuitBreakerClient.get('/benchmark', requestConfig)
+    await concurrencyBaseClient.get('/benchmark', requestConfig)
+    await circuitBreakerBaseClient.get('/benchmark', requestConfig)
     await authStaticTokenClient.get('/benchmark', requestConfig)
     await loggerNoopClient.get('/benchmark', requestConfig)
     await fetchClient.get('/benchmark', {

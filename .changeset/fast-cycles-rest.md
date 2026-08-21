@@ -20,6 +20,7 @@ into the request result without temporary objects. Normalize cache vary-header
 names once and avoid per-request Map allocation while creating cache keys.
 Rely on native ES2020 error subclassing instead of repairing the request-error
 prototype on every failure. Avoid exception-driven origin resolution for
-relative concurrency and circuit-breaker request URLs.
+relative concurrency and circuit-breaker request URLs, and reuse the last exact
+successful origin parse for repeated plugin isolation checks.
 Preserve the stable response-size error when cancellation of an oversized
 stream also fails.
