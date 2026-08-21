@@ -78,3 +78,5 @@ without an HTTP weekday prefix, falling back to the configured retry delay for
 invalid negative, fractional, ISO, or month-name date values.
 Reuse pre-aborted external signals without allocating a timeout controller,
 listener, timer, or cleanup closure.
+Short-circuit pre-aborted Fetch requests before body serialization and network
+dispatch, and share abort error conversion with XHR to remove duplicate code.

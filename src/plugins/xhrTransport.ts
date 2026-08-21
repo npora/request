@@ -1,4 +1,5 @@
 import { RequestError } from '../errors'
+import { createAbortError } from '../utils/createAbortError'
 import type {
   NporaResponse,
   RequestConfig
@@ -314,28 +315,6 @@ function parseHeaders(value: string): Headers {
   }
 
   return headers
-}
-
-function createAbortError(
-  reason: unknown,
-  config: RequestConfig
-): RequestError {
-  if (reason instanceof RequestError) {
-    return new RequestError(reason.message, {
-      code: reason.code,
-      status: reason.status,
-      data: reason.data,
-      response: reason.response,
-      config: reason.config ?? config,
-      cause: reason
-    })
-  }
-
-  return new RequestError('Request aborted', {
-    code: 'ABORT_ERROR',
-    config,
-    cause: reason
-  })
 }
 
 function createConfigError(

@@ -597,4 +597,29 @@ describe('request config', () => {
 
     expect(fetchMock).not.toHaveBeenCalled()
   })
+
+  it('should abort before serializing a request body', async () => {
+    const controller = new AbortController()
+    const serialize = vi.fn(() => {
+      throw new Error('serialization should not run')
+    })
+    const fetchMock = vi.fn()
+
+    controller.abort('already cancelled')
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient()
+
+    await expect(request.post('/users', {
+      json: {
+        toJSON: serialize
+      },
+      signal: controller.signal
+    })).rejects.toMatchObject({
+      code: 'ABORT_ERROR'
+    })
+
+    expect(serialize).not.toHaveBeenCalled()
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
 })

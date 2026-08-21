@@ -10,6 +10,7 @@ import {
   validateRequestConfig
 } from '../utils'
 import { buildRequestWithHeaders } from '../utils/buildRequest'
+import { createAbortError } from '../utils/createAbortError'
 import { validateResponseStatus } from '../utils/validateResponseStatus'
 
 export class FetchAdapter implements Adapter {
@@ -45,6 +46,10 @@ export class FetchAdapter implements Adapter {
     let responseExposed = false
 
     try {
+      if (config.signal?.aborted) {
+        throw createAbortError(config.signal.reason, config)
+      }
+
       request = buildRequestWithHeaders(config, headers)
       let response = await fetch(request.url, request.init)
       const validStatus = validateResponseStatus(response.status, config)
@@ -115,22 +120,7 @@ export class FetchAdapter implements Adapter {
       const reason = signal?.reason
 
       if (signal?.aborted) {
-        if (reason instanceof RequestError) {
-          throw new RequestError(reason.message, {
-            code: reason.code,
-            status: reason.status,
-            data: reason.data,
-            response: reason.response,
-            config: reason.config ?? config,
-            cause: reason
-          })
-        }
-
-        throw new RequestError('Request aborted', {
-          code: 'ABORT_ERROR',
-          config,
-          cause: error
-        })
+        throw createAbortError(reason, config, error)
       }
 
       throw new RequestError('Network request failed', {
