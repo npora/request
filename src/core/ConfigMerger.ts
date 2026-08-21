@@ -199,8 +199,14 @@ export class ConfigMerger {
     defaults?: RequestConfig['extensions'],
     extensions?: RequestConfig['extensions']
   ): RequestConfig['extensions'] {
-    if (!defaults && !extensions) {
-      return undefined
+    if (!defaults) {
+      return extensions
+        ? { ...extensions }
+        : undefined
+    }
+
+    if (!extensions) {
+      return { ...defaults }
     }
 
     const result: Record<string, unknown> = {
@@ -217,12 +223,8 @@ export class ConfigMerger {
         continue
       }
 
-      const defaultValue = (defaults as Record<string, unknown> | undefined)?.[
-        key
-      ]
-      const requestValue = (
-        extensions as Record<string, unknown> | undefined
-      )?.[key]
+      const defaultValue = (defaults as Record<string, unknown>)[key]
+      const requestValue = (extensions as Record<string, unknown>)[key]
 
       if (
         isPlainObject(defaultValue) &&

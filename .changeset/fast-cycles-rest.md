@@ -31,6 +31,8 @@ rewriting the in-memory LRU order when the requested entry is already newest.
 Skip clock reads for permanent cache entries, and reuse empty normalized query
 metadata while generating headerless cache keys. Reuse the last exact automatic
 cache key for repeated requests without headers or query parameters.
+Clone single-sided extension configuration directly, reserving per-plugin deep
+merge scans for requests that actually combine default and request extensions.
 Keep non-refreshing authentication errors and synchronous refresh policy
 decisions off the asynchronous retry path. Merge query and body configuration
 directly into the request result without temporary objects. Normalize cache

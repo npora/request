@@ -222,6 +222,31 @@ describe('ConfigMerger', () => {
     })
   })
 
+  it('should isolate single-sided extension containers', () => {
+    const requestExtensions = {
+      cache: {
+        enabled: true
+      }
+    }
+    const defaultExtensions = {
+      retry: {
+        retries: 2
+      }
+    }
+    const requestConfig = ConfigMerger.merge({}, {
+      url: '/request',
+      extensions: requestExtensions
+    })
+    const defaultConfig = ConfigMerger.mergeDefaults({
+      extensions: defaultExtensions
+    }, {})
+
+    expect(requestConfig.extensions).toEqual(requestExtensions)
+    expect(requestConfig.extensions).not.toBe(requestExtensions)
+    expect(defaultConfig.extensions).toEqual(defaultExtensions)
+    expect(defaultConfig.extensions).not.toBe(defaultExtensions)
+  })
+
   it('should replace the default body mode when a request supplies one', () => {
     const config = ConfigMerger.merge(
       {
