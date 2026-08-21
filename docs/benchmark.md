@@ -33,6 +33,8 @@ pnpm benchmark -- \
 - `sequentialClient`: complete client pipeline, one request at a time.
 - `bareSequentialClient`: method shortcut without client defaults or request
   options, measuring the minimum validated Client path.
+- `jsonBodySequentialClient`: method shortcut replacing a default JSON body
+  with a request JSON body.
 - `sequentialPluginPipeline`: sequential client with synchronous request and
   response interceptors plus request and response plugin hooks.
 - `concurrentClient`: complete client pipeline with bounded concurrency.

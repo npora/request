@@ -45,6 +45,11 @@ const bareRequestConfig: RequestConfig = {
   url: '/benchmark',
   method: 'GET'
 }
+const jsonBodyRequestConfig = {
+  json: {
+    source: 'request'
+  }
+}
 const client = createClient({
   adapter,
   headers: {
@@ -52,6 +57,12 @@ const client = createClient({
   }
 })
 const bareClient = createClient({ adapter })
+const jsonBodyClient = createClient({
+  adapter,
+  json: {
+    source: 'default'
+  }
+})
 const pipelineClient = createClient({
   adapter
 }).use(createBenchmarkPlugin())
@@ -157,6 +168,10 @@ const sequential = await runSequential(
 const bareSequential = await runSequential(
   options.operations,
   () => bareClient.get('/benchmark')
+)
+const jsonBodySequential = await runSequential(
+  options.operations,
+  () => jsonBodyClient.post('/benchmark', jsonBodyRequestConfig)
 )
 const sequentialPluginPipeline = await runSequential(
   options.operations,
@@ -294,6 +309,7 @@ const report = {
     directAdapter: direct,
     sequentialClient: sequential,
     bareSequentialClient: bareSequential,
+    jsonBodySequentialClient: jsonBodySequential,
     sequentialPluginPipeline,
     concurrentClient: concurrent,
     concurrentPluginPipeline: pluginPipeline,
@@ -337,6 +353,7 @@ async function warmUp(iterations: number): Promise<void> {
   for (let index = 0; index < iterations; index += 1) {
     await client.get('/benchmark', requestConfig)
     await bareClient.get('/benchmark')
+    await jsonBodyClient.post('/benchmark', jsonBodyRequestConfig)
     await pipelineClient.get('/benchmark', requestConfig)
     await concurrencyClient.get('/benchmark', requestConfig)
     await circuitBreakerClient.get('/benchmark', requestConfig)

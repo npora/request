@@ -68,11 +68,8 @@ export class ConfigMerger {
       )
     }
 
-    if (
-      this.hasBodyConfig(defaults) ||
-      this.hasBodyConfig(config)
-    ) {
-      this.mergeBodyConfig(result, defaults, config)
+    if (this.hasBodyConfig(config)) {
+      this.mergeBodyConfig(result, config)
     }
 
     return result
@@ -254,23 +251,8 @@ export class ConfigMerger {
 
   private static mergeBodyConfig(
     result: Partial<RequestConfig>,
-    defaults: Partial<RequestConfig>,
     config: Partial<RequestConfig>
   ): void {
-    const hasRequestBodyConfig =
-      hasOwnProperty.call(config, 'body') ||
-      hasOwnProperty.call(config, 'json') ||
-      hasOwnProperty.call(config, 'form') ||
-      hasOwnProperty.call(config, 'formData')
-
-    if (!hasRequestBodyConfig) {
-      result.body = defaults.body
-      result.json = defaults.json
-      result.form = defaults.form
-      result.formData = defaults.formData
-      return
-    }
-
     result.body = config.body
     result.json = config.json
     result.form = config.form
