@@ -53,6 +53,9 @@ const pipelineClient = createClient({
 const cacheClient = createClient({
   adapter
 }).use(cachePlugin())
+const cachePrimitiveClient = createClient({
+  adapter: createPrimitiveBenchmarkAdapter()
+}).use(cachePlugin())
 const cacheMissClient = createClient({
   adapter
 }).use(cachePlugin())
@@ -164,6 +167,10 @@ const cacheHitClient = await runSequential(
   options.operations,
   () => cacheClient.get('/benchmark-cache', cachedRequestConfig)
 )
+const cachePrimitiveHitClient = await runSequential(
+  options.operations,
+  () => cachePrimitiveClient.get('/benchmark-cache', cachedRequestConfig)
+)
 const cacheMissClientResult = await runSequential(
   options.operations,
   () => cacheMissClient.get('/benchmark-cache-miss', cacheMissRequestConfig)
@@ -266,6 +273,7 @@ const report = {
     concurrentClient: concurrent,
     concurrentPluginPipeline: pluginPipeline,
     cacheHitClient,
+    cachePrimitiveHitClient,
     cacheMissClient: cacheMissClientResult,
     concurrencyImmediateClient,
     circuitBreakerSuccessClient,
@@ -296,6 +304,7 @@ await writeBenchmarkReport(options.output, report)
 
 async function warmUp(iterations: number): Promise<void> {
   await cacheClient.get('/benchmark-cache', cachedRequestConfig)
+  await cachePrimitiveClient.get('/benchmark-cache', cachedRequestConfig)
 
   for (let index = 0; index < iterations; index += 1) {
     await client.get('/benchmark', requestConfig)
@@ -378,6 +387,19 @@ function createBenchmarkAdapter(): Adapter {
       config: RequestConfig
     ): Promise<NporaResponse<T>> {
       return createBenchmarkResponse<T>(config)
+    }
+  }
+}
+
+function createPrimitiveBenchmarkAdapter(): Adapter {
+  return {
+    async request<T>(
+      config: RequestConfig
+    ): Promise<NporaResponse<T>> {
+      return {
+        ...createBenchmarkResponse<T>(config),
+        data: 'benchmark' as T
+      }
     }
   }
 }

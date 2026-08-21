@@ -37,6 +37,8 @@ pnpm benchmark -- \
 - `concurrentPluginPipeline`: concurrent client with request/response
   interceptors and request/response plugin hooks.
 - `cacheHitClient`: repeated data reads from the default in-memory cache.
+- `cachePrimitiveHitClient`: repeated immutable string reads from the default
+  in-memory cache.
 - `cacheMissClient`: repeated cacheable requests with persistence disabled,
   covering miss registration and response handling.
 - `concurrencyImmediateClient`: sequential requests admitted immediately by
@@ -99,6 +101,10 @@ instead of building intermediate entry arrays and objects. Request-specific
 headers remain isolated from reusable client defaults. Body-mode detection
 checks only the four own configuration fields, avoiding duplicate value and
 ownership probes on body-free requests.
+
+Cache entries retain isolation cloning for objects and binary values. Immutable
+primitive data bypasses `structuredClone`, avoiding exception or clone overhead
+without exposing mutable shared state.
 
 The Pipeline passes its final validated `Headers` directly to the first
 adapter attempt. FetchAdapter reuses that instance for request construction;

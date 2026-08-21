@@ -19,7 +19,8 @@ context or timestamps. Avoid
 allocating observer Promises for synchronous logger, retry, and circuit-breaker
 callbacks. Resolve Fetch response types once and avoid double-wrapping bounded
 data-only response streams. Keep synchronous memory-cache reads, writes,
-deletions, hits, and miss registration off the asynchronous hook path. Keep
+deletions, hits, and miss registration off the asynchronous hook path, and
+reuse immutable primitive cache values without structured cloning. Keep
 non-refreshing authentication errors and synchronous refresh policy decisions
 off the asynchronous retry path. Merge query and body configuration directly
 into the request result without temporary objects. Normalize cache vary-header

@@ -500,6 +500,36 @@ describe('cachePlugin', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2)
   })
 
+  it('should reuse immutable cached values without structured cloning', async () => {
+    const cloneSpy = vi.fn(globalThis.structuredClone)
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response('Npora', {
+        headers: {
+          'content-type': 'text/plain'
+        }
+      })
+    )
+
+    vi.stubGlobal('structuredClone', cloneSpy)
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient().use(cachePlugin())
+    const config = {
+      extensions: {
+        cache: {
+          enabled: true
+        }
+      },
+      responseType: 'text' as const
+    }
+
+    await expect(request.get('/document', config)).resolves.toBe('Npora')
+    await expect(request.get('/document', config)).resolves.toBe('Npora')
+
+    expect(cloneSpy).not.toHaveBeenCalled()
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
   it('should isolate cache stores between plugin instances', async () => {
     const fetchMock = vi
       .fn()

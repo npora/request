@@ -784,7 +784,11 @@ function cloneResponse(response: Response): Response | undefined {
 }
 
 function cloneCacheValue<T>(value: T): T {
-  if (typeof structuredClone !== 'function') {
+  if (
+    value === null ||
+    typeof value !== 'object' ||
+    typeof structuredClone !== 'function'
+  ) {
     return value
   }
 
