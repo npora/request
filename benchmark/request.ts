@@ -66,6 +66,9 @@ const jsonBodyClient = createClient({
 const pipelineClient = createClient({
   adapter
 }).use(createBenchmarkPlugin())
+const singleAsyncHookLifecycleClient = createClient({
+  adapter
+}).use(createAsyncHookBenchmarkPlugin())
 const cacheClient = createClient({
   adapter
 }).use(cachePlugin())
@@ -176,6 +179,10 @@ const jsonBodySequential = await runSequential(
 const sequentialPluginPipeline = await runSequential(
   options.operations,
   () => pipelineClient.get('/benchmark', requestConfig)
+)
+const singleAsyncHookLifecycle = await runSequential(
+  options.operations,
+  () => singleAsyncHookLifecycleClient.get('/benchmark')
 )
 const concurrent = await runConcurrent(
   options.operations,
@@ -311,6 +318,7 @@ const report = {
     bareSequentialClient: bareSequential,
     jsonBodySequentialClient: jsonBodySequential,
     sequentialPluginPipeline,
+    singleAsyncHookLifecycleClient: singleAsyncHookLifecycle,
     concurrentClient: concurrent,
     concurrentPluginPipeline: pluginPipeline,
     cacheHitClient,
@@ -355,6 +363,7 @@ async function warmUp(iterations: number): Promise<void> {
     await bareClient.get('/benchmark')
     await jsonBodyClient.post('/benchmark', jsonBodyRequestConfig)
     await pipelineClient.get('/benchmark', requestConfig)
+    await singleAsyncHookLifecycleClient.get('/benchmark')
     await concurrencyClient.get('/benchmark', requestConfig)
     await circuitBreakerClient.get('/benchmark', requestConfig)
     await concurrencyBaseClient.get('/benchmark', requestConfig)
@@ -429,6 +438,21 @@ function createBenchmarkPlugin(): Plugin {
       hooks.onRequest(() => {})
       hooks.onResponse(() => {})
       interceptors.response.use(response => response)
+    }
+  }
+}
+
+function createAsyncHookBenchmarkPlugin(): Plugin {
+  const resolvedHook = () => Promise.resolve()
+
+  return {
+    name: 'async-hook-lifecycle',
+
+    install({ hooks }) {
+      hooks.onRequest(resolvedHook)
+      hooks.onTransport(resolvedHook)
+      hooks.onResponse(resolvedHook)
+      hooks.onSettled(resolvedHook)
     }
   }
 }

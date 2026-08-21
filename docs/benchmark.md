@@ -37,6 +37,8 @@ pnpm benchmark -- \
   with a request JSON body.
 - `sequentialPluginPipeline`: sequential client with synchronous request and
   response interceptors plus request and response plugin hooks.
+- `singleAsyncHookLifecycleClient`: sequential client with one asynchronous
+  request, transport, response, and settled hook per lifecycle stage.
 - `concurrentClient`: complete client pipeline with bounded concurrency.
 - `concurrentPluginPipeline`: concurrent client with request/response
   interceptors and request/response plugin hooks.
@@ -119,10 +121,12 @@ interceptors and plugin hooks remain on the synchronous lifecycle path until a
 Promise requires continuation. This keeps plugin ordering deterministic without
 allocating and sorting collections on every request. Error notification and
 final rejection likewise stay synchronous until an asynchronous hook or
-interceptor requires continuation. Requests without any hooks, interceptors, or
-response schema dispatch directly after validation without allocating lifecycle
-context, timestamps, or an adopting Pipeline Promise. Method shortcuts merge
-their configuration once before dispatch.
+interceptor requires continuation. Lifecycle stages with one hook dispatch it
+directly, avoiding an empty recursive continuation after asynchronous hooks.
+Requests without any hooks, interceptors, or response schema dispatch directly
+after validation without allocating lifecycle context, timestamps, or an
+adopting Pipeline Promise. Method shortcuts merge their configuration once
+before dispatch.
 
 Configuration merging creates nested values only when either side supplies
 them. Header normalization writes directly into one case-insensitive result
