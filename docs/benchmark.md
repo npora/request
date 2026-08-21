@@ -99,6 +99,11 @@ The adapter installs the earlier stream bound only when the raw response must
 be preserved or cloned, avoiding duplicate stream wrappers on the common data
 path.
 
+Stateful isolation plugins resolve ordinary relative URLs without first
+attempting an absolute `URL` parse. Absolute and base-relative requests retain
+standards-based origin parsing without using expected exceptions as control
+flow.
+
 Request construction avoids success-path body-field arrays and iterates query,
 form and FormData records without intermediate entry arrays. URL joining uses
 relative-path fast paths while query encoding remains delegated to
