@@ -11,6 +11,7 @@ import { buildRequest } from '../src/utils/buildRequest'
 import { validateRequestConfig } from '../src/utils/validateRequestConfig'
 
 afterEach(() => {
+  vi.useRealTimers()
   vi.unstubAllGlobals()
 })
 
@@ -144,6 +145,21 @@ describe('request config', () => {
       redirect: 'manual',
       cache: 'no-store'
     })
+    expect(init).not.toHaveProperty('duplex')
+  })
+
+  it('should enable half duplex for streaming request bodies', () => {
+    const body = new ReadableStream<Uint8Array>()
+    const request = buildRequest({
+      url: 'https://api.example.com/upload',
+      method: 'POST',
+      body
+    })
+
+    expect(
+      (request.init as RequestInit & { duplex?: string }).duplex
+    ).toBe('half')
+    expect(() => new Request(request.url, request.init)).not.toThrow()
   })
 
   it('should skip timeout controller allocation when timeout is disabled', () => {
@@ -161,6 +177,28 @@ describe('request config', () => {
     expect(request.init.signal).toBeUndefined()
     expect(abortController).not.toHaveBeenCalled()
     expect(() => request.clear()).not.toThrow()
+  })
+
+  it('should not retain a timeout when request serialization fails', () => {
+    vi.useFakeTimers()
+    const signal = new AbortController().signal
+    const addEventListener = vi.spyOn(signal, 'addEventListener')
+
+    expect(() => buildRequest({
+      url: '/users',
+      timeout: 1000,
+      signal,
+      query: {
+        invalid: {
+          toString() {
+            throw new Error('serialization failed')
+          }
+        } as never
+      }
+    })).toThrow('serialization failed')
+
+    expect(vi.getTimerCount()).toBe(0)
+    expect(addEventListener).not.toHaveBeenCalled()
   })
 
   it('should serialize json body', () => {

@@ -320,6 +320,9 @@ method/body combinations and body configuration conflicts throw a
 Configuration is validated again after plugin request hooks, including when a
 custom adapter is used.
 
+Native `ReadableStream` request bodies automatically use Fetch half-duplex
+mode, as required by Node's Fetch implementation for streaming uploads.
+
 ---
 
 # MockAdapter

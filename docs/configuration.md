@@ -237,6 +237,7 @@ because the request promise has already returned the stream.
 - Each matching `extensions` object shallow merges.
 - A request body mode replaces the inherited body mode.
 - Configuration is validated before request hooks and again after they run.
+- `ReadableStream` request bodies automatically enable Fetch half-duplex mode.
 
 Invalid URLs, headers, methods, timeouts, sizes, response types, status
 validators, body combinations, and query conflicts throw `RequestError` with

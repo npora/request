@@ -25,6 +25,23 @@ export function buildRequestWithHeaders(
   headers: Headers
 ): BuiltRequest {
   const body = buildBody(config, headers)
+  const url = buildURL(config)
+  const init: RequestInit = {
+    ...config.fetchOptions,
+    method: config.method ?? 'GET',
+    headers,
+    body,
+    signal: config.signal
+  }
+
+  if (
+    body &&
+    typeof ReadableStream !== 'undefined' &&
+    body instanceof ReadableStream
+  ) {
+    (init as RequestInit & { duplex: 'half' }).duplex = 'half'
+  }
+
   const timeoutEnabled = Boolean(
     config.timeout && config.timeout > 0
   )
@@ -32,15 +49,13 @@ export function buildRequestWithHeaders(
     ? createTimeoutSignal(config.signal, config.timeout)
     : undefined
 
+  if (timeoutSignal) {
+    init.signal = timeoutSignal.signal
+  }
+
   return {
-    url: buildURL(config),
-    init: {
-      ...config.fetchOptions,
-      method: config.method ?? 'GET',
-      headers,
-      body,
-      signal: timeoutSignal?.signal ?? config.signal
-    },
+    url,
+    init,
     clear: timeoutSignal?.clear ?? noop
   }
 }

@@ -61,3 +61,7 @@ relative concurrency and circuit-breaker request URLs, and reuse the last exact
 successful origin parse for repeated plugin isolation checks.
 Preserve the stable response-size error when cancellation of an oversized
 stream also fails.
+Enable Fetch half-duplex mode for `ReadableStream` request bodies so Node
+runtimes can send streaming uploads without caller-supplied transport options.
+Delay timeout allocation until synchronous request serialization succeeds,
+preventing timers and abort listeners from surviving configuration failures.
