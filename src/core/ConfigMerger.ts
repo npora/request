@@ -109,10 +109,6 @@ export class ConfigMerger {
     defaults?: RequestConfig['fetchOptions'],
     options?: RequestConfig['fetchOptions']
   ): RequestConfig['fetchOptions'] {
-    if (!defaults && !options) {
-      return undefined
-    }
-
     return {
       ...defaults,
       ...options
@@ -125,27 +121,23 @@ export class ConfigMerger {
   private static mergeHeaders(
     defaults?: HeadersInit,
     headers?: HeadersInit
-  ): HeadersInit | undefined {
-    if (!defaults && !headers) {
-      return undefined
-    }
-
+  ): HeadersInit {
     const result: Record<string, string> = {}
 
-    this.appendHeaders(result, defaults)
-    this.appendHeaders(result, headers)
+    if (defaults) {
+      this.appendHeaders(result, defaults)
+    }
+    if (headers) {
+      this.appendHeaders(result, headers)
+    }
 
     return result
   }
 
   private static appendHeaders(
     result: Record<string, string>,
-    headers?: HeadersInit
+    headers: HeadersInit
   ): void {
-    if (!headers) {
-      return
-    }
-
     if (headers instanceof Headers) {
       headers.forEach((value, key) => {
         setHeader(result, key, value)
@@ -180,13 +172,9 @@ export class ConfigMerger {
   }
 
   private static mergeObject<T extends object>(
-    defaults?: T,
-    value?: T
-  ): T | undefined {
-    if (!defaults && !value) {
-      return undefined
-    }
-
+    defaults: T | undefined,
+    value: T
+  ): T {
     return {
       ...defaults,
       ...value

@@ -127,9 +127,10 @@ their configuration once before dispatch.
 Configuration merging creates nested values only when either side supplies
 them. Header normalization writes directly into one case-insensitive result
 instead of building intermediate entry arrays and objects. Request-specific
-headers remain isolated from reusable client defaults. Body-mode detection
-checks only the four own configuration fields, avoiding duplicate value and
-ownership probes on body-free requests.
+headers remain isolated from reusable client defaults. Nested merge helpers
+reuse their caller's presence checks, and single-sided headers skip the absent
+input entirely. Body-mode detection checks only the four own configuration
+fields, avoiding duplicate value and ownership probes on body-free requests.
 
 Method shortcuts without client defaults or request options reuse an internal
 empty configuration marker and construct only the final URL and method pair.
