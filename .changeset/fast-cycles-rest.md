@@ -18,5 +18,7 @@ non-refreshing authentication errors and synchronous refresh policy decisions
 off the asynchronous retry path. Merge query and body configuration directly
 into the request result without temporary objects. Normalize cache vary-header
 names once and avoid per-request Map allocation while creating cache keys.
+Rely on native ES2020 error subclassing instead of repairing the request-error
+prototype on every failure.
 Preserve the stable response-size error when cancellation of an oversized
 stream also fails.
