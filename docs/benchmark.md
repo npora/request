@@ -90,6 +90,11 @@ cloning when no response hooks or interceptors need `raw`. Complete responses,
 response lifecycle extensions and HTTP errors retain a separately readable
 raw body.
 
+Data-only responses with a size limit apply one bounded reader during parsing.
+The adapter installs the earlier stream bound only when the raw response must
+be preserved or cloned, avoiding duplicate stream wrappers on the common data
+path.
+
 Request construction avoids success-path body-field arrays and iterates query,
 form and FormData records without intermediate entry arrays. URL joining uses
 relative-path fast paths while query encoding remains delegated to

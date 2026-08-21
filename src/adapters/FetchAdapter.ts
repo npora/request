@@ -46,14 +46,15 @@ export class FetchAdapter implements Adapter {
 
     try {
       request = buildRequestWithHeaders(config, headers)
-      let response = limitResponseSize(
-        await fetch(request.url, request.init),
-        config
-      )
+      let response = await fetch(request.url, request.init)
       const validStatus = validateResponseStatus(response.status, config)
-      const streaming = isStreamingResponseType(
-        resolveResponseType(response, config)
-      )
+
+      if (preserveRaw || !validStatus) {
+        response = limitResponseSize(response, config)
+      }
+
+      const responseType = resolveResponseType(response, config)
+      const streaming = isStreamingResponseType(responseType)
 
       if (streaming) {
         response = finalizeStreamingResponse(
@@ -73,7 +74,11 @@ export class FetchAdapter implements Adapter {
         )
           ? response
           : response.clone()
-      const data = await parseResponse<T>(parseTarget, config)
+      const data = await parseResponse<T>(
+        parseTarget,
+        config,
+        responseType
+      )
       const nporaResponse: NporaResponse<T> = {
         data,
         status: response.status,

@@ -165,7 +165,8 @@ export function finalizeStreamingResponse(
  */
 export async function parseResponse<T = unknown>(
   response: Response,
-  config: RequestConfig
+  config: RequestConfig,
+  resolvedResponseType?: ResponseType
 ): Promise<T> {
   if (
     config.method === 'HEAD' ||
@@ -176,7 +177,8 @@ export async function parseResponse<T = unknown>(
     return undefined as T
   }
 
-  const responseType = resolveResponseType(response, config)
+  const responseType =
+    resolvedResponseType ?? resolveResponseType(response, config)
   const maxSize = config.maxResponseSize
 
   try {
