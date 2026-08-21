@@ -27,11 +27,14 @@ export function loggerPlugin(defaultOptions: LoggerOptions = {}): Plugin {
           return
         }
 
+        const url = requestContext.config.url
         const state: LoggerState = {
           requestId:
             options.createRequestId?.() ??
             `request-${++nextRequestId}`,
-          options
+          options,
+          url,
+          redactedURL: redactURL(url)
         }
 
         states.set(requestContext, state)
@@ -41,7 +44,7 @@ export function loggerPlugin(defaultOptions: LoggerOptions = {}): Plugin {
           requestId: state.requestId,
           timestamp: requestContext.startTime,
           method: requestContext.config.method ?? 'GET',
-          url: redactURL(requestContext.config.url)
+          url: state.redactedURL
         })
       })
 
@@ -61,7 +64,7 @@ export function loggerPlugin(defaultOptions: LoggerOptions = {}): Plugin {
           duration: Math.max(0, timestamp - requestContext.startTime),
           attempts: requestContext.attempt + 1,
           method: requestContext.config.method ?? 'GET',
-          url: redactURL(requestContext.config.url),
+          url: resolveRedactedURL(state, requestContext.config.url),
           status: requestContext.response.status
         })
       })
@@ -80,11 +83,14 @@ export function loggerPlugin(defaultOptions: LoggerOptions = {}): Plugin {
             return
           }
 
+          const url = requestContext.config.url
           state = {
             requestId:
               options.createRequestId?.() ??
               `request-${++nextRequestId}`,
-            options
+            options,
+            url,
+            redactedURL: redactURL(url)
           }
           states.set(requestContext, state)
 
@@ -93,7 +99,7 @@ export function loggerPlugin(defaultOptions: LoggerOptions = {}): Plugin {
             requestId: state.requestId,
             timestamp: requestContext.startTime,
             method: requestContext.config.method ?? 'GET',
-            url: redactURL(requestContext.config.url)
+            url: state.redactedURL
           })
         }
 
@@ -108,7 +114,7 @@ export function loggerPlugin(defaultOptions: LoggerOptions = {}): Plugin {
             Math.max(0, timestamp - requestContext.startTime),
             requestContext.attempt + 1,
             requestContext.config.method ?? 'GET',
-            redactURL(requestContext.config.url)
+            resolveRedactedURL(state, requestContext.config.url)
           )
         )
       })
@@ -120,6 +126,16 @@ interface LoggerState {
   requestId: string
 
   options: LoggerOptions
+
+  url: string
+
+  redactedURL: string
+}
+
+function resolveRedactedURL(state: LoggerState, url: string): string {
+  return url === state.url
+    ? state.redactedURL
+    : redactURL(url)
 }
 
 const consoleLogger: RequestLogger = {

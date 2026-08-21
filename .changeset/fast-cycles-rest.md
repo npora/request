@@ -17,8 +17,10 @@ value probes on body-free requests. Dispatch requests without hooks,
 interceptors, or schemas directly after validation without allocating lifecycle
 context or timestamps. Avoid
 allocating observer Promises for synchronous logger, retry, and circuit-breaker
-callbacks. Resolve Fetch response types once and avoid double-wrapping bounded
-data-only response streams. Keep synchronous memory-cache reads, writes,
+callbacks, and reuse logger URL redaction across lifecycle entries while the
+effective URL is unchanged. Resolve Fetch response types once and avoid
+double-wrapping bounded data-only response streams. Keep synchronous
+memory-cache reads, writes,
 deletions, hits, and miss registration off the asynchronous hook path, and
 reuse immutable primitive cache values without structured cloning. Keep
 non-refreshing authentication errors and synchronous refresh policy decisions

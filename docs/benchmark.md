@@ -56,6 +56,8 @@ pnpm benchmark -- \
   error interceptors.
 - `loggerNoopClient`: request and response logging through a synchronous
   no-op logger.
+- `loggerSensitiveQueryClient`: synchronous no-op logging for a URL containing
+  a sensitive query value that must be redacted from lifecycle entries.
 - `authNonRefreshErrorClient`: rejected authenticated requests that do not
   qualify for token refresh.
 - `fetchAdapterClient`: complete FetchAdapter lifecycle against an in-memory
@@ -87,6 +89,10 @@ follower needs it, and the shared completion Promise is created lazily when
 that first follower arrives. The cache scenarios exercise these common paths
 so repeated key, snapshot and coordination setup remain visible in
 comparisons.
+
+Logger lifecycle state reuses a redacted URL while the effective URL remains
+unchanged, and re-runs redaction if another plugin modifies it. The two logger
+scenarios keep both the inexpensive and sensitive-query paths visible.
 
 CI stores the JSON report as a build artifact. Correctness and resource
 cleanup remain enforced separately by unit, integration and browser stress

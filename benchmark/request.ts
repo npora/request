@@ -208,6 +208,13 @@ const loggerNoopClientResult = await runSequential(
   options.operations,
   () => loggerNoopClient.get('/benchmark', requestConfig)
 )
+const loggerSensitiveQueryClientResult = await runSequential(
+  options.operations,
+  () => loggerNoopClient.get(
+    '/benchmark?token=secret&mode=benchmark',
+    requestConfig
+  )
+)
 const authNonRefreshErrorClientResult = await runSequential(
   options.operations,
   () => authNonRefreshErrorClient.get('/benchmark', requestConfig)
@@ -283,6 +290,7 @@ const report = {
     retryOnceClient: retryOnceClientResult,
     httpErrorClient: httpErrorClientResult,
     loggerNoopClient: loggerNoopClientResult,
+    loggerSensitiveQueryClient: loggerSensitiveQueryClientResult,
     authNonRefreshErrorClient: authNonRefreshErrorClientResult,
     fetchAdapterClient,
     fetchAdapterCompleteResponse,
@@ -317,6 +325,10 @@ async function warmUp(iterations: number): Promise<void> {
     await httpErrorClient.get('/benchmark', requestConfig)
       .catch(ignoreBenchmarkError)
     await loggerNoopClient.get('/benchmark', requestConfig)
+    await loggerNoopClient.get(
+      '/benchmark?token=secret&mode=benchmark',
+      requestConfig
+    )
     await fetchClient.get('/benchmark', {
       responseType: 'text'
     })

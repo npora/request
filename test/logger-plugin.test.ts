@@ -3,6 +3,7 @@ import {
   createClient,
   loggerPlugin,
   retryPlugin,
+  type Plugin,
   type RequestLogger
 } from '../src'
 
@@ -229,6 +230,49 @@ describe('loggerPlugin', () => {
     expect(serializedLogs).not.toContain('header-secret')
     expect(serializedLogs).not.toContain('cookie-secret')
     expect(serializedLogs).not.toContain('config-secret')
+  })
+
+  it('should redact a URL changed after request logging', async () => {
+    const info = vi.fn<RequestLogger['info']>()
+    const changeURL: Plugin = {
+      name: 'change-url',
+      install({ hooks }) {
+        hooks.onTransport(context => {
+          context.config.url = '/changed?token=response-secret'
+        })
+      }
+    }
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ ok: true }), {
+          headers: {
+            'content-type': 'application/json'
+          }
+        })
+      )
+    )
+
+    const request = createClient()
+      .use(loggerPlugin({
+        logger: {
+          info,
+          error() {}
+        }
+      }))
+      .use(changeURL)
+
+    await request.get('/original?token=request-secret')
+
+    expect(info.mock.calls[0]?.[1]).toMatchObject({
+      type: 'request',
+      url: '/original?token=%5BREDACTED%5D'
+    })
+    expect(info.mock.calls[1]?.[1]).toMatchObject({
+      type: 'response',
+      url: '/changed?token=%5BREDACTED%5D'
+    })
   })
 
   it('should send structured lifecycle entries to a custom logger', async () => {
