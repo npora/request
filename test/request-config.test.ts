@@ -392,12 +392,13 @@ describe('request config', () => {
         },
         form: {
           name: 'Npora'
-        }
+        },
+        formData: new FormData()
       })
     ).rejects.toMatchObject({
       code: 'CONFIG_ERROR',
       message:
-        'Request body options are mutually exclusive: body, json, form'
+        'Request body options are mutually exclusive: body, json, form, formData'
     })
   })
 

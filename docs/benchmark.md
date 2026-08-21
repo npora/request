@@ -138,8 +138,10 @@ configuration and record serializers cache the native own-property intrinsic
 instead of resolving its prototype chain for every field.
 
 Request method and response-type validation use direct branch dispatch instead
-of scanning constant option arrays. Retry decisions skip elapsed-time and event
-bookkeeping when jitter, elapsed-time limits and retry observers are all absent.
+of scanning constant option arrays. Valid request bodies likewise use direct
+mode checks, reserving field collection for the conflicting-body error path.
+Retry decisions skip elapsed-time and event bookkeeping when jitter,
+elapsed-time limits and retry observers are all absent.
 
 Cache entries retain isolation cloning for objects and binary values. Immutable
 primitive data bypasses `structuredClone`, avoiding exception or clone overhead
