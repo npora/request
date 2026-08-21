@@ -67,3 +67,5 @@ Delay timeout allocation until synchronous request serialization succeeds,
 preventing timers and abort listeners from surviving configuration failures.
 Register external abort listeners before allocating timeout timers, avoiding
 timer churn for pre-aborted signals and leaks when listener setup fails.
+Reject request timeouts beyond the platform timer range instead of allowing
+Node to overflow them into an immediate timeout.

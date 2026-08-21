@@ -471,7 +471,10 @@ describe('request config', () => {
     expect(requestSpy).not.toHaveBeenCalled()
   })
 
-  it('should reject invalid timeout values', async () => {
+  it.each([
+    Number.POSITIVE_INFINITY,
+    2_147_483_648
+  ])('should reject invalid timeout value %s', async timeout => {
     const fetchMock = vi.fn()
 
     vi.stubGlobal('fetch', fetchMock)
@@ -480,7 +483,7 @@ describe('request config', () => {
 
     await expect(
       request.get('/users', {
-        timeout: Number.POSITIVE_INFINITY
+        timeout
       })
     ).rejects.toMatchObject({
       code: 'CONFIG_ERROR'

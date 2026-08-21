@@ -169,9 +169,13 @@ function validateTimeout(config: RequestConfig): void {
     return
   }
 
-  if (!Number.isFinite(config.timeout) || config.timeout < 0) {
+  if (
+    !Number.isFinite(config.timeout) ||
+    config.timeout < 0 ||
+    config.timeout > 2_147_483_647
+  ) {
     throw configError(
-      'Request timeout must be a finite, non-negative number',
+      'Request timeout is out of range',
       config
     )
   }

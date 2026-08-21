@@ -75,7 +75,7 @@ Only one of `body`, `json`, `form`, and `formData` may be present. `GET` and
 
 | Option | Type | Default | Purpose |
 | --- | --- | --- | --- |
-| `timeout` | `number` | disabled | Abort after this many milliseconds. `0` disables the timer. |
+| `timeout` | `number` | disabled | Abort after this many milliseconds (maximum `2_147_483_647`). `0` disables the timer. |
 | `signal` | `AbortSignal` | none | Cancel the request with the platform Abort API. |
 | `maxResponseSize` | `number` | `Infinity` | Maximum parsed or streamed response bytes. |
 
