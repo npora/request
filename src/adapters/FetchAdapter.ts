@@ -18,7 +18,7 @@ export class FetchAdapter implements Adapter {
   ): Promise<NporaResponse<T>> {
     return this.execute<T>(
       config,
-      validateRequestConfig(config),
+      validateRequestConfig(config, true)!,
       true
     )
   }

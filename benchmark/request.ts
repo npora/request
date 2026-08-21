@@ -51,6 +51,7 @@ const client = createClient({
     'x-client': 'npora'
   }
 })
+const bareClient = createClient({ adapter })
 const pipelineClient = createClient({
   adapter
 }).use(createBenchmarkPlugin())
@@ -152,6 +153,10 @@ const direct = await runSequential(
 const sequential = await runSequential(
   options.operations,
   () => client.get('/benchmark', requestConfig)
+)
+const bareSequential = await runSequential(
+  options.operations,
+  () => bareClient.get('/benchmark')
 )
 const sequentialPluginPipeline = await runSequential(
   options.operations,
@@ -288,6 +293,7 @@ const report = {
   scenarios: {
     directAdapter: direct,
     sequentialClient: sequential,
+    bareSequentialClient: bareSequential,
     sequentialPluginPipeline,
     concurrentClient: concurrent,
     concurrentPluginPipeline: pluginPipeline,
@@ -330,6 +336,7 @@ async function warmUp(iterations: number): Promise<void> {
 
   for (let index = 0; index < iterations; index += 1) {
     await client.get('/benchmark', requestConfig)
+    await bareClient.get('/benchmark')
     await pipelineClient.get('/benchmark', requestConfig)
     await concurrencyClient.get('/benchmark', requestConfig)
     await circuitBreakerClient.get('/benchmark', requestConfig)

@@ -35,6 +35,8 @@ Clone single-sided extension configuration directly, reserving per-plugin deep
 merge scans for requests that actually combine default and request extensions.
 Detect missing, plain-text, and JSON response media types without normalization
 work while retaining strict handling for parameters and structured suffixes.
+Skip materializing empty validated headers for custom adapters that do not
+consume the built-in validated-header fast path.
 Keep non-refreshing authentication errors and synchronous refresh policy
 decisions off the asynchronous retry path. Merge query and body configuration
 directly into the request result without temporary objects. Normalize cache

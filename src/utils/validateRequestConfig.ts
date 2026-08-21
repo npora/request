@@ -12,7 +12,10 @@ const BODY_FIELDS = [
 /**
  * Validate configuration before request hooks or adapters act on it.
  */
-export function validateRequestConfig(config: RequestConfig): Headers {
+export function validateRequestConfig(
+  config: RequestConfig,
+  headersRequired: boolean
+): Headers | undefined {
   validateURL(config)
   validateMethod(config)
   validateTimeout(config)
@@ -20,7 +23,9 @@ export function validateRequestConfig(config: RequestConfig): Headers {
   validateQuery(config)
   validateResponseOptions(config)
   validateSchema(config)
-  const headers = validateHeaders(config)
+  const headers = headersRequired || config.headers !== undefined
+    ? validateHeaders(config)
+    : undefined
   validateBody(config)
 
   return headers

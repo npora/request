@@ -8,12 +8,26 @@ import {
 import type { Plugin } from '../src'
 import { createClient, MockAdapter } from '../src'
 import { buildRequest } from '../src/utils/buildRequest'
+import { validateRequestConfig } from '../src/utils/validateRequestConfig'
 
 afterEach(() => {
   vi.unstubAllGlobals()
 })
 
 describe('request config', () => {
+  it('should only materialize optional headers when needed', () => {
+    expect(validateRequestConfig({
+      url: '/users'
+    }, false)).toBeUndefined()
+
+    expect(validateRequestConfig({
+      url: '/users',
+      headers: {
+        accept: 'application/json'
+      }
+    }, false)).toBeInstanceOf(Headers)
+  })
+
   it('should build url with baseURL and query', () => {
     const { url } = buildRequest({
       baseURL: 'https://api.example.com',

@@ -38,12 +38,15 @@ export class Pipeline {
       !this.interceptors.error.active
     ) {
       try {
-        const headers = validateRequestConfig(config)
+        const headers = validateRequestConfig(
+          config,
+          !!this.adapter.requestValidated
+        )
 
         return this.adapter.requestValidated
           ? this.adapter.requestValidated<T>(
               config,
-              headers,
+              headers!,
               preserveRaw
             )
           : this.adapter.request<T>(config)
@@ -60,6 +63,7 @@ export class Pipeline {
     preserveRaw: boolean
   ): Promise<NporaResponse<T>> {
     const context = new RequestContext<T>(config)
+    const headersRequired = !!this.adapter.requestValidated
     let validatedHeaders: Headers | undefined
 
     try {
@@ -76,7 +80,10 @@ export class Pipeline {
             : intercepted
         }
 
-        let headers = validateRequestConfig(context.config)
+        let headers = validateRequestConfig(
+          context.config,
+          headersRequired
+        )
 
         if (this.hooks.hasRequestHooks) {
           const hooks = this.hooks.runRequest(context)
@@ -85,7 +92,10 @@ export class Pipeline {
             await hooks
           }
 
-          headers = validateRequestConfig(context.config)
+          headers = validateRequestConfig(
+            context.config,
+            headersRequired
+          )
         }
 
         validatedHeaders = headers
