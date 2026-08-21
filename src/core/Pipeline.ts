@@ -5,6 +5,7 @@ import type { PluginHooks } from '../interceptors/PluginHooks'
 import type { Adapter, NporaResponse, RequestConfig } from '../types'
 import { RequestError, SchemaValidationError } from '../errors'
 import { validateRequestConfig } from '../utils'
+import { throwIfAborted } from '../utils/createAbortError'
 import { isPromiseLike } from '../utils/isPromiseLike'
 import { MAX_TIMER_DELAY } from '../utils/maxTimerDelay'
 import { RequestContext } from './RequestContext'
@@ -43,6 +44,8 @@ export class Pipeline {
           config,
           !!this.adapter.requestValidated
         )
+
+        throwIfAborted(config)
 
         return this.adapter.requestValidated
           ? this.adapter.requestValidated<T>(
@@ -122,6 +125,8 @@ export class Pipeline {
           const headers = validatedHeaders
 
           validatedHeaders = undefined
+
+          throwIfAborted(context.config)
 
           if (this.hooks.hasTransportHooks) {
             const hooks = this.hooks.runTransport(context)

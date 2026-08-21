@@ -12,6 +12,34 @@ import {
 } from '../src'
 
 describe('adapter validation handoff', () => {
+  it.each([false, true])(
+    'should skip a custom adapter for a pre-aborted request (lifecycle=%s)',
+    async lifecycle => {
+      let requests = 0
+      const adapter: Adapter = {
+        async request<T>(config): Promise<NporaResponse<T>> {
+          requests += 1
+          return createResponse(config) as NporaResponse<T>
+        }
+      }
+      const request = createClient({ adapter })
+      const controller = new AbortController()
+
+      if (lifecycle) {
+        request.interceptors.request.use(config => config)
+      }
+
+      controller.abort('already cancelled')
+
+      await expect(request.get('/aborted', {
+        signal: controller.signal
+      })).rejects.toMatchObject({
+        code: 'ABORT_ERROR'
+      })
+      expect(requests).toBe(0)
+    }
+  )
+
   it('should reject unsupported methods before calling a custom adapter', async () => {
     let requests = 0
     const adapter: Adapter = {

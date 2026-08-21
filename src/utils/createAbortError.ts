@@ -1,6 +1,14 @@
 import { RequestError } from '../errors'
 import type { RequestConfig } from '../types'
 
+export function throwIfAborted(config: RequestConfig): void {
+  const signal = config.signal
+
+  if (signal?.aborted) {
+    throw createAbortError(signal.reason, config)
+  }
+}
+
 export function createAbortError(
   reason: unknown,
   config: RequestConfig,

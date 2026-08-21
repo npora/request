@@ -25,12 +25,6 @@ export function xhrRequest<T>(
   config: RequestConfig,
   options: XHRTransportOptions = {}
 ): Promise<NporaResponse<T>> {
-  if (config.signal?.aborted) {
-    return Promise.reject(
-      createAbortError(config.signal.reason, config)
-    )
-  }
-
   let request: ReturnType<typeof buildRequest> | undefined
   let xhr: XMLHttpRequest
 

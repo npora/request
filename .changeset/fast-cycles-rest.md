@@ -80,5 +80,5 @@ Reuse pre-aborted external signals without allocating a timeout controller,
 listener, timer, or cleanup closure.
 Short-circuit pre-aborted Fetch requests before body serialization and network
 dispatch, and share abort error conversion with XHR to remove duplicate code.
-Short-circuit pre-aborted XHR requests before body serialization, transport
-construction, header setup, and progress-handler allocation.
+Enforce the same cancellation gate at the shared transport boundary so XHR,
+Mock, and custom adapters are skipped before serialization or setup work.

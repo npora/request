@@ -10,7 +10,10 @@ import {
   validateRequestConfig
 } from '../utils'
 import { buildRequestWithHeaders } from '../utils/buildRequest'
-import { createAbortError } from '../utils/createAbortError'
+import {
+  createAbortError,
+  throwIfAborted
+} from '../utils/createAbortError'
 import { validateResponseStatus } from '../utils/validateResponseStatus'
 
 export class FetchAdapter implements Adapter {
@@ -46,9 +49,7 @@ export class FetchAdapter implements Adapter {
     let responseExposed = false
 
     try {
-      if (config.signal?.aborted) {
-        throw createAbortError(config.signal.reason, config)
-      }
+      throwIfAborted(config)
 
       request = buildRequestWithHeaders(config, headers)
       let response = await fetch(request.url, request.init)
