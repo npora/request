@@ -386,19 +386,19 @@ describe('cachePlugin', () => {
   })
 
   it('should preserve the default headerless cache key', async () => {
-    let capturedKey: string | undefined
+    const capturedKeys: string[] = []
     const store: CacheStore = {
       get(key) {
-        capturedKey = key
+        capturedKeys.push(key)
         return undefined
       },
       set() {},
       delete() {},
       clear() {}
     }
-    const fetchMock = vi.fn().mockResolvedValue(
-      createJsonResponse({ ok: true })
-    )
+    const fetchMock = vi.fn().mockImplementation(() => {
+      return Promise.resolve(createJsonResponse({ ok: true }))
+    })
 
     vi.stubGlobal('fetch', fetchMock)
 
@@ -411,8 +411,30 @@ describe('cachePlugin', () => {
         }
       }
     })
+    await request.get('/headerless', {
+      extensions: {
+        cache: {
+          enabled: true
+        }
+      }
+    })
+    await request.get('/other', {
+      extensions: {
+        cache: {
+          enabled: true
+        }
+      }
+    })
+    await request.get('/other', {
+      extensions: {
+        cache: {
+          enabled: true
+        }
+      },
+      responseType: 'text'
+    })
 
-    expect(capturedKey).toBe(JSON.stringify({
+    expect(capturedKeys[0]).toBe(JSON.stringify({
       method: 'GET',
       url: '/headerless',
       query: [],
@@ -424,6 +446,9 @@ describe('cachePlugin', () => {
         ['cookie', null]
       ]
     }))
+    expect(capturedKeys[1]).toBe(capturedKeys[0])
+    expect(capturedKeys[2]).not.toBe(capturedKeys[1])
+    expect(capturedKeys[3]).not.toBe(capturedKeys[2])
   })
 
   it('should persist a deduplicated miss under its request cache key', async () => {

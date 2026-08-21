@@ -197,6 +197,7 @@ export function cachePlugin(
     undefined,
     varyHeaders
   )
+  const keyMemo: CacheKeyMemo = {}
 
   const plugin: CachePlugin = {
     name: 'cache',
@@ -228,7 +229,8 @@ export function cachePlugin(
           requestContext.config,
           cache,
           varyHeaders,
-          emptyHeaderValues
+          emptyHeaderValues,
+          keyMemo
         )
         const stored = readStore(store, key)
 
@@ -263,7 +265,8 @@ export function cachePlugin(
           requestContext.config,
           cache,
           varyHeaders,
-          emptyHeaderValues
+          emptyHeaderValues,
+          keyMemo
         )
 
         if (isAsyncIterable(requestContext.response.data)) {
@@ -728,18 +731,36 @@ function createCacheKey(
   config: RequestConfig,
   cache: CacheOptions,
   varyHeaders: readonly string[],
-  emptyHeaderValues: ReadonlyArray<[string, string | null]>
+  emptyHeaderValues: ReadonlyArray<[string, string | null]>,
+  memo: CacheKeyMemo
 ): string {
   if (cache.key) {
     return cache.key
   }
 
-  return JSON.stringify({
-    method: config.method ?? 'GET',
+  const method = config.method ?? 'GET'
+  const responseType = config.responseType ?? 'auto'
+  const bare = !config.headers && !config.query && !config.searchParams
+
+  if (
+    bare &&
+    memo.key !== undefined &&
+    memo.method === method &&
+    memo.baseURL === config.baseURL &&
+    memo.url === config.url &&
+    memo.responseType === responseType
+  ) {
+    return memo.key
+  }
+
+  const key = JSON.stringify({
+    method,
     baseURL: config.baseURL,
     url: config.url,
-    query: normalizeQuery(config.searchParams ?? config.query),
-    responseType: config.responseType ?? 'auto',
+    query: bare
+      ? EMPTY_QUERY
+      : normalizeQuery(config.searchParams ?? config.query),
+    responseType,
     headers: config.headers
       ? normalizeCacheHeaders(
           new Headers(config.headers),
@@ -747,6 +768,24 @@ function createCacheKey(
         )
       : emptyHeaderValues
   })
+
+  if (bare) {
+    memo.method = method
+    memo.baseURL = config.baseURL
+    memo.url = config.url
+    memo.responseType = responseType
+    memo.key = key
+  }
+
+  return key
+}
+
+interface CacheKeyMemo {
+  method?: HttpMethod
+  baseURL?: string
+  url?: string
+  responseType?: string
+  key?: string
 }
 
 function normalizeCacheHeaders(
