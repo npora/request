@@ -262,24 +262,42 @@ export function cachePlugin(
           cache.ttl,
           requestContext.config
         )
-        const record = createCacheEntry(
-          requestContext.response,
-          Date.now() + Math.max(0, ttl)
-        )
-
-        completedRecords.set(requestContext, record)
 
         if (
           ttl <= 0 ||
           !allowsPersistentCaching(requestContext.response)
         ) {
           const deletion = deleteStore(store, key)
+          const waitsForDeletion = isPromiseLike(deletion)
+          const pending = inFlight.get(key)
 
-          if (isPromiseLike(deletion)) {
+          if (
+            pending?.owner === requestContext &&
+            (pending.hasFollowers || waitsForDeletion)
+          ) {
+            completedRecords.set(
+              requestContext,
+              createCacheEntry(
+                requestContext.response,
+                Date.now() + Math.max(0, ttl)
+              )
+            )
+          } else if (pending?.owner === requestContext) {
+            uncacheableLeaders.add(requestContext)
+          }
+
+          if (waitsForDeletion) {
             return deletion
           }
           return
         }
+
+        const record = createCacheEntry(
+          requestContext.response,
+          Date.now() + ttl
+        )
+
+        completedRecords.set(requestContext, record)
 
         const write = writeStore(store, key, record)
 
@@ -342,6 +360,8 @@ export function cachePlugin(
         const pending = inFlight.get(key)
 
         if (pending) {
+          pending.hasFollowers = true
+
           return waitForSharedRecord(
             pending.promise,
             requestContext.config
@@ -450,6 +470,8 @@ export function cachePlugin(
 interface InFlightRequest {
   owner: object
 
+  hasFollowers: boolean
+
   promise: Promise<CacheEntry | undefined>
 
   resolve(entry: CacheEntry | undefined): void
@@ -471,6 +493,7 @@ function createInFlightRequest(owner: object): InFlightRequest {
 
   return {
     owner,
+    hasFollowers: false,
     promise,
     resolve,
     reject

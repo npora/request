@@ -81,9 +81,10 @@ repeated trends rather than treating a single run as a release gate.
 The default cache-key path normalizes configured vary-header names once and
 reuses the resulting empty header metadata for headerless requests. The cache
 miss path also reuses its registered deduplication key when handling the
-response instead of serializing the same request identity twice. The cache
-scenarios exercise these common paths so repeated key setup remains visible
-in comparisons.
+response instead of serializing the same request identity twice. When
+persistence is disabled, it only snapshots the response if a concurrent
+follower needs it. The cache scenarios exercise these common paths so repeated
+key and snapshot setup remain visible in comparisons.
 
 CI stores the JSON report as a build artifact. Correctness and resource
 cleanup remain enforced separately by unit, integration and browser stress

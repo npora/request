@@ -620,6 +620,30 @@ describe('cachePlugin', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 
+  it('should skip cache snapshots for an unshared non-persistent miss', async () => {
+    const cloneSpy = vi.fn(globalThis.structuredClone)
+    const fetchMock = vi.fn().mockResolvedValue(
+      createJsonResponse({ ok: true })
+    )
+
+    vi.stubGlobal('structuredClone', cloneSpy)
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient().use(cachePlugin())
+
+    await expect(request.get('/transient', {
+      extensions: {
+        cache: {
+          enabled: true,
+          ttl: 0
+        }
+      }
+    })).resolves.toEqual({ ok: true })
+
+    expect(cloneSpy).not.toHaveBeenCalled()
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
   it('should isolate cache stores between plugin instances', async () => {
     const fetchMock = vi
       .fn()
@@ -924,7 +948,8 @@ describe('cachePlugin', () => {
     const config = {
       extensions: {
         cache: {
-          enabled: true
+          enabled: true,
+          ttl: 0
         }
       }
     }

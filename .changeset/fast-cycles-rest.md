@@ -27,7 +27,9 @@ into the request result without temporary objects. Normalize cache vary-header
 names once, avoid per-request Map allocation while creating cache keys, and
 reuse empty vary-header metadata for headerless requests. Reuse the registered
 deduplication key when persisting or discarding a cache miss response instead
-of serializing the same request identity twice.
+of serializing the same request identity twice. Skip transient response
+snapshots for non-persistent cache misses unless a concurrent follower needs
+the result.
 Rely on native ES2020 error subclassing instead of repairing the request-error
 prototype on every failure. Avoid exception-driven origin resolution for
 relative concurrency and circuit-breaker request URLs, and reuse the last exact
