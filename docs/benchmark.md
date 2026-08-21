@@ -34,10 +34,13 @@ pnpm benchmark -- \
 - `concurrentClient`: complete client pipeline with bounded concurrency.
 - `concurrentPluginPipeline`: concurrent client with request/response
   interceptors and request/response plugin hooks.
+- `cacheHitClient`: repeated data reads from the default in-memory cache.
 - `fetchAdapterClient`: complete FetchAdapter lifecycle against an in-memory
   Fetch response, without network latency.
 - `fetchAdapterCompleteResponse`: the same Fetch lifecycle while preserving
   a separately readable raw `Response`.
+- `fetchAdapterBoundedClient`: data-only Fetch parsing with a response-size
+  limit enforced while the body is consumed.
 - `fetchAdapterQueryClient`: data-only Fetch lifecycle with scalar, array,
   nullable and hash-aware query serialization.
 

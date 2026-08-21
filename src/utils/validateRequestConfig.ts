@@ -189,6 +189,15 @@ function validateHeaders(config: RequestConfig): Headers {
 }
 
 function validateBody(config: RequestConfig): void {
+  if (
+    config.body == null &&
+    config.json == null &&
+    config.form == null &&
+    config.formData == null
+  ) {
+    return
+  }
+
   let activeField: typeof BODY_FIELDS[number] | undefined
 
   for (const key of BODY_FIELDS) {

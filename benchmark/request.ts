@@ -1,4 +1,5 @@
 import {
+  cachePlugin,
   createClient,
   type Adapter,
   type NporaResponse,
@@ -43,6 +44,19 @@ const client = createClient({
 const pipelineClient = createClient({
   adapter
 }).use(createBenchmarkPlugin())
+const cacheClient = createClient({
+  adapter
+}).use(cachePlugin())
+const cachedRequestConfig: RequestConfig = {
+  url: '/benchmark-cache',
+  method: 'GET',
+  extensions: {
+    cache: {
+      enabled: true,
+      ttl: Number.POSITIVE_INFINITY
+    }
+  }
+}
 const originalFetch = globalThis.fetch
 const fetchClient = createClient({
   baseURL: 'https://benchmark.example.com',
@@ -81,6 +95,10 @@ const pluginPipeline = await runConcurrent(
   options.concurrency,
   () => pipelineClient.get('/benchmark', requestConfig)
 )
+const cacheHitClient = await runSequential(
+  options.operations,
+  () => cacheClient.get('/benchmark-cache', cachedRequestConfig)
+)
 const fetchAdapterClient = await runSequential(
   options.operations,
   () => fetchClient.get('/benchmark', {
@@ -96,6 +114,13 @@ const fetchAdapterCompleteResponse = await runSequential(
     headers: {
       'x-request': 'benchmark'
     },
+    responseType: 'text'
+  })
+)
+const fetchAdapterBoundedClient = await runSequential(
+  options.operations,
+  () => fetchClient.get('/benchmark', {
+    maxResponseSize: 1024,
     responseType: 'text'
   })
 )
@@ -132,8 +157,10 @@ const report = {
     sequentialClient: sequential,
     concurrentClient: concurrent,
     concurrentPluginPipeline: pluginPipeline,
+    cacheHitClient,
     fetchAdapterClient,
     fetchAdapterCompleteResponse,
+    fetchAdapterBoundedClient,
     fetchAdapterQueryClient
   },
   comparison: {
@@ -150,6 +177,8 @@ printBenchmarkReport(report.scenarios)
 await writeBenchmarkReport(options.output, report)
 
 async function warmUp(iterations: number): Promise<void> {
+  await cacheClient.get('/benchmark-cache', cachedRequestConfig)
+
   for (let index = 0; index < iterations; index += 1) {
     await client.get('/benchmark', requestConfig)
     await pipelineClient.get('/benchmark', requestConfig)

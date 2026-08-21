@@ -7,6 +7,7 @@ import type {
 } from '../types'
 import { RequestError } from '../errors'
 import { isURLSearchParams } from '../utils/isURLSearchParams'
+import { isPromiseLike } from '../utils/isPromiseLike'
 import type { Plugin } from './Plugin'
 import { resolveExtensionConfig } from './resolveExtensionConfig'
 
@@ -205,7 +206,10 @@ export function cachePlugin(
           cache,
           varyHeaders
         )
-        const record = await readStore(store, key)
+        const stored = readStore(store, key)
+        const record = isPromiseLike(stored)
+          ? await stored
+          : stored
 
         if (!active) {
           return
@@ -213,7 +217,11 @@ export function cachePlugin(
 
         if (record) {
           if (isExpired(record.expiresAt)) {
-            await deleteStore(store, key)
+            const deletion = deleteStore(store, key)
+
+            if (isPromiseLike(deletion)) {
+              await deletion
+            }
           } else {
             const cachedResponse = restoreCacheEntry(
               record,
@@ -226,7 +234,11 @@ export function cachePlugin(
               return
             }
 
-            await deleteStore(store, key)
+            const deletion = deleteStore(store, key)
+
+            if (isPromiseLike(deletion)) {
+              await deletion
+            }
           }
         }
 
@@ -287,7 +299,11 @@ export function cachePlugin(
 
         if (isAsyncIterable(requestContext.response.data)) {
           uncacheableLeaders.add(requestContext)
-          await deleteStore(store, key)
+          const deletion = deleteStore(store, key)
+
+          if (isPromiseLike(deletion)) {
+            await deletion
+          }
           return
         }
 
@@ -306,11 +322,19 @@ export function cachePlugin(
           ttl <= 0 ||
           !allowsPersistentCaching(requestContext.response)
         ) {
-          await deleteStore(store, key)
+          const deletion = deleteStore(store, key)
+
+          if (isPromiseLike(deletion)) {
+            await deletion
+          }
           return
         }
 
-        await writeStore(store, key, record)
+        const write = writeStore(store, key, record)
+
+        if (isPromiseLike(write)) {
+          await write
+        }
       })
 
       context.hooks.onSettled(requestContext => {
@@ -425,38 +449,54 @@ function createInFlightRequest(owner: object): InFlightRequest {
   }
 }
 
-async function readStore(
+function readStore(
   store: CacheStore,
   key: string
-): Promise<CacheEntry | undefined> {
+): MaybePromise<CacheEntry | undefined> {
   try {
-    return await store.get(key)
+    const result = store.get(key)
+
+    return isPromiseLike(result)
+      ? Promise.resolve(result).catch(() => undefined)
+      : result
   } catch {
     return undefined
   }
 }
 
-async function writeStore(
+function writeStore(
   store: CacheStore,
   key: string,
   entry: CacheEntry
-): Promise<void> {
+): MaybePromise<void> {
   try {
-    await store.set(key, entry)
+    const result = store.set(key, entry)
+
+    if (isPromiseLike(result)) {
+      return Promise.resolve(result).catch(ignoreStoreError)
+    }
   } catch {
     // Cache storage failures must not change the network response.
   }
 }
 
-async function deleteStore(
+function deleteStore(
   store: CacheStore,
   key: string
-): Promise<void> {
+): MaybePromise<void> {
   try {
-    await store.delete(key)
+    const result = store.delete(key)
+
+    if (isPromiseLike(result)) {
+      return Promise.resolve(result).catch(ignoreStoreError)
+    }
   } catch {
     // Expired or disabled cache entries can be ignored safely.
   }
+}
+
+function ignoreStoreError(): void {
+  // Cache storage failures must not change the request lifecycle.
 }
 
 async function waitForSharedRecord(

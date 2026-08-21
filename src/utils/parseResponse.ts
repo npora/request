@@ -5,6 +5,8 @@ import {
   parseServerSentEvents
 } from './parseStreamingResponse'
 
+const TEXT_DECODER = new TextDecoder()
+
 /**
  * Bound a Fetch response before it can be cloned into multiple body branches.
  */
@@ -179,7 +181,7 @@ export async function parseResponse<T = unknown>(
 
   try {
     if (maxSize !== undefined && Number.isFinite(maxSize)) {
-      await rejectOversizedContentLength(response, maxSize, config)
+      rejectOversizedContentLength(response, maxSize, config)
 
       if (isStreamingResponseType(responseType)) {
         const stream = limitResponseStream(response, maxSize, config)
@@ -235,11 +237,11 @@ export async function parseResponse<T = unknown>(
   }
 }
 
-async function rejectOversizedContentLength(
+function rejectOversizedContentLength(
   response: Response,
   maxSize: number,
   config: RequestConfig
-): Promise<void> {
+): void {
   const contentLength = Number(response.headers.get('content-length'))
 
   if (!Number.isFinite(contentLength) || contentLength <= maxSize) {
@@ -311,7 +313,7 @@ function parseBufferedResponse<T>(
 ): T {
   switch (responseType) {
     case 'json':
-      return JSON.parse(new TextDecoder().decode(bytes)) as T
+      return JSON.parse(TEXT_DECODER.decode(bytes)) as T
 
     case 'blob':
       return new Blob([toArrayBuffer(bytes)], {
@@ -325,7 +327,7 @@ function parseBufferedResponse<T>(
       ) as T
 
     default:
-      return new TextDecoder().decode(bytes) as T
+      return TEXT_DECODER.decode(bytes) as T
   }
 }
 
