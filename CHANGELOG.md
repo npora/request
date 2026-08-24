@@ -1,5 +1,56 @@
 # @npora/request
 
+## 1.14.4
+
+### Patch Changes
+
+- b931ff2: Make asynchronous initial authentication token resolution, cache-store reads and writes, retry decisions, and circuit-breaker failure classification observe each request's AbortSignal without retaining listeners, retry work, or half-open probe permits.
+- b931ff2: Make asynchronous refresh-policy, shared token-refresh and post-refresh token waits abortable per request without cancelling the shared refresh, and prevent removed auth plugins from retrying requests that were already waiting.
+- b931ff2: Isolate cache generations across clear calls so stale asynchronous reads and requests started before clearing cannot serve, overwrite or delete entries created afterward, while existing deduplicated followers still settle normally.
+- b931ff2: Avoid retaining duplicate raw response bodies for data-only cache entries while preserving independent raw bodies for complete responses and raw-response hooks.
+- b931ff2: Prevent data-only cache entries and in-flight leaders from serving complete-response callers without a readable raw body, deduplicate those callers through a raw-capable leader, and continue allowing complete leaders to serve data-only followers.
+- b931ff2: Retain half-open probe capacity until asynchronous failure classification settles, preventing slow custom failure policies from admitting more probes than halfOpenMaxRequests while still releasing capacity after false results or rejected classifiers.
+- b931ff2: Avoid teeing data-only XHR response bodies, and parse buffered JSON, text, Blob, and ArrayBuffer values directly from the native XHR Blob while preserving limits, MIME types, parser errors, and readable raw bodies when required.
+- b931ff2: Avoid retaining per-request retry option state when a request uses the plugin defaults.
+- b931ff2: Reject non-string `baseURL` values and malformed HTTP(S) `url` or `baseURL`
+  forms before adapter dispatch, preventing runtime-dependent URL normalization
+  from changing the intended request target. Ignore inherited values while
+  merging configuration and reject reserved request fields supplied through a
+  prototype chain before adapters or plugins can consume them.
+  
+  Prevent timeout allocation when a custom external signal aborts synchronously
+  during listener registration, and cancel streaming response readers if abort
+  listener setup fails so request cleanup cannot be deferred indefinitely.
+  
+  Avoid retaining retry timers or concurrency queue entries when custom abort
+  signals fire synchronously during listener registration, and keep permit
+  handoff progressing when listener removal throws.
+  
+  Replace the concurrency wait array with a constant-time FIFO queue so permit
+  handoff, cancellation, timeout, and plugin removal do not degrade as queue
+  depth grows.
+  
+  Make cache-deduplication followers settle idempotently when abort registration
+  fires synchronously or listener cleanup fails, without retaining a subscription
+  to the shared request after cancellation.
+  
+  Prevent XMLHttpRequest transports from sending after synchronous abort
+  registration, and keep XHR settlement progressing when abort-listener cleanup
+  throws.
+  
+  Make delayed MockAdapter responses roll back listener and timer setup safely,
+  including synchronous abort registration and listener-cleanup failures.
+  
+  Roll back timeout-signal listener registration when listener or timer setup
+  throws, and clear handles returned by synchronously firing custom timers.
+  
+  Apply the same transactional setup to retry delays so listener and timer
+  initialization failures cannot retain cancellation resources.
+  
+  Avoid redundant circuit-breaker Map delete/set operations when consecutive
+  requests use the same isolation key while preserving LRU refresh on key
+  changes.
+
 ## 1.14.3
 
 ### Patch Changes
