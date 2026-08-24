@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { CacheStore, Plugin } from '../src'
+import type { CacheEntry, CacheStore, Plugin } from '../src'
 import {
   cachePlugin,
   createClient,
@@ -23,6 +23,84 @@ afterEach(() => {
 })
 
 describe('cachePlugin', () => {
+  it('should abort while an asynchronous cache read is pending', async () => {
+    const store: CacheStore = {
+      get: vi.fn(() => new Promise<CacheEntry | undefined>(() => {})),
+      set() {},
+      delete() {},
+      clear() {}
+    }
+    const fetchMock = vi.fn()
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient().use(cachePlugin({ store }))
+    const controller = new AbortController()
+    const pending = request.get('/pending-cache-read', {
+      signal: controller.signal,
+      extensions: {
+        cache: { enabled: true }
+      }
+    }).catch(error => error)
+
+    await vi.waitFor(() => {
+      expect(store.get).toHaveBeenCalledTimes(1)
+    })
+
+    controller.abort('cancel cache read')
+
+    const outcome = await Promise.race([
+      pending,
+      new Promise<'still-pending'>(resolve => {
+        setTimeout(() => resolve('still-pending'), 25)
+      })
+    ])
+
+    expect(outcome).toMatchObject({ code: 'ABORT_ERROR' })
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('should abort while an asynchronous cache write is pending', async () => {
+    const store: CacheStore = {
+      get() {
+        return undefined
+      },
+      set: vi.fn(() => new Promise<void>(() => {})),
+      delete() {},
+      clear() {}
+    }
+    const fetchMock = vi.fn().mockResolvedValue(
+      createJsonResponse({ ok: true })
+    )
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient().use(cachePlugin({ store }))
+    const controller = new AbortController()
+    const pending = request.get('/pending-cache-write', {
+      signal: controller.signal,
+      extensions: {
+        cache: { enabled: true, ttl: 1000 }
+      }
+    }).catch(error => error)
+
+    await vi.waitFor(() => {
+      expect(store.set).toHaveBeenCalledTimes(1)
+    })
+
+    controller.abort('cancel cache write')
+
+    const outcome = await Promise.race([
+      pending,
+      new Promise<'still-pending'>(resolve => {
+        setTimeout(() => resolve('still-pending'), 25)
+      })
+    ])
+
+    expect(outcome).toMatchObject({ code: 'ABORT_ERROR' })
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
   it('should evict the least recently used memory entry at capacity', () => {
     const store = new MemoryCacheStore({
       maxEntries: 2
@@ -645,6 +723,299 @@ describe('cachePlugin', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 
+  it('should not preserve a raw body for data-only cache requests', async () => {
+    const response = createJsonResponse({ ok: true })
+    const clone = vi.spyOn(response, 'clone')
+    const fetchMock = vi.fn().mockResolvedValue(response)
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient().use(cachePlugin())
+    const config = {
+      extensions: {
+        cache: {
+          enabled: true
+        }
+      }
+    }
+
+    await expect(request.get('/data', config)).resolves.toEqual({ ok: true })
+    await expect(request.get('/data', config)).resolves.toEqual({ ok: true })
+
+    expect(clone).not.toHaveBeenCalled()
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('should preserve independent raw bodies for complete cached responses', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      createJsonResponse({ ok: true })
+    )
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient().use(cachePlugin())
+    const config = {
+      extensions: {
+        cache: {
+          enabled: true
+        }
+      }
+    }
+    const first = await request.getResponse('/data', config)
+    const second = await request.getResponse('/data', config)
+
+    await expect(first.raw.json()).resolves.toEqual({ ok: true })
+    await expect(second.raw.json()).resolves.toEqual({ ok: true })
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('should refetch a rawless data cache entry for a complete response', async () => {
+    const fetchMock = vi.fn().mockImplementation(() =>
+      Promise.resolve(createJsonResponse({ payload: 'cached' }))
+    )
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient().use(cachePlugin())
+    const config = {
+      extensions: {
+        cache: {
+          enabled: true,
+          ttl: Infinity
+        }
+      }
+    }
+
+    await expect(request.get('/mixed-mode', config)).resolves.toEqual({
+      payload: 'cached'
+    })
+
+    const response = await request.getResponse('/mixed-mode', config)
+
+    await expect(response.raw.json()).resolves.toEqual({
+      payload: 'cached'
+    })
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('should not share or overwrite raw across mixed-mode requests', async () => {
+    const resolvers: Array<(response: Response) => void> = []
+    const fetchMock = vi.fn().mockImplementation(() => {
+      return new Promise<Response>(resolve => {
+        resolvers.push(resolve)
+      })
+    })
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient().use(cachePlugin())
+    const config = {
+      extensions: {
+        cache: {
+          enabled: true,
+          ttl: Infinity
+        }
+      }
+    }
+    const dataOnly = request.get<{ source: string }>('/mixed-flight', config)
+
+    await vi.waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledTimes(1)
+    })
+
+    const complete = request.getResponse<{ source: string }>(
+      '/mixed-flight',
+      config
+    )
+
+    await vi.waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledTimes(2)
+    })
+
+    const completeFollower = request.getResponse<{ source: string }>(
+      '/mixed-flight',
+      config
+    )
+
+    resolvers[1]?.(createJsonResponse({ source: 'complete' }))
+    const [completeResponse, followerResponse] = await Promise.all([
+      complete,
+      completeFollower
+    ])
+
+    resolvers[0]?.(createJsonResponse({ source: 'data' }))
+    await expect(dataOnly).resolves.toEqual({ source: 'data' })
+    await expect(completeResponse.raw.json()).resolves.toEqual({
+      source: 'complete'
+    })
+    await expect(followerResponse.raw.json()).resolves.toEqual({
+      source: 'complete'
+    })
+
+    const cached = await request.getResponse<{ source: string }>(
+      '/mixed-flight',
+      config
+    )
+
+    expect(cached.data).toEqual({ source: 'complete' })
+    await expect(cached.raw.json()).resolves.toEqual({
+      source: 'complete'
+    })
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('should share a complete leader with a data-only follower', async () => {
+    let resolveFetch!: (response: Response) => void
+    const fetchMock = vi.fn().mockImplementation(() => {
+      return new Promise<Response>(resolve => {
+        resolveFetch = resolve
+      })
+    })
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient().use(cachePlugin())
+    const config = {
+      extensions: {
+        cache: {
+          enabled: true,
+          ttl: Infinity
+        }
+      }
+    }
+    const complete = request.getResponse<{ value: number }>(
+      '/complete-leader',
+      config
+    )
+
+    await vi.waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledTimes(1)
+    })
+
+    const dataOnly = request.get<{ value: number }>(
+      '/complete-leader',
+      config
+    )
+
+    resolveFetch(createJsonResponse({ value: 1 }))
+
+    const [response, data] = await Promise.all([complete, dataOnly])
+
+    expect(data).toEqual({ value: 1 })
+    await expect(response.raw.json()).resolves.toEqual({ value: 1 })
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('should deduplicate complete followers beside a rawless leader', async () => {
+    const resolvers: Array<(response: Response) => void> = []
+    const fetchMock = vi.fn().mockImplementation(() => {
+      return new Promise<Response>(resolve => {
+        resolvers.push(resolve)
+      })
+    })
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient().use(cachePlugin())
+    const config = {
+      extensions: {
+        cache: {
+          enabled: true,
+          ttl: 0
+        }
+      }
+    }
+    const dataOnly = request.get('/rawless-leader', config)
+
+    await vi.waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledTimes(1)
+    })
+
+    const first = request.getResponse('/rawless-leader', config)
+    const second = request.getResponse('/rawless-leader', config)
+
+    await vi.waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledTimes(2)
+    })
+
+    resolvers[1]?.(createJsonResponse({ mode: 'complete' }))
+    const [firstResponse, secondResponse] = await Promise.all([first, second])
+
+    await expect(firstResponse.raw.json()).resolves.toEqual({
+      mode: 'complete'
+    })
+    await expect(secondResponse.raw.json()).resolves.toEqual({
+      mode: 'complete'
+    })
+
+    resolvers[0]?.(createJsonResponse({ mode: 'data' }))
+    await expect(dataOnly).resolves.toEqual({ mode: 'data' })
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('should retain a rawless entry when its complete refetch fails', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(createJsonResponse({ stale: false }))
+      .mockRejectedValueOnce(new Error('offline'))
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient().use(cachePlugin())
+    const config = {
+      extensions: {
+        cache: {
+          enabled: true,
+          ttl: Infinity
+        }
+      }
+    }
+
+    await request.get('/rawless-fallback', config)
+    await expect(
+      request.getResponse('/rawless-fallback', config)
+    ).rejects.toMatchObject({ code: 'NETWORK_ERROR' })
+    await expect(request.get('/rawless-fallback', config)).resolves.toEqual({
+      stale: false
+    })
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('should store raw bodies only when the caller can observe them', async () => {
+    let stored: CacheEntry | undefined
+    const store: CacheStore = {
+      get() {
+        return undefined
+      },
+      set(_key, entry) {
+        stored = entry
+      },
+      delete() {},
+      clear() {}
+    }
+    const fetchMock = vi.fn().mockImplementation(() =>
+      Promise.resolve(createJsonResponse({ payload: 'cached' }))
+    )
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient().use(cachePlugin({ store }))
+    const config = {
+      extensions: {
+        cache: {
+          enabled: true
+        }
+      }
+    }
+
+    await request.get('/data-only', config)
+    expect(stored?.raw).toBeUndefined()
+
+    await request.getResponse('/complete', config)
+    expect(stored?.raw).toBeInstanceOf(Response)
+    await expect(stored?.raw?.json()).resolves.toEqual({ payload: 'cached' })
+  })
+
   it('should skip cache snapshots for an unshared non-persistent miss', async () => {
     const cloneSpy = vi.fn(globalThis.structuredClone)
     const fetchMock = vi.fn().mockResolvedValue(
@@ -959,6 +1330,204 @@ describe('cachePlugin', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2)
   })
 
+  it('should isolate requests started after clear from an older shared request', async () => {
+    const resolvers: Array<(response: Response) => void> = []
+    const fetchMock = vi.fn().mockImplementation(() => {
+      return new Promise<Response>(resolve => {
+        resolvers.push(resolve)
+      })
+    })
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const plugin = cachePlugin()
+    const request = createClient().use(plugin)
+    const config = {
+      extensions: {
+        cache: {
+          enabled: true,
+          ttl: Infinity
+        }
+      }
+    }
+    const oldLeader = request.get('/clear-flight', config)
+
+    await vi.waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledTimes(1)
+    })
+
+    const oldFollower = request.get('/clear-flight', config)
+
+    await Promise.resolve()
+    plugin.clear()
+
+    const current = request.get('/clear-flight', config)
+
+    await vi.waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledTimes(2)
+    })
+
+    resolvers[1]?.(createJsonResponse({ generation: 'current' }))
+    await expect(current).resolves.toEqual({ generation: 'current' })
+
+    resolvers[0]?.(new Response(JSON.stringify({ generation: 'old' }), {
+      headers: {
+        'cache-control': 'no-store',
+        'content-type': 'application/json'
+      }
+    }))
+    await expect(oldLeader).resolves.toEqual({ generation: 'old' })
+    await expect(oldFollower).resolves.toEqual({ generation: 'old' })
+
+    await expect(request.get('/clear-flight', config)).resolves.toEqual({
+      generation: 'current'
+    })
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('should settle complete-response followers detached by clear', async () => {
+    const resolvers: Array<(response: Response) => void> = []
+    const fetchMock = vi.fn().mockImplementation(() => {
+      return new Promise<Response>(resolve => {
+        resolvers.push(resolve)
+      })
+    })
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const plugin = cachePlugin()
+    const request = createClient().use(plugin)
+    const config = {
+      extensions: {
+        cache: {
+          enabled: true,
+          ttl: Infinity
+        }
+      }
+    }
+    const oldLeader = request.getResponse('/clear-complete', config)
+
+    await vi.waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledTimes(1)
+    })
+
+    const oldFollower = request.getResponse('/clear-complete', config)
+
+    await Promise.resolve()
+    plugin.clear()
+
+    const current = request.getResponse('/clear-complete', config)
+
+    await vi.waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledTimes(2)
+    })
+
+    resolvers[1]?.(createJsonResponse({ generation: 'current' }))
+    const currentResponse = await current
+
+    resolvers[0]?.(createJsonResponse({ generation: 'old' }))
+    const [oldResponse, followerResponse] = await Promise.all([
+      oldLeader,
+      oldFollower
+    ])
+
+    await expect(currentResponse.raw.json()).resolves.toEqual({
+      generation: 'current'
+    })
+    await expect(oldResponse.raw.json()).resolves.toEqual({
+      generation: 'old'
+    })
+    await expect(followerResponse.raw.json()).resolves.toEqual({
+      generation: 'old'
+    })
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('should not repopulate the cache from an unshared request cleared in flight', async () => {
+    let resolveFirst!: (response: Response) => void
+    const fetchMock = vi
+      .fn()
+      .mockImplementationOnce(() => {
+        return new Promise<Response>(resolve => {
+          resolveFirst = resolve
+        })
+      })
+      .mockResolvedValueOnce(createJsonResponse({ generation: 'current' }))
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const plugin = cachePlugin({ dedupe: false })
+    const request = createClient().use(plugin)
+    const config = {
+      extensions: {
+        cache: {
+          enabled: true,
+          ttl: Infinity
+        }
+      }
+    }
+    const oldRequest = request.get('/clear-unshared', config)
+
+    await vi.waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledTimes(1)
+    })
+
+    plugin.clear()
+    resolveFirst(createJsonResponse({ generation: 'old' }))
+
+    await expect(oldRequest).resolves.toEqual({ generation: 'old' })
+    await expect(request.get('/clear-unshared', config)).resolves.toEqual({
+      generation: 'current'
+    })
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('should ignore a stale asynchronous cache read after clear', async () => {
+    let resolveRead!: (entry: CacheEntry) => void
+    const store: CacheStore = {
+      get() {
+        return new Promise<CacheEntry>(resolve => {
+          resolveRead = resolve
+        })
+      },
+      set() {},
+      delete() {},
+      clear() {}
+    }
+    const fetchMock = vi.fn().mockResolvedValue(
+      createJsonResponse({ generation: 'network' })
+    )
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const plugin = cachePlugin({ store })
+    const request = createClient().use(plugin)
+    const pending = request.get('/clear-read', {
+      extensions: {
+        cache: {
+          enabled: true,
+          ttl: Infinity
+        }
+      }
+    })
+
+    await vi.waitFor(() => {
+      expect(resolveRead).toBeTypeOf('function')
+    })
+
+    plugin.clear()
+    resolveRead({
+      data: { generation: 'stale' },
+      expiresAt: Infinity,
+      status: 200,
+      statusText: 'OK',
+      headers: []
+    })
+
+    await expect(pending).resolves.toEqual({ generation: 'network' })
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
   it('should deduplicate concurrent equivalent requests', async () => {
     let resolveFetch!: (response: Response) => void
     const fetchMock = vi.fn().mockImplementation(() => {
@@ -1054,10 +1623,10 @@ describe('cachePlugin', () => {
   })
 
   it('should allow disabling request deduplication', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(
-      createJsonResponse({
+    const fetchMock = vi.fn().mockImplementation(() =>
+      Promise.resolve(createJsonResponse({
         ok: true
-      })
+      }))
     )
 
     vi.stubGlobal('fetch', fetchMock)
@@ -1205,6 +1774,139 @@ describe('cachePlugin', () => {
       ok: true
     })
     expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('should not subscribe after synchronous follower abort registration', async () => {
+    let resolveFetch!: (response: Response) => void
+    const fetchMock = vi.fn().mockImplementation(() => {
+      return new Promise<Response>(resolve => {
+        resolveFetch = resolve
+      })
+    })
+    const reason = new Error('synchronous follower abort')
+    const removeEventListener = vi.fn()
+    const signal = {
+      aborted: false,
+      reason,
+      addEventListener(_type: string, listener: EventListener) {
+        this.aborted = true
+        listener(new Event('abort'))
+      },
+      removeEventListener
+    } as unknown as AbortSignal
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient().use(cachePlugin())
+    const extensions = {
+      cache: {
+        enabled: true
+      }
+    }
+    const leader = request.get('/sync-abort-shared', { extensions })
+
+    await vi.waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledTimes(1)
+    })
+
+    const follower = request.get('/sync-abort-shared', {
+      signal,
+      extensions
+    })
+
+    await expect(follower).rejects.toMatchObject({
+      code: 'ABORT_ERROR',
+      cause: reason
+    })
+    expect(removeEventListener).toHaveBeenCalledTimes(1)
+
+    resolveFetch(createJsonResponse({ ok: true }))
+    await expect(leader).resolves.toEqual({ ok: true })
+    expect(removeEventListener).toHaveBeenCalledTimes(1)
+  })
+
+  it('should release a follower when listener cleanup throws', async () => {
+    let resolveFetch!: (response: Response) => void
+    const fetchMock = vi.fn().mockImplementation(() => {
+      return new Promise<Response>(resolve => {
+        resolveFetch = resolve
+      })
+    })
+    const removeEventListener = vi.fn(() => {
+      throw new Error('listener cleanup failed')
+    })
+    const signal = {
+      aborted: false,
+      addEventListener() {},
+      removeEventListener
+    } as unknown as AbortSignal
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient().use(cachePlugin())
+    const extensions = {
+      cache: {
+        enabled: true
+      }
+    }
+    const leader = request.get('/cleanup-shared', { extensions })
+
+    await vi.waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledTimes(1)
+    })
+
+    const follower = request.get('/cleanup-shared', {
+      signal,
+      extensions
+    })
+
+    resolveFetch(createJsonResponse({ ok: true }))
+
+    await expect(leader).resolves.toEqual({ ok: true })
+    await expect(follower).resolves.toEqual({ ok: true })
+    expect(removeEventListener).toHaveBeenCalledTimes(1)
+  })
+
+  it('should clean up when follower abort listener setup fails', async () => {
+    let resolveFetch!: (response: Response) => void
+    const fetchMock = vi.fn().mockImplementation(() => {
+      return new Promise<Response>(resolve => {
+        resolveFetch = resolve
+      })
+    })
+    const removeEventListener = vi.fn()
+    const signal = {
+      aborted: false,
+      addEventListener() {
+        throw new Error('listener setup failed')
+      },
+      removeEventListener
+    } as unknown as AbortSignal
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient().use(cachePlugin())
+    const extensions = {
+      cache: {
+        enabled: true
+      }
+    }
+    const leader = request.get('/listener-failure-shared', { extensions })
+
+    await vi.waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledTimes(1)
+    })
+
+    const follower = request.get('/listener-failure-shared', {
+      signal,
+      extensions
+    })
+
+    await expect(follower).rejects.toThrow('listener setup failed')
+    expect(removeEventListener).toHaveBeenCalledTimes(1)
+
+    resolveFetch(createJsonResponse({ ok: true }))
+    await expect(leader).resolves.toEqual({ ok: true })
   })
 
   it('should share a custom cache store between plugin instances', async () => {

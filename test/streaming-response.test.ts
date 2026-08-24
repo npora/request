@@ -204,6 +204,76 @@ describe('streaming response parsing', () => {
     expect(cancel).toHaveBeenCalledTimes(1)
   })
 
+  it('should release a stream when abort listener registration fails', async () => {
+    const cancel = vi.fn()
+    const body = new ReadableStream<Uint8Array>({
+      cancel
+    })
+    const signal = {
+      aborted: false,
+      addEventListener() {
+        throw new Error('listener registration failed')
+      },
+      removeEventListener: vi.fn()
+    } as unknown as AbortSignal
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(body, {
+          headers: {
+            'content-type': 'application/x-ndjson'
+          }
+        })
+      )
+    )
+
+    await expect(createClient().ndjson('/records', {
+      signal
+    })).rejects.toMatchObject({
+      code: 'NETWORK_ERROR',
+      cause: expect.objectContaining({
+        message: 'listener registration failed'
+      })
+    })
+    await vi.waitFor(() => {
+      expect(cancel).toHaveBeenCalledTimes(1)
+    })
+  })
+
+  it('should cancel once when listener registration aborts synchronously', async () => {
+    const cancel = vi.fn()
+    const reason = new Error('synchronous abort')
+    const signal = {
+      aborted: false,
+      reason,
+      addEventListener(_type: string, listener: EventListener) {
+        this.aborted = true
+        listener(new Event('abort'))
+      },
+      removeEventListener: vi.fn()
+    } as unknown as AbortSignal
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(new ReadableStream<Uint8Array>({ cancel }), {
+          headers: {
+            'content-type': 'application/x-ndjson'
+          }
+        })
+      )
+    )
+
+    const records = await createClient().ndjson('/records', { signal })
+
+    await expect(collect(records)).rejects.toMatchObject({
+      code: 'ABORT_ERROR',
+      cause: reason
+    })
+    expect(cancel).toHaveBeenCalledTimes(1)
+  })
+
   it('should enforce maxResponseSize during streaming iteration', async () => {
     vi.stubGlobal(
       'fetch',

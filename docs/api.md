@@ -724,6 +724,8 @@ they are explicitly included in `methods`. Requests with a `ReadableStream`
 body are not retried because their body cannot be replayed safely.
 
 Retry delays are interrupted immediately when the request signal is aborted.
+Asynchronous `shouldRetry`, delay and jitter results observe the same signal,
+so application retry policies cannot keep an aborted request pending.
 Valid `Retry-After` response headers take precedence over the configured delay
 and are capped by `maxDelay`. They are not randomized.
 
@@ -767,7 +769,12 @@ new requests with `RequestError.code === 'CIRCUIT_OPEN'` before adapter I/O.
 After `resetTimeout`, it enters half-open state and admits at most
 `halfOpenMaxRequests` concurrent probes. `successThreshold` successful probes
 close it; a counted probe failure opens it again and restarts the recovery
-window.
+window. When `shouldCountFailure` is asynchronous, its pending classification
+remains part of the probe lifecycle and continues occupying a half-open slot.
+False results and rejected classifiers release the slot without leaving the
+circuit permanently saturated. Aborting the probe also stops waiting for the
+classifier and releases its slot; a late classifier result cannot mutate the
+circuit afterward.
 
 Circuits use the resolved request origin as their isolation key. Relative URLs
 without an absolute `baseURL` share the `default` key. Override the key or
@@ -945,8 +952,19 @@ await cache.clear()
 Store methods may be synchronous or asynchronous. Read, write and expiration
 cleanup failures are treated as cache misses and do not change the network
 result. Explicit `cache.clear()` failures remain visible to the caller.
+Asynchronous request-scoped store operations observe the request signal, so a
+stalled external store cannot keep an aborted request pending. The underlying
+store operation is not forcibly cancelled and must implement its own I/O
+cancellation when that is required.
 `CacheEntry.raw` is optional so portable stores may persist parsed data and
 response metadata without serializing a native `Response`.
+
+Calling `cache.clear()` immediately starts a new cache and deduplication
+generation. Requests started afterward never join an older in-flight leader,
+and stale asynchronous reads or older responses cannot repopulate, overwrite or
+delete entries in the new generation. Requests already sharing an older leader
+still settle normally. Await `cache.clear()` when using an asynchronous store
+before relying on the underlying store having finished its own clear operation.
 
 The generated default key incorporates values from `varyHeaders`, including
 authorization and cookies. External stores must treat cache keys as sensitive
@@ -984,6 +1002,14 @@ token once. A refresh retry preserves the request-level authorization scheme.
 When `refreshToken()` updates external state and returns `void`, token providers
 and storage are read again before retrying. Failed refreshes preserve the
 original request error and do not block later requests from trying again.
+
+Each request observes its own `AbortSignal` while waiting for an initial token
+provider or storage read, an asynchronous refresh policy, the shared refresh
+operation, or a post-refresh token provider.
+Cancelling one waiter does not cancel the shared refresh or other requests, and
+listener cleanup failures cannot leave that waiter pending. Removing the auth
+plugin prevents requests already waiting on refresh from injecting the new token
+or retrying after the refresh completes.
 
 ## Logger
 

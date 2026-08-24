@@ -116,6 +116,45 @@ describe('request config', () => {
   })
 
   it.each([
+    {
+      config: {
+        url: 'https:uploads.example.com/file'
+      },
+      message: 'Request URL is malformed'
+    },
+    {
+      config: {
+        url: '/file',
+        baseURL: 'https:/api.example.com'
+      },
+      message: 'Request URL is malformed'
+    },
+    {
+      config: {
+        url: '/file',
+        baseURL: 42
+      },
+      message: 'Request baseURL must be a string'
+    }
+  ])('should reject unsafe URL configuration before fetch', async ({
+    config,
+    message
+  }) => {
+    const fetchMock = vi.fn()
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(
+      createClient().request(config as never)
+    ).rejects.toMatchObject({
+      code: 'CONFIG_ERROR',
+      message
+    })
+
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it.each([
     'mailto:team@example.com',
     '//cdn.example.com/file'
   ])(

@@ -715,15 +715,50 @@ describe('retryPlugin', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 
+  it('should abort while an asynchronous retry decision is pending', async () => {
+    const shouldRetry = vi.fn(() => new Promise<boolean>(() => {}))
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response('Busy', { status: 503 })
+    )
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient().use(retryPlugin({
+      retries: 1,
+      shouldRetry
+    }))
+    const controller = new AbortController()
+    const pending = request.get('/pending-retry-policy', {
+      signal: controller.signal
+    }).catch(error => error)
+
+    await vi.waitFor(() => {
+      expect(shouldRetry).toHaveBeenCalledTimes(1)
+    })
+
+    controller.abort('cancel retry policy')
+
+    const outcome = await Promise.race([
+      pending,
+      new Promise<'still-pending'>(resolve => {
+        setTimeout(() => resolve('still-pending'), 25)
+      })
+    ])
+
+    expect(outcome).toMatchObject({ code: 'ABORT_ERROR' })
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
   it('should not retain a retry timer when listener setup fails', async () => {
     vi.useFakeTimers()
 
+    const removeEventListener = vi.fn()
     const signal = {
       aborted: false,
       addEventListener() {
         throw new Error('listener setup failed')
       },
-      removeEventListener: vi.fn()
+      removeEventListener
     } as unknown as AbortSignal
     const fetchMock = vi.fn().mockResolvedValue(
       new Response('Busy', { status: 503 })
@@ -738,6 +773,104 @@ describe('retryPlugin', () => {
     await expect(request.get('/busy', { signal })).rejects.toThrow(
       'listener setup failed'
     )
+    expect(removeEventListener).toHaveBeenCalledTimes(1)
     expect(vi.getTimerCount()).toBe(0)
+  })
+
+  it('should not allocate a retry timer after synchronous abort', async () => {
+    vi.useFakeTimers()
+
+    const reason = new Error('synchronous abort')
+    const signal = {
+      aborted: false,
+      reason,
+      addEventListener(_type: string, listener: EventListener) {
+        this.aborted = true
+        listener(new Event('abort'))
+      },
+      removeEventListener: vi.fn()
+    } as unknown as AbortSignal
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response('Busy', { status: 503 })
+    )
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient().use(
+      retryPlugin({ retries: 1, delay: 1000 })
+    )
+
+    await expect(request.get('/busy', { signal })).rejects.toMatchObject({
+      code: 'ABORT_ERROR',
+      cause: reason
+    })
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(vi.getTimerCount()).toBe(0)
+  })
+
+  it('should remove the retry listener when timer setup fails', async () => {
+    const removeEventListener = vi.fn()
+    const signal = {
+      aborted: false,
+      addEventListener() {},
+      removeEventListener
+    } as unknown as AbortSignal
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response('Busy', { status: 503 })
+    )
+
+    vi.stubGlobal('fetch', fetchMock)
+    vi.spyOn(globalThis, 'setTimeout').mockImplementation(() => {
+      throw new Error('timer setup failed')
+    })
+
+    const request = createClient().use(
+      retryPlugin({ retries: 1, delay: 1000 })
+    )
+
+    await expect(request.get('/busy', { signal })).rejects.toThrow(
+      'timer setup failed'
+    )
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(removeEventListener).toHaveBeenCalledTimes(1)
+  })
+
+  it('should clear a handle returned by a synchronous retry timer', async () => {
+    const removeEventListener = vi.fn()
+    const clearTimeoutSpy = vi.spyOn(globalThis, 'clearTimeout')
+    const signal = {
+      aborted: false,
+      addEventListener() {},
+      removeEventListener
+    } as unknown as AbortSignal
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response('Busy', { status: 503 })
+      )
+      .mockResolvedValueOnce(
+        new Response('{"ok":true}', {
+          headers: {
+            'content-type': 'application/json'
+          }
+        })
+      )
+
+    vi.stubGlobal('fetch', fetchMock)
+    vi.spyOn(globalThis, 'setTimeout').mockImplementation(callback => {
+      callback()
+      return 1 as unknown as ReturnType<typeof setTimeout>
+    })
+
+    const request = createClient().use(
+      retryPlugin({ retries: 1, delay: 1000 })
+    )
+
+    await expect(request.get('/busy', { signal })).resolves.toEqual({
+      ok: true
+    })
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    expect(removeEventListener).toHaveBeenCalledTimes(1)
+    expect(clearTimeoutSpy).toHaveBeenCalledTimes(1)
   })
 })

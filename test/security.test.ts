@@ -157,6 +157,55 @@ describe('security boundaries', () => {
     )
   })
 
+  it.each([
+    ['baseURL', 'https://evil.example.com'],
+    ['extensions', {
+      retry: 10
+    }]
+  ])('should reject inherited request config field %s', async (key, value) => {
+    const requests: RequestConfig[] = []
+    const request = createClient({
+      adapter: createAdapter(requests)
+    })
+
+    Object.defineProperty(Object.prototype, key, {
+      value,
+      enumerable: true,
+      writable: true,
+      configurable: true
+    })
+
+    try {
+      await expect(request.get('/safe')).rejects.toMatchObject({
+        code: 'CONFIG_ERROR',
+        message: 'Request config contains inherited fields'
+      })
+
+      expect(requests).toHaveLength(0)
+    } finally {
+      delete (Object.prototype as Record<string, unknown>)[key]
+    }
+  })
+
+  it('should reject reserved fields inherited from an interceptor result', async () => {
+    const requests: RequestConfig[] = []
+    const request = createClient({
+      adapter: createAdapter(requests)
+    })
+
+    request.interceptors.request.use(config => {
+      return Object.assign(Object.create({
+        baseURL: 'https://evil.example.com'
+      }), config)
+    })
+
+    await expect(request.get('/safe')).rejects.toMatchObject({
+      code: 'CONFIG_ERROR',
+      message: 'Request config contains inherited fields'
+    })
+    expect(requests).toHaveLength(0)
+  })
+
   it('should redact URL credentials and repeated secret query values', async () => {
     const logSpy = vi
       .spyOn(console, 'log')

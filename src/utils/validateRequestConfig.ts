@@ -2,6 +2,7 @@ import { RequestError } from '../errors'
 import type { RequestConfig } from '../types'
 import { isURLSearchParams } from './isURLSearchParams'
 import { MAX_TIMER_DELAY } from './maxTimerDelay'
+import { hasOwnProperty } from './hasOwnProperty'
 
 const BODY_FIELDS = [
   'body',
@@ -17,6 +18,7 @@ export function validateRequestConfig(
   config: RequestConfig,
   headersRequired: boolean
 ): Headers | undefined {
+  validateConfigPrototype(config)
   validateURL(config)
   validateMethod(config)
   validateTimeout(config)
@@ -30,6 +32,29 @@ export function validateRequestConfig(
   validateBody(config)
 
   return headers
+}
+
+function validateConfigPrototype(
+  config: Partial<RequestConfig>
+): void {
+  const prototype = Object.getPrototypeOf(config)
+
+  if (prototype === null) {
+    return
+  }
+
+  const source = prototype === Object.prototype
+    ? Object.prototype
+    : config
+
+  for (const key in source) {
+    if (!hasOwnProperty.call(config, key)) {
+      throw configError(
+        'Request config contains inherited fields',
+        config as RequestConfig
+      )
+    }
+  }
 }
 
 function validateQuery(config: RequestConfig): void {
@@ -163,6 +188,30 @@ function validateURL(config: RequestConfig): void {
   if (typeof config.url !== 'string') {
     throw configError('Request url must be a string', config)
   }
+
+  if (
+    config.baseURL !== undefined &&
+    typeof config.baseURL !== 'string'
+  ) {
+    throw configError('Request baseURL must be a string', config)
+  }
+
+  if (
+    isMalformedHttpURL(config.url) ||
+    (
+      config.baseURL !== undefined &&
+      isMalformedHttpURL(config.baseURL)
+    )
+  ) {
+    throw configError(
+      'Request URL is malformed',
+      config
+    )
+  }
+}
+
+function isMalformedHttpURL(value: string): boolean {
+  return /^https?:(?!\/\/)/i.test(value)
 }
 
 function validateTimeout(config: RequestConfig): void {

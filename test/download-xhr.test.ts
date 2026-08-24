@@ -9,6 +9,7 @@ import {
 import {
   createClient,
   downloadPlugin,
+  type Plugin,
   RequestError,
   retryPlugin
 } from '../src'
@@ -157,6 +158,7 @@ describe('downloadPlugin XMLHttpRequest fallback', () => {
     const xhr = FakeXMLHttpRequest.instances[0]
 
     expect(await data.text()).toBe('npora')
+    expect(data.type).toBe('text/plain')
     expect(fetchMock).not.toHaveBeenCalled()
     expect(xhr).toMatchObject({
       method: 'GET',
@@ -298,6 +300,101 @@ describe('downloadPlugin XMLHttpRequest fallback', () => {
     expect(clone).not.toHaveBeenCalled()
   })
 
+  it('should not clone the raw XHR body for data-only requests', async () => {
+    const clone = vi.spyOn(Response.prototype, 'clone')
+    const request = createClient().use(
+      downloadPlugin({ transport: 'xhr' })
+    )
+
+    const data = await request.get<Blob>('/file', {
+      extensions: {
+        download: {
+          onProgress: vi.fn()
+        }
+      }
+    })
+
+    expect(await data.text()).toBe('npora')
+    expect(clone).not.toHaveBeenCalled()
+  })
+
+  it('should retain the raw XHR body on HTTP errors', async () => {
+    scenario = xhr => {
+      xhr.status = 422
+      xhr.statusText = 'Unprocessable Content'
+      xhr.response = new Blob(['invalid'])
+      xhr.load()
+    }
+
+    const request = createClient().use(
+      downloadPlugin({ transport: 'xhr' })
+    )
+    const error = await request.get('/invalid', {
+      extensions: {
+        download: {
+          onProgress: vi.fn()
+        }
+      }
+    }).catch(reason => reason)
+
+    expect(error).toBeInstanceOf(RequestError)
+    expect(await error.response.raw.text()).toBe('invalid')
+  })
+
+  it('should preserve raw XHR bodies for hooks that require them', async () => {
+    const clone = vi.spyOn(Response.prototype, 'clone')
+    let rawText = ''
+    const rawPlugin: Plugin = {
+      name: 'raw-response-reader',
+      install({ hooks }) {
+        hooks.onResponse(async context => {
+          rawText = await context.response?.raw.text() ?? ''
+        })
+      }
+    }
+    const request = createClient()
+      .use(downloadPlugin({ transport: 'xhr' }))
+      .use(rawPlugin)
+    const config = {
+      responseType: 'text' as const,
+      maxResponseSize: 10,
+      extensions: {
+        download: {
+          onProgress: vi.fn()
+        }
+      }
+    }
+
+    await request.get<Blob>('/file', config)
+
+    expect(rawText).toBe('npora')
+    expect(clone).toHaveBeenCalledTimes(1)
+
+    request.unuse(rawPlugin.name)
+    clone.mockClear()
+    await request.get<Blob>('/file', config)
+
+    expect(clone).not.toHaveBeenCalled()
+  })
+
+  it('should preserve complete raw XHR blobs without cloning them', async () => {
+    const clone = vi.spyOn(Response.prototype, 'clone')
+    const request = createClient().use(
+      downloadPlugin({ transport: 'xhr' })
+    )
+    const response = await request.getResponse<Blob>('/file', {
+      extensions: {
+        download: {
+          onProgress: vi.fn()
+        }
+      }
+    })
+
+    expect(await response.data.text()).toBe('npora')
+    expect(await response.raw.text()).toBe('npora')
+    expect(clone).not.toHaveBeenCalled()
+  })
+
   it('should abort before serializing or creating an XHR', async () => {
     const controller = new AbortController()
     const serialize = vi.fn(() => ({ value: 'unused' }))
@@ -367,6 +464,105 @@ describe('downloadPlugin XMLHttpRequest fallback', () => {
     await vi.advanceTimersByTimeAsync(25)
     await timeoutAssertion
     expect(FakeXMLHttpRequest.instances[1]?.aborted).toBe(true)
+  })
+
+  it('should not send after synchronous abort listener registration', async () => {
+    const sendScenario = vi.fn()
+    const reason = new Error('synchronous XHR abort')
+    const removeEventListener = vi.fn()
+    const signal = {
+      aborted: false,
+      reason,
+      addEventListener(_type: string, listener: EventListener) {
+        this.aborted = true
+        listener(new Event('abort'))
+      },
+      removeEventListener
+    } as unknown as AbortSignal
+
+    scenario = sendScenario
+
+    const request = createClient().use(
+      downloadPlugin({ transport: 'xhr' })
+    )
+
+    await expect(request.get('/sync-abort', {
+      signal,
+      extensions: {
+        download: {
+          onProgress: vi.fn()
+        }
+      }
+    })).rejects.toMatchObject({
+      code: 'ABORT_ERROR',
+      cause: reason
+    })
+
+    expect(sendScenario).not.toHaveBeenCalled()
+    expect(removeEventListener).toHaveBeenCalledTimes(1)
+    expect(FakeXMLHttpRequest.instances[0]?.aborted).toBe(true)
+  })
+
+  it('should complete when abort listener cleanup throws', async () => {
+    const removeEventListener = vi.fn(() => {
+      throw new Error('listener cleanup failed')
+    })
+    const signal = {
+      aborted: false,
+      addEventListener() {},
+      removeEventListener
+    } as unknown as AbortSignal
+    const request = createClient().use(
+      downloadPlugin({ transport: 'xhr' })
+    )
+
+    const data = await request.get<Blob>('/cleanup-error', {
+      signal,
+      extensions: {
+        download: {
+          onProgress: vi.fn()
+        }
+      }
+    })
+
+    expect(await data.text()).toBe('npora')
+    expect(removeEventListener).toHaveBeenCalledTimes(1)
+  })
+
+  it('should clean up when abort listener registration fails', async () => {
+    const sendScenario = vi.fn()
+    const removeEventListener = vi.fn()
+    const signal = {
+      aborted: false,
+      addEventListener() {
+        throw new Error('listener registration failed')
+      },
+      removeEventListener
+    } as unknown as AbortSignal
+
+    scenario = sendScenario
+
+    const request = createClient().use(
+      downloadPlugin({ transport: 'xhr' })
+    )
+
+    await expect(request.get('/listener-error', {
+      signal,
+      extensions: {
+        download: {
+          onProgress: vi.fn()
+        }
+      }
+    })).rejects.toMatchObject({
+      code: 'CONFIG_ERROR',
+      cause: expect.objectContaining({
+        message: 'listener registration failed'
+      })
+    })
+
+    expect(sendScenario).not.toHaveBeenCalled()
+    expect(removeEventListener).toHaveBeenCalledTimes(1)
+    expect(FakeXMLHttpRequest.instances[0]?.aborted).toBe(true)
   })
 
   it('should stop the transfer when a progress callback fails', async () => {

@@ -4,13 +4,13 @@ This is a dated engineering snapshot, not a permanent ranking. Project
 versions, repository activity, package contents, and runtime capabilities will
 change.
 
-Snapshot date: 2026-08-21.
+Snapshot date: 2026-08-24.
 
 ## Projects
 
 | Project | Version | GitHub stars | Runtime focus | Runtime dependencies | npm unpacked size |
 | --- | ---: | ---: | --- | ---: | ---: |
-| Npora Request | 1.14.2 | 0 | Browser, Node, and Worker; Fetch-first resilient client | 0 | 224 kB |
+| Npora Request | 1.14.3 | 0 | Browser, Node, and Worker; Fetch-first resilient client | 0 | 233 kB |
 | [Axios](https://github.com/axios/axios) | 1.19.0 | 109,198 | Browser and Node; multi-adapter full client | 4 | 1,868 kB |
 | [Ky](https://github.com/sindresorhus/ky) | 2.0.2 | 17,032 | Modern Fetch runtimes; compact typed client | 0 | 405 kB |
 | [Got](https://github.com/sindresorhus/got) | 15.1.0 | 14,930 | Node; feature-rich native HTTP client | 12 | 371 kB |
@@ -60,6 +60,42 @@ client.
   consistently.
 - ofetch is substantially smaller when an application only needs convenient
   parsing, retries, query parameters, and hooks.
+
+## Concurrency and operational risk notes
+
+- Axios 1.19.0 fixed immediate propagation of already-aborted signals,
+  synchronous interceptor failures that could still dispatch, final streamed
+  download progress ordering, proxy bypass matching, and response-size
+  enforcement for base64 data URLs. Its release history demonstrates mature
+  coverage, but also shows why adapter/interceptor combinations need their own
+  cancellation and security regression tests. See the official
+  [Axios 1.19.0 release notes](https://github.com/axios/axios/releases/tag/v1.19.0).
+- Ky retries by cloning request bodies with `ReadableStream.tee()`. Its official
+  documentation warns that a retried streaming upload may be buffered entirely
+  in memory; large uploads should disable retries or use a replayable body.
+  Chromium can also perform its own 408 retry in addition to Ky's retry. See
+  [Ky retry documentation](https://github.com/sindresorhus/ky#retry).
+- Got is the strongest comparison here for Node transport control, but v15 is
+  Node 22+ and ESM-only. HTTP/2 is opt-in, and supplying a custom HTTPS agent
+  bypasses Got's built-in HTTP/2 behavior. See the official
+  [Got repository](https://github.com/sindresorhus/got) and
+  [options documentation](https://github.com/sindresorhus/got/blob/main/documentation/2-options.md).
+- ofetch retries once by default for eligible failures but avoids automatic
+  retry for mutating methods unless configured. That is a safer default for
+  non-idempotent writes, while applications still need replayability and
+  idempotency controls for any enabled upload retry. See the official
+  [ofetch documentation](https://github.com/unjs/ofetch#%EF%B8%8F-auto-retry).
+- Npora Request's first-party queue and circuit breaker reduce the amount of
+  application coordination code, but they also create shared mutable state.
+  Bounded keys/queues, plugin uninstall, synchronous abort registration,
+  timeout cleanup, half-open probe limits, and upload/download backpressure are
+  therefore release-gated rather than treated as incidental plugin behavior.
+
+No synthetic benchmark proves network correctness. The comparison combines
+the 10,000,000-operation in-memory matrix with real HTTP integration tests and
+multi-browser XHR/stream coverage; production limits still depend on payload
+size, remote latency, runtime Fetch/XHR behavior, proxy topology, and retry
+idempotency.
 
 ## Product direction
 

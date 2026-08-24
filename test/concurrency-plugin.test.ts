@@ -193,7 +193,71 @@ describe('concurrencyPlugin', () => {
     expect(error).toMatchObject({
       message: 'listener setup failed'
     })
+    expect(signal.removeEventListener).toHaveBeenCalledTimes(1)
     expect(queuedState.queued).toBe(0)
+    expect(concurrency.getState('default')).toEqual({
+      active: 0,
+      queued: 0
+    })
+  })
+
+  it('should not enqueue after synchronous abort registration', async () => {
+    vi.useFakeTimers()
+
+    const adapter = new ControlledAdapter()
+    const concurrency = concurrencyPlugin({ maxConcurrent: 1 })
+    const request = createClient({ adapter }).use(concurrency)
+    const signal = {
+      aborted: false,
+      reason: new Error('synchronous abort'),
+      addEventListener(_type: string, listener: EventListener) {
+        this.aborted = true
+        listener(new Event('abort'))
+      },
+      removeEventListener: vi.fn()
+    } as unknown as AbortSignal
+
+    const active = request.get('/active')
+    const queued = request.get('/queued', { signal })
+
+    await expect(queued).rejects.toMatchObject({
+      code: 'ABORT_ERROR'
+    })
+    expect(concurrency.getState('default')).toEqual({
+      active: 1,
+      queued: 0
+    })
+    expect(vi.getTimerCount()).toBe(0)
+
+    adapter.complete('/active')
+    await active
+  })
+
+  it('should grant a permit when listener cleanup throws', async () => {
+    const adapter = new ControlledAdapter()
+    const concurrency = concurrencyPlugin({ maxConcurrent: 1 })
+    const request = createClient({ adapter }).use(concurrency)
+    const removeEventListener = vi.fn(() => {
+      throw new Error('listener cleanup failed')
+    })
+    const signal = {
+      aborted: false,
+      addEventListener() {},
+      removeEventListener
+    } as unknown as AbortSignal
+
+    const active = request.get('/active')
+    const queued = request.get('/queued', { signal })
+
+    await flush()
+    adapter.complete('/active')
+    await active
+    await flush()
+
+    expect(adapter.started).toEqual(['/active', '/queued'])
+    adapter.complete('/queued')
+    await queued
+    expect(removeEventListener).toHaveBeenCalledTimes(1)
     expect(concurrency.getState('default')).toEqual({
       active: 0,
       queued: 0
@@ -318,6 +382,50 @@ describe('concurrencyPlugin', () => {
     await active
   })
 
+  it('should unlink a cancelled middle entry without changing FIFO order', async () => {
+    const adapter = new ControlledAdapter()
+    const concurrency = concurrencyPlugin({ maxConcurrent: 1 })
+    const request = createClient({ adapter }).use(concurrency)
+    const controller = new AbortController()
+
+    const active = request.get('/active')
+    const first = request.get('/first')
+    const cancelled = request.get('/cancelled', {
+      signal: controller.signal
+    })
+    const last = request.get('/last')
+
+    await flush()
+    controller.abort('cancel middle entry')
+
+    await expect(cancelled).rejects.toMatchObject({
+      code: 'ABORT_ERROR'
+    })
+    expect(concurrency.getState('default')).toEqual({
+      active: 1,
+      queued: 2
+    })
+
+    adapter.complete('/active')
+    await active
+    await flush()
+    adapter.complete('/first')
+    await first
+    await flush()
+    adapter.complete('/last')
+    await last
+
+    expect(adapter.started).toEqual([
+      '/active',
+      '/first',
+      '/last'
+    ])
+    expect(concurrency.getState('default')).toEqual({
+      active: 0,
+      queued: 0
+    })
+  })
+
   it('should reject queued requests when the plugin is removed', async () => {
     const adapter = new ControlledAdapter()
     const concurrency = concurrencyPlugin({
@@ -432,6 +540,28 @@ describe('concurrencyPlugin', () => {
       ok: true
     })
     expect(adapter.calls).toBe(2001)
+  })
+
+  it('should drain a large contended queue', async () => {
+    const adapter = new ImmediateAdapter()
+    const concurrency = concurrencyPlugin({
+      maxConcurrent: 1,
+      maxQueue: 2500,
+      queueTimeout: Number.POSITIVE_INFINITY
+    })
+    const request = createClient({ adapter }).use(concurrency)
+    const requests = Array.from(
+      { length: 2000 },
+      (_, index) => request.get(`/queued-${index}`)
+    )
+
+    await Promise.all(requests)
+
+    expect(adapter.calls).toBe(2000)
+    expect(concurrency.getState('default')).toEqual({
+      active: 0,
+      queued: 0
+    })
   })
 })
 

@@ -8,6 +8,7 @@ import type {
 import { RequestError } from '../errors'
 import { isURLSearchParams } from '../utils/isURLSearchParams'
 import { isPromiseLike } from '../utils/isPromiseLike'
+import { waitForSignal } from '../utils/waitForSignal'
 import type { Plugin } from './Plugin'
 import { resolveExtensionConfig } from './resolveExtensionConfig'
 
@@ -183,10 +184,14 @@ export function cachePlugin(
     maxEntries: options.maxEntries
   })
   const cacheHits = new WeakSet<object>()
-  const leaders = new WeakMap<object, string>()
+  const leaders = new WeakMap<object, InFlightRequest>()
+  const unsharedGenerations = new WeakMap<object, number>()
   const completedRecords = new WeakMap<object, CacheEntry>()
   const uncacheableLeaders = new WeakSet<object>()
   const inFlight = new Map<string, InFlightRequest>()
+  const rawInFlight = new Map<string, InFlightRequest>()
+  const rawLeaders = new WeakSet<object>()
+  let generation = 0
   const methods = new Set(
     options.methods ?? DEFAULT_CACHE_METHODS
   )
@@ -203,6 +208,9 @@ export function cachePlugin(
     name: 'cache',
 
     clear() {
+      generation += 1
+      inFlight.clear()
+      rawInFlight.clear()
       return store.clear()
     },
 
@@ -224,6 +232,7 @@ export function cachePlugin(
         }
 
         normalizeCacheTtl(cache.ttl, requestContext.config)
+        const requestGeneration = generation
 
         const key = createCacheKey(
           requestContext.config,
@@ -234,13 +243,49 @@ export function cachePlugin(
         )
         const stored = readStore(store, key)
 
-        if (isPromiseLike(stored)) {
-          return Promise.resolve(stored).then(record => {
-            return handleCacheRecord(requestContext, cache, key, record)
+        if (
+          requestContext.config.signal &&
+          isPromiseLike(stored)
+        ) {
+          return waitForSignal(() => stored, requestContext.config)
+            .then(record => {
+            if (requestGeneration !== generation) {
+              return
+            }
+
+            return handleCacheRecord(
+              requestContext,
+              cache,
+              key,
+              record,
+              requestGeneration
+            )
           })
         }
 
-        return handleCacheRecord(requestContext, cache, key, stored)
+        if (isPromiseLike(stored)) {
+          return Promise.resolve(stored).then(record => {
+            if (requestGeneration !== generation) {
+              return
+            }
+
+            return handleCacheRecord(
+              requestContext,
+              cache,
+              key,
+              record,
+              requestGeneration
+            )
+          })
+        }
+
+        return handleCacheRecord(
+          requestContext,
+          cache,
+          key,
+          stored,
+          requestGeneration
+        )
       })
 
       context.hooks.onResponse(requestContext => {
@@ -261,20 +306,33 @@ export function cachePlugin(
           return
         }
 
-        const key = leaders.get(requestContext) ?? createCacheKey(
+        const leader = leaders.get(requestContext)
+        const key = leader?.key ?? createCacheKey(
           requestContext.config,
           cache,
           varyHeaders,
           emptyHeaderValues,
           keyMemo
         )
+        const currentGeneration =
+          (
+            leader?.generation ??
+            unsharedGenerations.get(requestContext)
+          ) === generation
 
         if (isAsyncIterable(requestContext.response.data)) {
           uncacheableLeaders.add(requestContext)
+
+          if (!currentGeneration) {
+            return
+          }
+
           const deletion = deleteStore(store, key)
 
           if (isPromiseLike(deletion)) {
-            return deletion
+            return requestContext.config.signal
+              ? waitForSignal(() => deletion, requestContext.config)
+              : deletion
           }
           return
         }
@@ -288,9 +346,11 @@ export function cachePlugin(
           ttl <= 0 ||
           !allowsPersistentCaching(requestContext.response)
         ) {
-          const deletion = deleteStore(store, key)
+          const deletion = currentGeneration
+            ? deleteStore(store, key)
+            : undefined
           const waitsForDeletion = isPromiseLike(deletion)
-          const pending = inFlight.get(key)
+          const pending = leader
 
           if (
             pending?.owner === requestContext &&
@@ -300,7 +360,8 @@ export function cachePlugin(
               requestContext,
               createCacheEntry(
                 requestContext.response,
-                Date.now() + Math.max(0, ttl)
+                Date.now() + Math.max(0, ttl),
+                requestContext.preserveRaw
               )
             )
           } else if (pending?.owner === requestContext) {
@@ -308,33 +369,51 @@ export function cachePlugin(
           }
 
           if (waitsForDeletion) {
-            return deletion
+            return requestContext.config.signal
+              ? waitForSignal(
+                  () => deletion as PromiseLike<void>,
+                  requestContext.config
+                )
+              : deletion
           }
           return
         }
 
         const record = createCacheEntry(
           requestContext.response,
-          Date.now() + ttl
+          Date.now() + ttl,
+          requestContext.preserveRaw
         )
 
         completedRecords.set(requestContext, record)
 
+        if (!currentGeneration) {
+          return
+        }
+
+        if (leader?.rawDemanded) {
+          return
+        }
+
         const write = writeStore(store, key, record)
 
         if (isPromiseLike(write)) {
-          return write
+          return requestContext.config.signal
+            ? waitForSignal(() => write, requestContext.config)
+            : write
         }
-      })
+      }, { requiresRawResponse: false })
 
       function handleCacheRecord(
         requestContext: {
           config: RequestConfig
           response?: NporaResponse
+          readonly preserveRaw: boolean
         },
         cache: CacheOptions,
         key: string,
-        record: CacheEntry | undefined
+        record: CacheEntry | undefined,
+        requestGeneration: number
       ): void | Promise<void> {
         if (!active) {
           return
@@ -342,6 +421,15 @@ export function cachePlugin(
 
         if (record) {
           if (!isExpired(record.expiresAt)) {
+            if (requestContext.preserveRaw && !record.raw) {
+              return prepareCacheMiss(
+                requestContext,
+                cache,
+                key,
+                requestGeneration
+              )
+            }
+
             const cachedResponse = restoreCacheEntry(
               record,
               requestContext.config
@@ -352,33 +440,57 @@ export function cachePlugin(
               cacheHits.add(requestContext)
               return
             }
+
           }
 
           const deletion = deleteStore(store, key)
 
           if (isPromiseLike(deletion)) {
-            return Promise.resolve(deletion).then(() => {
-              return prepareCacheMiss(requestContext, cache, key)
+            const deleted = requestContext.config.signal
+              ? waitForSignal(() => deletion, requestContext.config)
+              : Promise.resolve(deletion)
+
+            return deleted.then(() => {
+              return prepareCacheMiss(
+                requestContext,
+                cache,
+                key,
+                requestGeneration
+              )
             })
           }
         }
 
-        return prepareCacheMiss(requestContext, cache, key)
+        return prepareCacheMiss(
+          requestContext,
+          cache,
+          key,
+          requestGeneration
+        )
       }
 
       function prepareCacheMiss(
         requestContext: {
           config: RequestConfig
           response?: NporaResponse
+          readonly preserveRaw: boolean
         },
         cache: CacheOptions,
-        key: string
+        key: string,
+        requestGeneration: number
       ): void | Promise<void> {
-        if (!active || !(cache.dedupe ?? options.dedupe ?? true)) {
+        if (!active || requestGeneration !== generation) {
           return
         }
 
-        const pending = inFlight.get(key)
+        if (!(cache.dedupe ?? options.dedupe ?? true)) {
+          unsharedGenerations.set(requestContext, requestGeneration)
+          return
+        }
+
+        const pending = requestContext.preserveRaw
+          ? rawInFlight.get(key)
+          : inFlight.get(key) ?? rawInFlight.get(key)
 
         if (pending) {
           return waitForSharedRecord(
@@ -397,30 +509,49 @@ export function cachePlugin(
           })
         }
 
-        const created = createInFlightRequest(requestContext)
+        if (requestContext.preserveRaw) {
+          const dataPending = inFlight.get(key)
 
-        inFlight.set(key, created)
-        leaders.set(requestContext, key)
+          if (dataPending) {
+            dataPending.rawDemanded = true
+          }
+        }
+
+        const created = createInFlightRequest(
+          requestContext,
+          key,
+          requestGeneration
+        )
+
+        if (requestContext.preserveRaw) {
+          rawInFlight.set(key, created)
+          rawLeaders.add(requestContext)
+        } else {
+          inFlight.set(key, created)
+        }
+        leaders.set(requestContext, created)
         ownedLeaders.add(requestContext)
       }
 
       context.hooks.onSettled(requestContext => {
-        const key = leaders.get(requestContext)
+        const pending = leaders.get(requestContext)
 
-        if (!key) {
+        if (!pending) {
           return
         }
 
         leaders.delete(requestContext)
         ownedLeaders.delete(requestContext)
 
-        const pending = inFlight.get(key)
+        const key = pending.key
 
-        if (!pending || pending.owner !== requestContext) {
-          return
+        const requests = rawLeaders.delete(requestContext)
+          ? rawInFlight
+          : inFlight
+
+        if (requests.get(key) === pending) {
+          requests.delete(key)
         }
-
-        inFlight.delete(key)
 
         if (uncacheableLeaders.delete(requestContext)) {
           pending.resolve?.(undefined)
@@ -456,21 +587,23 @@ export function cachePlugin(
         active = false
 
         for (const owner of ownedLeaders) {
-          const key = leaders.get(owner)
+          const pending = leaders.get(owner)
 
           leaders.delete(owner)
 
-          if (!key) {
+          if (!pending) {
             continue
           }
 
-          const pending = inFlight.get(key)
+          const key = pending.key
 
-          if (!pending || pending.owner !== owner) {
-            continue
+          const requests = rawLeaders.delete(owner)
+            ? rawInFlight
+            : inFlight
+
+          if (requests.get(key) === pending) {
+            requests.delete(key)
           }
-
-          inFlight.delete(key)
           pending.reject?.(
             new RequestError('Cache plugin removed during shared request', {
               code: 'ABORT_ERROR'
@@ -487,7 +620,15 @@ export function cachePlugin(
 }
 
 interface InFlightRequest {
-  owner: object
+  owner: {
+    readonly preserveRaw: boolean
+  }
+
+  key: string
+
+  generation: number
+
+  rawDemanded?: true
 
   promise?: Promise<CacheEntry | undefined>
 
@@ -496,9 +637,15 @@ interface InFlightRequest {
   reject?: (error: unknown) => void
 }
 
-function createInFlightRequest(owner: object): InFlightRequest {
+function createInFlightRequest(
+  owner: InFlightRequest['owner'],
+  key: string,
+  generation: number
+): InFlightRequest {
   return {
-    owner
+    owner,
+    key,
+    generation
   }
 }
 
@@ -577,44 +724,77 @@ function ignoreStoreError(): void {
   // Cache storage failures must not change the request lifecycle.
 }
 
-async function waitForSharedRecord(
+function waitForSharedRecord(
   promise: Promise<CacheEntry | undefined>,
   config: RequestConfig
 ): Promise<CacheEntry | undefined> {
   const signal = config.signal
 
   if (!signal) {
-    try {
-      return await promise
-    } catch (error) {
+    return promise.catch(error => {
       throw cloneSharedError(error, config)
-    }
+    })
   }
 
   if (signal.aborted) {
-    throw createSharedAbortError(signal.reason, config)
+    return Promise.reject(
+      createSharedAbortError(signal.reason, config)
+    )
   }
 
   return new Promise((resolve, reject) => {
+    let settled = false
+
     const cleanup = () => {
-      signal.removeEventListener('abort', onAbort)
+      try {
+        signal.removeEventListener('abort', onAbort)
+      } catch {
+        // Cleanup failures must not retain a shared-response wait.
+      }
+    }
+    const resolveOnce = (entry: CacheEntry | undefined) => {
+      if (settled) {
+        return
+      }
+
+      settled = true
+      cleanup()
+      resolve(entry)
+    }
+    const rejectOnce = (error: unknown) => {
+      if (settled) {
+        return
+      }
+
+      settled = true
+      cleanup()
+      reject(error)
     }
     const onAbort = () => {
-      cleanup()
-      reject(createSharedAbortError(signal.reason, config))
+      rejectOnce(createSharedAbortError(signal.reason, config))
     }
 
-    signal.addEventListener('abort', onAbort, {
-      once: true
-    })
+    try {
+      signal.addEventListener('abort', onAbort, {
+        once: true
+      })
+    } catch (error) {
+      rejectOnce(error)
+      return
+    }
+
+    if (signal.aborted) {
+      onAbort()
+    }
+
+    if (settled) {
+      return
+    }
+
     promise.then(
-      entry => {
-        cleanup()
-        resolve(entry)
-      },
+      resolveOnce,
       error => {
-        cleanup()
-        reject(cloneSharedError(error, config))
+        rejectOnce(cloneSharedError(error, config))
       }
     )
   })
@@ -651,7 +831,8 @@ function cloneSharedError(
 
 function createCacheEntry(
   response: NporaResponse,
-  expiresAt: number
+  expiresAt: number,
+  preserveRaw: boolean
 ): CacheEntry {
   return {
     data: cloneCacheValue(response.data),
@@ -659,7 +840,9 @@ function createCacheEntry(
     status: response.status,
     statusText: response.statusText,
     headers: [...response.headers.entries()],
-    raw: cloneResponse(response.raw)
+    raw: preserveRaw
+      ? cloneResponse(response.raw)
+      : undefined
   }
 }
 

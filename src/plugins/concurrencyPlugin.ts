@@ -57,15 +57,19 @@ export interface ConcurrencyPlugin extends Plugin {
 interface ConcurrencyRecord {
   key: string
   active: number
-  queue: QueueEntry[]
+  head?: QueueEntry
+  tail?: QueueEntry
+  size: number
 }
 
 interface QueueEntry {
   context: object
   config: RequestConfig
+  prev?: QueueEntry
+  next?: QueueEntry
+  linked: boolean
   resolve(): void
   reject(error: unknown): void
-  cleanup(): void
 }
 
 interface NormalizedOptions {
@@ -90,7 +94,7 @@ export function concurrencyPlugin(
 
       return {
         active: record?.active ?? 0,
-        queued: record?.queue.length ?? 0
+        queued: record?.size ?? 0
       }
     },
 
@@ -126,7 +130,7 @@ export function concurrencyPlugin(
           )
         }
 
-        if (record.queue.length >= normalized.maxQueue) {
+        if (record.size >= normalized.maxQueue) {
           throw createLimitError(
             'Concurrency queue is full',
             requestContext.config
@@ -165,7 +169,7 @@ export function concurrencyPlugin(
 
         if (
           record.active === 0 &&
-          record.queue.length === 0
+          record.size === 0
         ) {
           touchRecord(records, record.key, record)
           trimRecords(records, normalized.maxKeys)
@@ -176,8 +180,9 @@ export function concurrencyPlugin(
         active = false
 
         for (const record of records.values()) {
-          for (const entry of record.queue.splice(0)) {
-            entry.cleanup()
+          let entry: QueueEntry | undefined
+
+          while ((entry = shiftQueue(record))) {
             entry.reject(createRemovedError(entry.config))
           }
         }
@@ -212,19 +217,18 @@ function enqueue(
     let timer: ReturnType<typeof setTimeout> | undefined
     let settled = false
 
-    const remove = () => {
-      const index = record.queue.indexOf(entry)
-
-      if (index !== -1) {
-        record.queue.splice(index, 1)
-      }
-    }
+    const remove = () => removeQueuedEntry(record, entry)
     const cleanup = () => {
       if (timer !== undefined) {
         clearTimeout(timer)
+        timer = undefined
       }
 
-      signal?.removeEventListener('abort', onAbort)
+      try {
+        signal?.removeEventListener('abort', onAbort)
+      } catch {
+        // Cleanup failures must not retain a queue entry.
+      }
     }
     const rejectOnce = (error: unknown) => {
       if (settled) {
@@ -251,25 +255,49 @@ function enqueue(
     const entry: QueueEntry = {
       context,
       config,
+      linked: false,
       resolve: resolveOnce,
-      reject: rejectOnce,
-      cleanup
+      reject: rejectOnce
     }
 
-    signal?.addEventListener('abort', onAbort, {
-      once: true
-    })
+    try {
+      signal?.addEventListener('abort', onAbort, {
+        once: true
+      })
+    } catch (error) {
+      rejectOnce(error)
+      return
+    }
+
+    if (signal?.aborted) {
+      onAbort()
+    }
+
+    if (settled) {
+      return
+    }
 
     if (Number.isFinite(timeout)) {
-      timer = setTimeout(() => {
-        remove()
-        rejectOnce(
-          createLimitError('Concurrency queue wait timed out', config)
-        )
-      }, timeout)
+      try {
+        timer = setTimeout(() => {
+          remove()
+          rejectOnce(
+            createLimitError('Concurrency queue wait timed out', config)
+          )
+        }, timeout)
+      } catch (error) {
+        rejectOnce(error)
+        return
+      }
+
+      if (settled) {
+        clearTimeout(timer)
+        timer = undefined
+        return
+      }
     }
 
-    record.queue.push(entry)
+    appendQueue(record, entry)
   })
 }
 
@@ -277,10 +305,9 @@ function releaseNext(
   record: ConcurrencyRecord,
   grant: (entry: QueueEntry) => void
 ): void {
-  const next = record.queue.shift()
+  const next = shiftQueue(record)
 
   if (next) {
-    next.cleanup()
     grant(next)
     return
   }
@@ -304,7 +331,7 @@ function getRecord(
   const record: ConcurrencyRecord = {
     key,
     active: 0,
-    queue: []
+    size: 0
   }
 
   records.set(key, record)
@@ -333,10 +360,68 @@ function trimRecords(
       return
     }
 
-    if (record.active === 0 && record.queue.length === 0) {
+    if (record.active === 0 && record.size === 0) {
       records.delete(key)
     }
   }
+}
+
+function appendQueue(
+  record: ConcurrencyRecord,
+  entry: QueueEntry
+): void {
+  entry.prev = record.tail
+  entry.next = undefined
+  entry.linked = true
+
+  if (record.tail) {
+    record.tail.next = entry
+  } else {
+    record.head = entry
+  }
+
+  record.tail = entry
+  record.size += 1
+}
+
+function shiftQueue(
+  record: ConcurrencyRecord
+): QueueEntry | undefined {
+  const entry = record.head
+
+  if (entry) {
+    removeQueuedEntry(record, entry)
+  }
+
+  return entry
+}
+
+function removeQueuedEntry(
+  record: ConcurrencyRecord,
+  entry: QueueEntry
+): void {
+  if (!entry.linked) {
+    return
+  }
+
+  const { prev, next } = entry
+
+  if (prev) {
+    prev.next = next
+  } else {
+    record.head = next
+  }
+
+  if (next) {
+    next.prev = prev
+  } else {
+    record.tail = prev
+  }
+
+  entry.prev = undefined
+  entry.next = undefined
+  entry.linked = false
+  record.size -= 1
 }
 
 function normalizeOptions(

@@ -80,6 +80,7 @@ export function finalizeStreamingResponse(
   let settled = false
   let pendingAbortError: unknown
   let onAbort: (() => void) | undefined
+  let streamController: ReadableStreamDefaultController<Uint8Array>
 
   const settle = () => {
     if (settled) {
@@ -88,7 +89,11 @@ export function finalizeStreamingResponse(
 
     settled = true
     if (onAbort) {
-      signal?.removeEventListener('abort', onAbort)
+      try {
+        signal?.removeEventListener('abort', onAbort)
+      } catch {
+        // Cleanup must continue if a custom signal rejects removal.
+      }
       onAbort = undefined
     }
     reader.releaseLock()
@@ -96,27 +101,7 @@ export function finalizeStreamingResponse(
   }
   const stream = new ReadableStream<Uint8Array>({
     start(controller) {
-      onAbort = () => {
-        const error = streamingReadError(signal?.reason, signal, config)
-
-        pendingAbortError = error
-        void reader.cancel(error).catch(() => {
-          // Preserve the stable cancellation error.
-        }).finally(() => {
-          if (!settled) {
-            settle()
-            controller.error(error)
-          }
-        })
-      }
-
-      if (signal?.aborted) {
-        onAbort()
-      } else {
-        signal?.addEventListener('abort', onAbort, {
-          once: true
-        })
-      }
+      streamController = controller
     },
 
     async pull(controller) {
@@ -160,6 +145,41 @@ export function finalizeStreamingResponse(
       }
     }
   })
+
+  if (signal) {
+    onAbort = () => {
+      if (settled || pendingAbortError !== undefined) {
+        return
+      }
+
+      const error = streamingReadError(signal.reason, signal, config)
+
+      pendingAbortError = error
+      void reader.cancel(error).catch(() => {
+        // Preserve the stable cancellation error.
+      }).finally(() => {
+        if (!settled) {
+          settle()
+          streamController.error(error)
+        }
+      })
+    }
+
+    try {
+      signal.addEventListener('abort', onAbort, {
+        once: true
+      })
+
+      if (signal.aborted) {
+        onAbort()
+      }
+    } catch (error) {
+      void reader.cancel(error).catch(() => {
+        // Preserve the listener registration error.
+      }).finally(settle)
+      throw error
+    }
+  }
   const wrapped = new Response(stream, {
     status: response.status,
     statusText: response.statusText,

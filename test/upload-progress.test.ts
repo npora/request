@@ -271,6 +271,60 @@ describe('uploadPlugin progress', () => {
     expect(xhr.upload.onprogress).toBeNull()
   })
 
+  it('should preserve raw bodies for complete buffered XHR responses', async () => {
+    const clone = vi.spyOn(Response.prototype, 'clone')
+    const request = createClient().use(uploadPlugin())
+    const response = await request.postResponse<{ ok: boolean }>('/upload', {
+      extensions: {
+        upload: {
+          data: { name: 'report' },
+          onProgress() {}
+        }
+      }
+    })
+
+    expect(response.data).toEqual({ ok: true })
+    await expect(response.raw.json()).resolves.toEqual({ ok: true })
+    expect(clone).not.toHaveBeenCalled()
+  })
+
+  it('should parse buffered XHR array buffers directly', async () => {
+    const request = createClient().use(uploadPlugin())
+    const data = await request.post<ArrayBuffer>('/upload', {
+      responseType: 'arrayBuffer',
+      extensions: {
+        upload: {
+          data: { name: 'report' },
+          onProgress() {}
+        }
+      }
+    })
+
+    expect(new TextDecoder().decode(data)).toBe('{"ok":true}')
+  })
+
+  it('should retain parser error metadata for buffered XHR JSON', async () => {
+    scenario = xhr => {
+      xhr.response = new Blob(['invalid-json'])
+      xhr.load()
+    }
+
+    const request = createClient().use(uploadPlugin())
+
+    await expect(request.post('/upload', {
+      extensions: {
+        upload: {
+          data: { name: 'report' },
+          onProgress() {}
+        }
+      }
+    })).rejects.toMatchObject({
+      code: 'PARSER_ERROR',
+      status: 200,
+      message: 'Failed to parse response'
+    })
+  })
+
   it('should support namespaced upload progress configuration', async () => {
     const onProgress = vi.fn()
     const request = createClient().use(uploadPlugin())

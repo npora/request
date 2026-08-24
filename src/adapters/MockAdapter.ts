@@ -622,32 +622,70 @@ function waitForDelay(
   }
 
   return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => {
-      cleanup()
+    let timer: ReturnType<typeof setTimeout> | undefined
+    let settled = false
 
-      if (timeoutWins) {
-        reject(
-          new RequestError(`Request timeout after ${timeout}ms`, {
-            code: 'TIMEOUT_ERROR',
-            config
-          })
-        )
-      } else {
-        resolve()
-      }
-    }, wait)
-    const onAbort = () => {
-      clearTimeout(timer)
-      cleanup()
-      reject(createAbortError(signal?.reason, config))
-    }
     const cleanup = () => {
-      signal?.removeEventListener('abort', onAbort)
+      if (timer !== undefined) {
+        clearTimeout(timer)
+        timer = undefined
+      }
+
+      try {
+        signal?.removeEventListener('abort', onAbort)
+      } catch {
+        // Cleanup failures must not retain a delayed mock request.
+      }
+    }
+    const rejectOnce = (error: unknown) => {
+      if (settled) {
+        return
+      }
+
+      settled = true
+      cleanup()
+      reject(error)
+    }
+    const onAbort = () => {
+      rejectOnce(createAbortError(signal?.reason, config))
     }
 
-    signal?.addEventListener('abort', onAbort, {
-      once: true
-    })
+    try {
+      signal?.addEventListener('abort', onAbort, {
+        once: true
+      })
+    } catch (error) {
+      rejectOnce(error)
+      return
+    }
+
+    if (signal?.aborted) {
+      onAbort()
+    }
+
+    if (settled) {
+      return
+    }
+
+    try {
+      timer = setTimeout(() => {
+        if (timeoutWins) {
+          rejectOnce(
+            new RequestError(`Request timeout after ${timeout}ms`, {
+              code: 'TIMEOUT_ERROR',
+              config
+            })
+          )
+          return
+        }
+
+        settled = true
+        cleanup()
+        resolve()
+      }, wait)
+    } catch (error) {
+      rejectOnce(error)
+    }
   })
 }
 

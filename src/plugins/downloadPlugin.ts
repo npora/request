@@ -101,7 +101,8 @@ export function downloadPlugin(
         requestContext.response = await xhrRequest<Blob>(
           requestContext.config,
           {
-            onDownloadProgress: onProgress
+            onDownloadProgress: onProgress,
+            preserveRaw: requestContext.preserveRaw
           }
         )
         xhrContexts.add(requestContext)
@@ -177,7 +178,7 @@ export function downloadPlugin(
           ...response,
           data: blob
         }
-      })
+      }, { requiresRawResponse: false })
     }
   }
 }
