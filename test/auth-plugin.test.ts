@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   authPlugin,
   createClient,
+  RequestError,
   type Adapter
 } from '../src'
 
@@ -52,6 +53,71 @@ describe('authPlugin refresh token', () => {
     expect(receivedHeaders?.get('authorization')).toBe(
       'Bearer bare-token'
     )
+  })
+
+  it('should abort while the initial token provider is pending', async () => {
+    const token = vi.fn(() => new Promise<string>(() => {}))
+    const adapter: Adapter = {
+      request: vi.fn(async config => ({
+        data: { ok: true },
+        status: 200,
+        statusText: 'OK',
+        headers: new Headers(),
+        config,
+        raw: new Response()
+      }))
+    }
+    const request = createClient({ adapter }).use(authPlugin({ token }))
+    const controller = new AbortController()
+    const pending = request.get('/pending-token', {
+      signal: controller.signal
+    }).catch(error => error)
+
+    await vi.waitFor(() => {
+      expect(token).toHaveBeenCalledTimes(1)
+    })
+
+    controller.abort('cancel initial token')
+
+    const outcome = await Promise.race([
+      pending,
+      new Promise<'still-pending'>(resolve => {
+        setTimeout(() => resolve('still-pending'), 25)
+      })
+    ])
+
+    expect(outcome).toMatchObject({ code: 'ABORT_ERROR' })
+    expect(adapter.request).not.toHaveBeenCalled()
+  })
+
+  it('should not start the initial token provider after synchronous abort registration', async () => {
+    const reason = new Error('synchronous initial token abort')
+    const removeEventListener = vi.fn()
+    const signal = {
+      aborted: false,
+      reason: undefined as unknown,
+      addEventListener(_type: string, listener: EventListener) {
+        this.aborted = true
+        this.reason = reason
+        listener(new Event('abort'))
+      },
+      removeEventListener
+    } as unknown as AbortSignal
+    const token = vi.fn().mockResolvedValue('unused-token')
+    const adapter: Adapter = {
+      request: vi.fn()
+    }
+    const request = createClient({ adapter }).use(authPlugin({ token }))
+
+    await expect(request.get('/sync-initial-token-abort', {
+      signal
+    })).rejects.toMatchObject({
+      code: 'ABORT_ERROR',
+      cause: reason
+    })
+    expect(token).not.toHaveBeenCalled()
+    expect(adapter.request).not.toHaveBeenCalled()
+    expect(removeEventListener).toHaveBeenCalledTimes(1)
   })
 
   it('should prefer request auth options over a static plugin token', async () => {
@@ -249,6 +315,237 @@ describe('authPlugin refresh token', () => {
 
     expect(refreshToken).toHaveBeenCalledTimes(1)
     expect(fetchMock).toHaveBeenCalledTimes(4)
+  })
+
+  it('should abort one refresh waiter without cancelling the shared refresh', async () => {
+    let token = 'expired-token'
+    let resolveRefresh!: (token: string) => void
+    const refreshToken = vi.fn(() => {
+      return new Promise<string>(resolve => {
+        resolveRefresh = resolve
+      })
+    })
+    const fetchMock = vi.fn(
+      async (_input: RequestInfo | URL, init?: RequestInit) => {
+        const authorization = new Headers(init?.headers)
+          .get('authorization')
+
+        return authorization === 'Bearer expired-token'
+          ? createJsonResponse({ unauthorized: true }, 401, 'Unauthorized')
+          : createJsonResponse({ ok: true })
+      }
+    )
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient().use(authPlugin({
+      token: () => token,
+      refreshToken
+    }))
+    const controller = new AbortController()
+    const aborted = request.get('/aborted-refresh', {
+      signal: controller.signal
+    }).catch(error => error)
+    const survivor = request.get('/surviving-refresh')
+
+    await vi.waitFor(() => {
+      expect(refreshToken).toHaveBeenCalledTimes(1)
+    })
+
+    controller.abort('cancel refresh waiter')
+
+    const earlyOutcome = await Promise.race([
+      aborted,
+      new Promise<'still-pending'>(resolve => {
+        setTimeout(() => resolve('still-pending'), 25)
+      })
+    ])
+
+    token = 'refreshed-token'
+    resolveRefresh(token)
+
+    await expect(survivor).resolves.toEqual({ ok: true })
+    await expect(aborted).resolves.toMatchObject({
+      code: 'ABORT_ERROR'
+    })
+    expect(earlyOutcome).toMatchObject({ code: 'ABORT_ERROR' })
+    expect(refreshToken).toHaveBeenCalledTimes(1)
+    expect(fetchMock).toHaveBeenCalledTimes(3)
+  })
+
+  it('should not start refresh after synchronous abort registration', async () => {
+    const reason = new Error('synchronous refresh abort')
+    const removeEventListener = vi.fn()
+    const signal = {
+      aborted: false,
+      reason: undefined as unknown,
+      addEventListener(_type: string, listener: EventListener) {
+        this.aborted = true
+        this.reason = reason
+        listener(new Event('abort'))
+      },
+      removeEventListener
+    } as unknown as AbortSignal
+    const adapter: Adapter = {
+      async request(config) {
+        throw new RequestError('Unauthorized', {
+          code: 'HTTP_ERROR',
+          status: 401,
+          config
+        })
+      }
+    }
+    const refreshToken = vi.fn().mockResolvedValue('unused-token')
+    const request = createClient({ adapter }).use(authPlugin({
+      token: 'expired-token',
+      refreshToken
+    }))
+
+    await expect(request.get('/sync-refresh-abort', {
+      signal
+    })).rejects.toMatchObject({
+      code: 'ABORT_ERROR',
+      cause: reason
+    })
+    expect(refreshToken).not.toHaveBeenCalled()
+    expect(removeEventListener).toHaveBeenCalledTimes(1)
+  })
+
+  it('should abort a refresh waiter when listener cleanup throws', async () => {
+    let abortListener!: EventListener
+    let aborted = false
+    const reason = new Error('cancel refresh with broken cleanup')
+    const signal = {
+      get aborted() {
+        return aborted
+      },
+      get reason() {
+        return aborted ? reason : undefined
+      },
+      addEventListener(_type: string, listener: EventListener) {
+        abortListener = listener
+      },
+      removeEventListener() {
+        throw new Error('listener cleanup failed')
+      }
+    } as unknown as AbortSignal
+    const adapter: Adapter = {
+      async request(config) {
+        throw new RequestError('Unauthorized', {
+          code: 'HTTP_ERROR',
+          status: 401,
+          config
+        })
+      }
+    }
+    const refreshToken = vi.fn(() => new Promise<string>(() => {}))
+    const request = createClient({ adapter }).use(authPlugin({
+      token: 'expired-token',
+      refreshToken
+    }))
+    const pending = request.get('/broken-refresh-cleanup', { signal })
+
+    await vi.waitFor(() => {
+      expect(refreshToken).toHaveBeenCalledTimes(1)
+      expect(abortListener).toBeTypeOf('function')
+    })
+
+    aborted = true
+    abortListener(new Event('abort'))
+
+    await expect(pending).rejects.toMatchObject({
+      code: 'ABORT_ERROR',
+      cause: reason
+    })
+  })
+
+  it('should not retry an in-flight refresh after the plugin is removed', async () => {
+    let resolveRefresh!: (token: string) => void
+    let attempts = 0
+    const adapter: Adapter = {
+      async request(config) {
+        attempts += 1
+
+        if (attempts === 1) {
+          throw new RequestError('Unauthorized', {
+            code: 'HTTP_ERROR',
+            status: 401,
+            config
+          })
+        }
+
+        return {
+          data: { retried: true },
+          status: 200,
+          statusText: 'OK',
+          headers: new Headers(),
+          config,
+          raw: new Response()
+        }
+      }
+    }
+    const refreshToken = vi.fn(() => {
+      return new Promise<string>(resolve => {
+        resolveRefresh = resolve
+      })
+    })
+    const request = createClient({ adapter }).use(authPlugin({
+      token: 'expired-token',
+      refreshToken
+    }))
+    const pending = request.get('/removed-during-refresh')
+
+    await vi.waitFor(() => {
+      expect(refreshToken).toHaveBeenCalledTimes(1)
+    })
+
+    request.unuse('auth')
+    resolveRefresh('refreshed-token')
+
+    await expect(pending).rejects.toMatchObject({
+      code: 'HTTP_ERROR',
+      status: 401
+    })
+    expect(attempts).toBe(1)
+  })
+
+  it('should abort while an asynchronous refresh policy is pending', async () => {
+    const adapter: Adapter = {
+      async request(config) {
+        throw new RequestError('Unauthorized', {
+          code: 'HTTP_ERROR',
+          status: 401,
+          config
+        })
+      }
+    }
+    const shouldRefresh = vi.fn(() => new Promise<boolean>(() => {}))
+    const refreshToken = vi.fn().mockResolvedValue('unused-token')
+    const request = createClient({ adapter }).use(authPlugin({
+      token: 'expired-token',
+      refreshToken,
+      shouldRefresh
+    }))
+    const controller = new AbortController()
+    const pending = request.get('/pending-refresh-policy', {
+      signal: controller.signal
+    }).catch(error => error)
+
+    await vi.waitFor(() => {
+      expect(shouldRefresh).toHaveBeenCalledTimes(1)
+    })
+
+    controller.abort('cancel refresh policy')
+
+    const outcome = await Promise.race([
+      pending,
+      new Promise<'still-pending'>(resolve => {
+        setTimeout(() => resolve('still-pending'), 25)
+      })
+    ])
+
+    expect(outcome).toMatchObject({ code: 'ABORT_ERROR' })
+    expect(refreshToken).not.toHaveBeenCalled()
   })
 
   it('should refresh and retry each request at most once', async () => {

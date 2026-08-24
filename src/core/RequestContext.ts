@@ -13,7 +13,10 @@ export class RequestContext<T = unknown> {
 
   public attempt = 0
 
-  constructor(config: RequestConfig) {
+  constructor(
+    config: RequestConfig,
+    public readonly preserveRaw = true
+  ) {
     this.config = config
     this.startTime = Date.now()
   }

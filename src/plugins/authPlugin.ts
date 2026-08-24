@@ -2,7 +2,9 @@ import { RequestError } from '../errors'
 import type { RequestContext } from '../core/RequestContext'
 import type { RequestConfig } from '../types'
 import type { Plugin } from './Plugin'
+import { createAbortError } from '../utils/createAbortError'
 import { isPromiseLike } from '../utils/isPromiseLike'
+import { waitForSignal } from '../utils/waitForSignal'
 import { resolveExtensionConfig } from './resolveExtensionConfig'
 
 type MaybePromise<T> = T | Promise<T>
@@ -71,8 +73,15 @@ export function authPlugin(options: AuthPluginOptions = {}): Plugin {
     name: 'auth',
 
     install(context) {
+      let active = true
+
       context.interceptors.request.use(config => {
-        return applyAuthorization(config, options)
+        return config.signal
+          ? waitForSignal(
+              () => applyAuthorization(config, options),
+              config
+            )
+          : applyAuthorization(config, options)
       })
 
       context.hooks.onRetry(requestContext => {
@@ -86,19 +95,20 @@ export function authPlugin(options: AuthPluginOptions = {}): Plugin {
           return undefined
         }
 
-        const shouldRefresh =
-          options.shouldRefresh ?? defaultShouldRefresh
-        const refresh = shouldRefresh(requestContext.error)
-
-        if (isPromiseLike(refresh)) {
-          return Promise.resolve(refresh).then(shouldRefreshToken => {
-            return shouldRefreshToken
+        if (options.shouldRefresh) {
+          return waitForSignal(
+            () => Promise.resolve(
+              options.shouldRefresh!(requestContext.error)
+            ),
+            requestContext.config
+          ).then(shouldRefreshToken => {
+            return active && shouldRefreshToken
               ? refreshRequest(requestContext, refreshToken)
               : undefined
           })
         }
 
-        if (!refresh) {
+        if (!defaultShouldRefresh(requestContext.error)) {
           return undefined
         }
 
@@ -112,9 +122,15 @@ export function authPlugin(options: AuthPluginOptions = {}): Plugin {
         refreshedContexts.add(requestContext)
 
         try {
-          const refreshedToken = await refreshAccessToken(
-            refreshToken
+          const refreshedToken = await waitForSignal(
+            () => refreshAccessToken(refreshToken),
+            requestContext.config
           )
+
+          if (!active) {
+            return undefined
+          }
+
           const resolvedAuthorization = resolveAuthorization(
             requestContext.config,
             options,
@@ -123,10 +139,13 @@ export function authPlugin(options: AuthPluginOptions = {}): Plugin {
               : undefined
           )
           const authorization = isPromiseLike(resolvedAuthorization)
-            ? await resolvedAuthorization
+            ? await waitForSignal(
+                () => Promise.resolve(resolvedAuthorization),
+                requestContext.config
+              )
             : resolvedAuthorization
 
-          if (!authorization.token) {
+          if (!active || !authorization.token) {
             return undefined
           }
 
@@ -140,9 +159,27 @@ export function authPlugin(options: AuthPluginOptions = {}): Plugin {
             retry: true,
             delay: 0
           }
-        } catch {
+        } catch (error) {
+          const signal = requestContext.config.signal
+
+          if (signal?.aborted) {
+            if (error instanceof RequestError) {
+              throw error
+            }
+
+            throw createAbortError(
+              signal.reason,
+              requestContext.config,
+              error
+            )
+          }
+
           return undefined
         }
+      }
+
+      return () => {
+        active = false
       }
     }
   }

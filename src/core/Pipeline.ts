@@ -66,7 +66,12 @@ export class Pipeline {
     config: RequestConfig,
     preserveRaw: boolean
   ): Promise<NporaResponse<T>> {
-    const context = new RequestContext<T>(config)
+    const context = new RequestContext<T>(
+      config,
+      preserveRaw ||
+      this.hooks.hasRawResponseHooks ||
+      this.interceptors.response.active
+    )
     const headersRequired = !!this.adapter.requestValidated
     let validatedHeaders: Headers | undefined
 
@@ -142,9 +147,7 @@ export class Pipeline {
                 ? await this.adapter.requestValidated<T>(
                     context.config,
                     headers,
-                    preserveRaw ||
-                    this.hooks.hasResponseHooks ||
-                    this.interceptors.response.active
+                    context.preserveRaw
                   )
                 : await this.adapter.request<T>(
                     context.config
@@ -448,26 +451,68 @@ function waitForRetry(
   }
 
   return new Promise((resolve, reject) => {
-    let timer: ReturnType<typeof setTimeout>
+    let timer: ReturnType<typeof setTimeout> | undefined
+    let settled = false
 
     const onAbort = () => {
-      clearTimeout(timer)
+      if (settled) {
+        return
+      }
+
+      settled = true
+      if (timer !== undefined) {
+        clearTimeout(timer)
+      }
       cleanup()
       reject(createAbortError(signal?.reason, config))
     }
 
     const cleanup = () => {
-      signal?.removeEventListener('abort', onAbort)
+      try {
+        signal?.removeEventListener('abort', onAbort)
+      } catch {
+        // Cleanup failures must not retain a retry wait.
+      }
     }
 
-    signal?.addEventListener('abort', onAbort, {
-      once: true
-    })
+    try {
+      signal?.addEventListener('abort', onAbort, {
+        once: true
+      })
+    } catch (error) {
+      if (!settled) {
+        settled = true
+        cleanup()
+        reject(error)
+      }
+      return
+    }
 
-    timer = setTimeout(() => {
+    if (signal?.aborted) {
+      onAbort()
+    }
+
+    if (settled) {
+      return
+    }
+
+    try {
+      timer = setTimeout(() => {
+        settled = true
+        cleanup()
+        resolve()
+      }, Math.min(milliseconds, MAX_TIMER_DELAY))
+    } catch (error) {
+      settled = true
       cleanup()
-      resolve()
-    }, Math.min(milliseconds, MAX_TIMER_DELAY))
+      reject(error)
+      return
+    }
+
+    if (settled) {
+      clearTimeout(timer)
+      timer = undefined
+    }
   })
 }
 

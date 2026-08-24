@@ -7,6 +7,7 @@ import type {
 } from '../types'
 import type { Plugin } from './Plugin'
 import { isPromiseLike } from '../utils/isPromiseLike'
+import { waitForSignal } from '../utils/waitForSignal'
 import { MAX_TIMER_DELAY } from '../utils/maxTimerDelay'
 import { resolveExtensionConfig } from './resolveExtensionConfig'
 
@@ -66,14 +67,19 @@ export function retryPlugin(
         let retryOptions = requestOptions.get(requestContext)
 
         if (!retryOptions) {
+          const override = resolveExtensionConfig(
+            requestContext.config,
+            'retry'
+          )
+
           retryOptions = resolveRetryOptions(
-            resolveExtensionConfig(
-              requestContext.config,
-              'retry'
-            ),
+            override,
             normalizedDefaults
           )
-          requestOptions.set(requestContext, retryOptions)
+
+          if (override) {
+            requestOptions.set(requestContext, retryOptions)
+          }
         }
 
         if (attempt >= retryOptions.retries) {
@@ -95,7 +101,7 @@ export function retryPlugin(
         )
 
         if (isPromiseLike(shouldRetry)) {
-          return Promise.resolve(shouldRetry).then(result => {
+          const decision = Promise.resolve(shouldRetry).then(result => {
             return result
               ? createRetryDecision(
                   retryOptions,
@@ -105,18 +111,26 @@ export function retryPlugin(
                 )
               : undefined
           })
+
+          return requestContext.config.signal
+            ? waitForSignal(() => decision, requestContext.config)
+            : decision
         }
 
         if (!shouldRetry) {
           return undefined
         }
 
-        return createRetryDecision(
+        const decision = createRetryDecision(
           retryOptions,
           requestContext.error,
           requestContext.startTime,
           attempt
         )
+
+        return requestContext.config.signal && isPromiseLike(decision)
+          ? waitForSignal(() => decision, requestContext.config)
+          : decision
       })
     }
   }

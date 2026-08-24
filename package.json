@@ -77,6 +77,7 @@
     "audit:malware": "node scripts/audit-malware.mjs",
     "audit:signatures": "pnpm audit signatures",
     "benchmark": "tsx benchmark/request.ts",
+    "stress": "node --expose-gc --import tsx benchmark/stress.ts",
     "benchmark:types": "tsc -p benchmark/tsconfig.json"
   },
   "devDependencies": {

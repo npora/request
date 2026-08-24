@@ -78,9 +78,18 @@ const cachePrimitiveClient = createClient({
 const cacheMissClient = createClient({
   adapter
 }).use(cachePlugin())
+const cacheDedupeClient = createClient({
+  adapter
+}).use(cachePlugin())
 const concurrencyClient = createClient({
   adapter
 }).use(concurrencyPlugin())
+const concurrencyContendedClient = createClient({
+  adapter
+}).use(concurrencyPlugin({
+  maxConcurrent: 1,
+  queueTimeout: Number.POSITIVE_INFINITY
+}))
 const circuitBreakerClient = createClient({
   adapter
 }).use(circuitBreakerPlugin())
@@ -132,6 +141,16 @@ const cachedRequestConfig: RequestConfig = {
 }
 const cacheMissRequestConfig: RequestConfig = {
   url: '/benchmark-cache-miss',
+  method: 'GET',
+  extensions: {
+    cache: {
+      enabled: true,
+      ttl: 0
+    }
+  }
+}
+const cacheDedupeRequestConfig: RequestConfig = {
+  url: '/benchmark-cache-dedupe',
   method: 'GET',
   extensions: {
     cache: {
@@ -206,9 +225,22 @@ const cacheMissClientResult = await runSequential(
   options.operations,
   () => cacheMissClient.get('/benchmark-cache-miss', cacheMissRequestConfig)
 )
+const cacheDedupeClientResult = await runConcurrent(
+  options.operations,
+  options.concurrency,
+  () => cacheDedupeClient.get(
+    '/benchmark-cache-dedupe',
+    cacheDedupeRequestConfig
+  )
+)
 const concurrencyImmediateClient = await runSequential(
   options.operations,
   () => concurrencyClient.get('/benchmark', requestConfig)
+)
+const concurrencyContendedClientResult = await runConcurrent(
+  options.operations,
+  options.concurrency,
+  () => concurrencyContendedClient.get('/benchmark', requestConfig)
 )
 const circuitBreakerSuccessClient = await runSequential(
   options.operations,
@@ -324,7 +356,9 @@ const report = {
     cacheHitClient,
     cachePrimitiveHitClient,
     cacheMissClient: cacheMissClientResult,
+    cacheDedupeClient: cacheDedupeClientResult,
     concurrencyImmediateClient,
+    concurrencyContendedClient: concurrencyContendedClientResult,
     circuitBreakerSuccessClient,
     concurrencyBaseClient: concurrencyBaseClientResult,
     circuitBreakerBaseClient: circuitBreakerBaseClientResult,
@@ -364,7 +398,18 @@ async function warmUp(iterations: number): Promise<void> {
     await jsonBodyClient.post('/benchmark', jsonBodyRequestConfig)
     await pipelineClient.get('/benchmark', requestConfig)
     await singleAsyncHookLifecycleClient.get('/benchmark')
+    await Promise.all([
+      cacheDedupeClient.get(
+        '/benchmark-cache-dedupe',
+        cacheDedupeRequestConfig
+      ),
+      cacheDedupeClient.get(
+        '/benchmark-cache-dedupe',
+        cacheDedupeRequestConfig
+      )
+    ])
     await concurrencyClient.get('/benchmark', requestConfig)
+    await concurrencyContendedClient.get('/benchmark', requestConfig)
     await circuitBreakerClient.get('/benchmark', requestConfig)
     await concurrencyBaseClient.get('/benchmark', requestConfig)
     await circuitBreakerBaseClient.get('/benchmark', requestConfig)

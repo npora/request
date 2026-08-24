@@ -52,7 +52,8 @@ export function uploadPlugin(): Plugin {
         requestContext.response = await xhrRequest(
           requestContext.config,
           {
-            onUploadProgress: upload.onProgress
+            onUploadProgress: upload.onProgress,
+            preserveRaw: requestContext.preserveRaw
           }
         )
       })

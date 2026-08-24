@@ -344,6 +344,127 @@ describe('MockAdapter', () => {
     })
   })
 
+  it('should not allocate a delay timer after synchronous abort registration', async () => {
+    vi.useFakeTimers()
+
+    const handler = vi.fn(() => ({ ok: true }))
+    const reason = new Error('synchronous mock abort')
+    const removeEventListener = vi.fn()
+    const signal = {
+      aborted: false,
+      reason,
+      addEventListener(_type: string, listener: EventListener) {
+        this.aborted = true
+        listener(new Event('abort'))
+      },
+      removeEventListener
+    } as unknown as AbortSignal
+    const adapter = new MockAdapter({
+      delay: 1000,
+      handlers: {
+        '/sync-abort': handler
+      }
+    })
+
+    await expect(adapter.request({
+      url: '/sync-abort',
+      signal
+    })).rejects.toMatchObject({
+      code: 'ABORT_ERROR',
+      cause: reason
+    })
+
+    expect(handler).not.toHaveBeenCalled()
+    expect(removeEventListener).toHaveBeenCalledTimes(1)
+    expect(vi.getTimerCount()).toBe(0)
+  })
+
+  it('should complete a delayed mock when listener cleanup throws', async () => {
+    vi.useFakeTimers()
+
+    const removeEventListener = vi.fn(() => {
+      throw new Error('listener cleanup failed')
+    })
+    const signal = {
+      aborted: false,
+      addEventListener() {},
+      removeEventListener
+    } as unknown as AbortSignal
+    const adapter = new MockAdapter({
+      delay: 10,
+      handlers: {
+        '/cleanup-error': () => ({ ok: true })
+      }
+    })
+    const response = adapter.request({
+      url: '/cleanup-error',
+      signal
+    })
+
+    await vi.advanceTimersByTimeAsync(10)
+
+    await expect(response).resolves.toMatchObject({
+      data: { ok: true }
+    })
+    expect(removeEventListener).toHaveBeenCalledTimes(1)
+    expect(vi.getTimerCount()).toBe(0)
+  })
+
+  it('should not retain a timer when delay listener setup fails', async () => {
+    vi.useFakeTimers()
+
+    const handler = vi.fn(() => ({ ok: true }))
+    const removeEventListener = vi.fn()
+    const signal = {
+      aborted: false,
+      addEventListener() {
+        throw new Error('listener setup failed')
+      },
+      removeEventListener
+    } as unknown as AbortSignal
+    const adapter = new MockAdapter({
+      delay: 1000,
+      handlers: {
+        '/listener-error': handler
+      }
+    })
+
+    await expect(adapter.request({
+      url: '/listener-error',
+      signal
+    })).rejects.toThrow('listener setup failed')
+
+    expect(handler).not.toHaveBeenCalled()
+    expect(removeEventListener).toHaveBeenCalledTimes(1)
+    expect(vi.getTimerCount()).toBe(0)
+  })
+
+  it('should remove the listener when delay timer setup fails', async () => {
+    const removeEventListener = vi.fn()
+    const signal = {
+      aborted: false,
+      addEventListener() {},
+      removeEventListener
+    } as unknown as AbortSignal
+    const adapter = new MockAdapter({
+      delay: 1000,
+      handlers: {
+        '/timer-error': () => ({ ok: true })
+      }
+    })
+
+    vi.spyOn(globalThis, 'setTimeout').mockImplementation(() => {
+      throw new Error('timer setup failed')
+    })
+
+    await expect(adapter.request({
+      url: '/timer-error',
+      signal
+    })).rejects.toThrow('timer setup failed')
+
+    expect(removeEventListener).toHaveBeenCalledTimes(1)
+  })
+
   it('should expose and reset request history and handlers', async () => {
     const adapter = new MockAdapter()
 

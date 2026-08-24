@@ -13,6 +13,9 @@ export interface HookOptions {
    * @default 0
    */
   priority?: number
+
+  /** @internal Response hooks may opt out when they never inspect raw. */
+  requiresRawResponse?: boolean
 }
 
 export type HookDisposer = () => void
@@ -45,6 +48,8 @@ export class PluginHooks {
 
   private readonly retryHooks = new HookRegistry<RetryHook>()
 
+  private rawResponseHooks = 0
+
   get active(): boolean {
     return (
       this.requestHooks.active ||
@@ -62,6 +67,10 @@ export class PluginHooks {
 
   get hasResponseHooks(): boolean {
     return this.responseHooks.active
+  }
+
+  get hasRawResponseHooks(): boolean {
+    return this.rawResponseHooks > 0
   }
 
   get hasTransportHooks(): boolean {
@@ -91,7 +100,23 @@ export class PluginHooks {
     hook: RequestHook,
     options: HookOptions = {}
   ): HookDisposer {
-    return this.responseHooks.register(hook, options)
+    const dispose = this.responseHooks.register(hook, options)
+
+    if (options.requiresRawResponse === false) {
+      return dispose
+    }
+
+    this.rawResponseHooks += 1
+    let active = true
+
+    return () => {
+      dispose()
+
+      if (active) {
+        active = false
+        this.rawResponseHooks -= 1
+      }
+    }
   }
 
   onTransport(

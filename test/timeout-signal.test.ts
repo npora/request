@@ -118,20 +118,118 @@ describe('createTimeoutSignal', () => {
     vi.useFakeTimers()
 
     try {
+      const removeEventListener = vi.fn()
       const signal = {
         aborted: false,
         addEventListener() {
           throw new Error('listener registration failed')
         },
-        removeEventListener() {}
+        removeEventListener
       } as unknown as AbortSignal
 
       expect(() => createTimeoutSignal(signal, 1000)).toThrow(
         'listener registration failed'
       )
+      expect(removeEventListener).toHaveBeenCalledTimes(1)
       expect(vi.getTimerCount()).toBe(0)
     } finally {
       vi.useRealTimers()
+    }
+  })
+
+  it('should not allocate a timer after synchronous external abort', () => {
+    vi.useFakeTimers()
+
+    try {
+      const reason = new RequestError('synchronous abort', {
+        code: 'ABORT_ERROR'
+      })
+      const signal = {
+        aborted: false,
+        reason,
+        addEventListener(_type: string, listener: EventListener) {
+          this.aborted = true
+          listener(new Event('abort'))
+        },
+        removeEventListener() {}
+      } as unknown as AbortSignal
+      const result = createTimeoutSignal(signal, 1000)
+
+      expect(result.signal?.aborted).toBe(true)
+      expect(result.signal?.reason).toBe(reason)
+      expect(vi.getTimerCount()).toBe(0)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('should clear a timeout when listener removal throws', () => {
+    vi.useFakeTimers()
+
+    try {
+      const signal = {
+        aborted: false,
+        addEventListener() {},
+        removeEventListener() {
+          throw new Error('listener cleanup failed')
+        }
+      } as unknown as AbortSignal
+      const result = createTimeoutSignal(signal, 1000)
+
+      expect(() => result.clear()).not.toThrow()
+      expect(vi.getTimerCount()).toBe(0)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('should remove the external listener when timer setup fails', () => {
+    const removeEventListener = vi.fn()
+    const signal = {
+      aborted: false,
+      addEventListener() {},
+      removeEventListener
+    } as unknown as AbortSignal
+
+    vi.spyOn(globalThis, 'setTimeout').mockImplementation(() => {
+      throw new Error('timer setup failed')
+    })
+
+    try {
+      expect(() => createTimeoutSignal(signal, 1000)).toThrow(
+        'timer setup failed'
+      )
+      expect(removeEventListener).toHaveBeenCalledTimes(1)
+    } finally {
+      vi.restoreAllMocks()
+    }
+  })
+
+  it('should clear a handle returned by a synchronous timeout', () => {
+    const removeEventListener = vi.fn()
+    const clearTimeoutSpy = vi.spyOn(globalThis, 'clearTimeout')
+    const signal = {
+      aborted: false,
+      addEventListener() {},
+      removeEventListener
+    } as unknown as AbortSignal
+
+    vi.spyOn(globalThis, 'setTimeout').mockImplementation(callback => {
+      callback()
+      return 1 as unknown as ReturnType<typeof setTimeout>
+    })
+
+    try {
+      const result = createTimeoutSignal(signal, 1000)
+
+      expect(result.signal?.aborted).toBe(true)
+      expect(result.signal?.reason).toMatchObject({
+        code: 'TIMEOUT_ERROR'
+      })
+      expect(removeEventListener).toHaveBeenCalledTimes(1)
+      expect(clearTimeoutSpy).toHaveBeenCalledTimes(1)
+    } finally {
+      vi.restoreAllMocks()
     }
   })
 })

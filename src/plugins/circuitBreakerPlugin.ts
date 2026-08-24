@@ -6,6 +6,7 @@ import type {
 } from '../types'
 import type { Plugin } from './Plugin'
 import { isPromiseLike } from '../utils/isPromiseLike'
+import { waitForSignal } from '../utils/waitForSignal'
 import { resolveRequestOrigin } from '../utils/resolveRequestOrigin'
 import { resolveExtensionConfig } from './resolveExtensionConfig'
 
@@ -112,6 +113,7 @@ export function circuitBreakerPlugin(
 ): CircuitBreakerPlugin {
   const normalized = normalizeOptions(options)
   const circuits = new Map<string, CircuitRecord>()
+  let latestCircuit: CircuitRecord | undefined
 
   const plugin: CircuitBreakerPlugin = {
     name: 'circuit-breaker',
@@ -123,9 +125,13 @@ export function circuitBreakerPlugin(
     reset(key) {
       if (key === undefined) {
         circuits.clear()
+        latestCircuit = undefined
         return
       }
 
+      if (circuits.get(key) === latestCircuit) {
+        latestCircuit = undefined
+      }
       circuits.delete(key)
     },
 
@@ -146,11 +152,18 @@ export function circuitBreakerPlugin(
         const key = normalizeKey(
           requestOptions?.key ?? normalized.createKey(requestContext.config)
         )
-        const record = getCircuit(
+        const existing = circuits.get(key)
+        const record = existing ?? createCircuit(
           circuits,
           key,
           normalized.maxCircuits
         )
+
+        if (existing && record !== latestCircuit) {
+          circuits.delete(key)
+          circuits.set(key, record)
+        }
+        latestCircuit = record
 
         if (
           record.state === 'open' &&
@@ -195,7 +208,7 @@ export function circuitBreakerPlugin(
         const record = admission.record
 
         if (!active) {
-          finishSettlement(record, circuits, normalized.maxCircuits)
+          finishAdmission(admission, circuits, normalized.maxCircuits)
           return
         }
 
@@ -203,12 +216,8 @@ export function circuitBreakerPlugin(
           circuits.get(admission.key) !== record ||
           record.generation !== admission.generation
         ) {
-          finishSettlement(record, circuits, normalized.maxCircuits)
+          finishAdmission(admission, circuits, normalized.maxCircuits)
           return
-        }
-
-        if (admission.probe) {
-          record.probes = Math.max(0, record.probes - 1)
         }
 
         if (!requestContext.error && requestContext.response) {
@@ -222,7 +231,7 @@ export function circuitBreakerPlugin(
             }
           }
 
-          finishSettlement(record, circuits, normalized.maxCircuits)
+          finishAdmission(admission, circuits, normalized.maxCircuits)
           return
         }
 
@@ -233,8 +242,18 @@ export function circuitBreakerPlugin(
             requestContext.error,
             requestContext.config
           )
+
+          if (
+            requestContext.config.signal &&
+            isPromiseLike(counted)
+          ) {
+            counted = waitForSignal(
+              () => counted,
+              requestContext.config
+            )
+          }
         } catch (error) {
-          finishSettlement(record, circuits, normalized.maxCircuits)
+          finishAdmission(admission, circuits, normalized.maxCircuits)
           throw error
         }
 
@@ -250,8 +269,8 @@ export function circuitBreakerPlugin(
               )
             })
             .finally(() => {
-              finishSettlement(
-                record,
+              finishAdmission(
+                admission,
                 circuits,
                 normalized.maxCircuits
               )
@@ -261,12 +280,13 @@ export function circuitBreakerPlugin(
         try {
           applyFailure(counted, active, circuits, admission, normalized)
         } finally {
-          finishSettlement(record, circuits, normalized.maxCircuits)
+          finishAdmission(admission, circuits, normalized.maxCircuits)
         }
       })
 
       return () => {
         active = false
+        latestCircuit = undefined
         circuits.clear()
       }
     }
@@ -307,11 +327,17 @@ function applyFailure(
   }
 }
 
-function finishSettlement(
-  record: CircuitRecord,
+function finishAdmission(
+  admission: Admission,
   circuits: Map<string, CircuitRecord>,
   maxCircuits: number
 ): void {
+  const record = admission.record
+
+  if (admission.probe) {
+    record.probes = Math.max(0, record.probes - 1)
+  }
+
   record.activeRequests = Math.max(0, record.activeRequests - 1)
   trimCircuits(circuits, maxCircuits)
 }
@@ -375,22 +401,14 @@ function normalizeKey(key: string): string {
   return key || 'default'
 }
 
-function getCircuit(
+function createCircuit(
   circuits: Map<string, CircuitRecord>,
   key: string,
   maxCircuits: number
 ): CircuitRecord {
-  let record = circuits.get(key)
-
-  if (record) {
-    circuits.delete(key)
-    circuits.set(key, record)
-    return record
-  }
-
   trimCircuits(circuits, maxCircuits - 1)
 
-  record = {
+  const record: CircuitRecord = {
     state: 'closed',
     failures: 0,
     successes: 0,

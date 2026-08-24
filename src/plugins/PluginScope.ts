@@ -190,6 +190,7 @@ function withPriority(
   pluginPriority: number
 ): HookOptions {
   return {
+    ...options,
     priority: options?.priority ?? pluginPriority
   }
 }

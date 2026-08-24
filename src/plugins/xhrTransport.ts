@@ -11,8 +11,10 @@ import {
 import {
   buildRequest,
   isBodylessResponse,
-  parseResponse
+  parseResponse,
+  resolveResponseType
 } from '../utils'
+import type { ResponseType } from '../types'
 import { validateResponseStatus } from '../utils/validateResponseStatus'
 
 type TransferProgress = TransferProgressSnapshot
@@ -20,6 +22,7 @@ type TransferProgress = TransferProgressSnapshot
 export interface XHRTransportOptions {
   onDownloadProgress?: (progress: TransferProgress) => void
   onUploadProgress?: (progress: TransferProgress) => void
+  preserveRaw?: boolean
 }
 
 export function xhrRequest<T>(
@@ -46,7 +49,11 @@ export function xhrRequest<T>(
     let settled = false
 
     const cleanup = () => {
-      signal?.removeEventListener('abort', onSignalAbort)
+      try {
+        signal?.removeEventListener('abort', onSignalAbort)
+      } catch {
+        // Cleanup failures must not retain an XHR request.
+      }
       request.clear()
       xhr.onload = null
       xhr.onerror = null
@@ -79,6 +86,10 @@ export function xhrRequest<T>(
     }
 
     const abortWith = (error: unknown) => {
+      if (settled) {
+        return
+      }
+
       rejectOnce(error)
       xhr.abort()
     }
@@ -90,7 +101,7 @@ export function xhrRequest<T>(
     }
 
     xhr.onload = () => {
-      void processResponse<T>(xhr, config).then(
+      void processResponse<T>(xhr, config, options.preserveRaw ?? true).then(
         resolveOnce,
         rejectOnce
       )
@@ -147,6 +158,10 @@ export function xhrRequest<T>(
         once: true
       })
 
+      if (settled) {
+        return
+      }
+
       const body = request.init.body
 
       if (
@@ -174,7 +189,8 @@ export function xhrRequest<T>(
 
 async function processResponse<T>(
   xhr: XMLHttpRequest,
-  config: RequestConfig
+  config: RequestConfig,
+  preserveRaw: boolean
 ): Promise<NporaResponse<T>> {
   if (xhr.status === 0) {
     throw new RequestError('Network request failed', {
@@ -199,21 +215,35 @@ async function processResponse<T>(
             }
           )
     const bodyless = isBodylessResponse(undefined, xhr.status)
-    const raw = new Response(
-      bodyless ? null : blob,
-      {
-        status: xhr.status,
-        statusText: xhr.statusText,
-        headers
-      }
-    )
+    const validStatus = validateResponseStatus(xhr.status, config)
+    const responseInit = {
+      status: xhr.status,
+      statusText: xhr.statusText,
+      headers
+    }
+    const emptyRaw = new Response(null, responseInit)
+    const responseType = bodyless
+      ? undefined
+      : resolveResponseType(emptyRaw, config)
+    const directBuffered =
+      !Number.isFinite(config.maxResponseSize)
+      && isBufferedResponseType(responseType)
+    const raw =
+      bodyless || (directBuffered && !preserveRaw && validStatus)
+        ? emptyRaw
+        : new Response(blob, responseInit)
     const parseTarget =
-      bodyless || config.responseType === 'stream'
+      bodyless ||
+      directBuffered ||
+      config.responseType === 'stream' ||
+      !preserveRaw
         ? raw
         : raw.clone()
     const data = bodyless
       ? undefined as T
-      : await parseResponse<T>(parseTarget, config)
+      : directBuffered
+        ? await parseBufferedBlob<T>(blob, responseType, raw, config)
+        : await parseResponse<T>(parseTarget, config)
     const response: NporaResponse<T> = {
       data,
       status: xhr.status,
@@ -222,7 +252,7 @@ async function processResponse<T>(
       config,
       raw
     }
-    if (!validateResponseStatus(xhr.status, config)) {
+    if (!validStatus) {
       throw new RequestError(
         xhr.statusText || 'Request failed',
         {
@@ -246,6 +276,52 @@ async function processResponse<T>(
         cause: error
       }
     )
+  }
+}
+
+function isBufferedResponseType(
+  type: ResponseType | undefined
+): type is 'json' | 'text' | 'blob' | 'arrayBuffer' {
+  return type === 'json' ||
+    type === 'text' ||
+    type === 'blob' ||
+    type === 'arrayBuffer'
+}
+
+async function parseBufferedBlob<T>(
+  blob: Blob,
+  type: 'json' | 'text' | 'blob' | 'arrayBuffer',
+  response: Response,
+  config: RequestConfig
+): Promise<T> {
+  try {
+    switch (type) {
+      case 'json':
+        return JSON.parse(await blob.text()) as T
+
+      case 'text':
+        return await blob.text() as T
+
+      case 'arrayBuffer':
+        return await blob.arrayBuffer() as T
+
+      default: {
+        const contentType = response.headers.get('content-type') ?? ''
+
+        return (
+          !contentType || blob.type === contentType
+            ? blob
+            : new Blob([blob], { type: contentType })
+        ) as T
+      }
+    }
+  } catch (error) {
+    throw new RequestError('Failed to parse response', {
+      code: 'PARSER_ERROR',
+      status: response.status,
+      config,
+      cause: error
+    })
   }
 }
 
