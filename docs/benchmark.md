@@ -43,21 +43,6 @@ pnpm benchmark:http -- \
   --output benchmark-results/http.json
 ```
 
-Install competitor packages in their isolated benchmark workspace, then run
-the reproducible cross-library localhost test:
-
-```sh
-pnpm benchmark:libraries:install
-pnpm build
-pnpm benchmark:libraries
-```
-
-The competitor packages are deliberately absent from the root package and
-published tarball, preserving Npora Request's zero-runtime-dependency contract.
-The full JSON report is written to
-`benchmark/competitors/library-comparison-result.json`; this generated local
-result is excluded from the published package and should not be committed.
-
 The stress runner distributes an exact total across core dispatch,
 serialization, interceptors, cache hits, deduplication and clear races, immediate and
 contended concurrency, queued cancellation, closed and transitioning circuits,
@@ -98,25 +83,6 @@ request; throughput was 21,029 requests/s, sampled p50 was 10.627 ms, p95 was
 15.808 ms, and p99 was 17.624 ms. This loopback result includes sockets, HTTP
 parsing, body streaming, and JSON parsing, but still does not predict remote
 service latency or production proxy/TLS behavior.
-
-The isolated five-library run used the same machine and runtime, one local JSON
-server, concurrency 128, a 300-request warm-up per client, and three rotated
-rounds of 30,000 measured requests per client. All 451,500 expected requests
-reached the server:
-
-| Client | Version | Median throughput | Median p99 |
-| --- | ---: | ---: | ---: |
-| ofetch | 1.5.1 | 22,653 req/s | 10.146 ms |
-| Npora Request | pending 1.15.0 workspace | 22,390 req/s | 10.445 ms |
-| Ky | 2.0.2 | 18,048 req/s | 16.393 ms |
-| Axios | 1.19.0 npm release | 14,638 req/s | 12.541 ms |
-| Got | 15.1.0 | 13,672 req/s | 17.203 ms |
-
-Npora Request was within 1.2% of ofetch and ahead of Ky, Axios, and Got in this
-specific run. This is not a universal ranking: Axios and Got use their Node
-HTTP transports while the other three use Node Fetch, and results change with
-payloads, TLS, agents, proxies, retries, hooks, and remote latency. The script
-keeps full per-round samples and verifies the server-side request count.
 
 ## Scenarios
 
