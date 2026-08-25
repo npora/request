@@ -106,8 +106,7 @@ try {
 
   assert.equal(received, expectedRequests)
   await writeFile(
-    process.env.NPORA_BENCH_OUTPUT ??
-      '/tmp/npora-library-comparison.json',
+    new URL('library-comparison-result.json', import.meta.url),
     `${JSON.stringify(report, null, 2)}\n`
   )
   process.stdout.write(`${JSON.stringify(report.results, null, 2)}\n`)

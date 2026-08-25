@@ -54,6 +54,9 @@ pnpm benchmark:libraries
 
 The competitor packages are deliberately absent from the root package and
 published tarball, preserving Npora Request's zero-runtime-dependency contract.
+The full JSON report is written to
+`benchmark/competitors/library-comparison-result.json`; this generated local
+result is excluded from the published package and should not be committed.
 
 The stress runner distributes an exact total across core dispatch,
 serialization, interceptors, cache hits, deduplication and clear races, immediate and
