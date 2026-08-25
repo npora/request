@@ -1,5 +1,89 @@
 # @npora/request
 
+## 1.15.0
+
+### Minor Changes
+
+- 05e65d7: Add automatic cache-tag invalidation after successful requests, with final
+  retry outcome accounting, failure preservation, custom-store preflight checks,
+  and awaited asynchronous invalidation.
+- 05e65d7: Add `maxRequestSize` preflight enforcement for deterministically sized JSON,
+  text, URLSearchParams, Blob, ArrayBuffer, and typed-array request bodies across
+  the built-in Fetch and XHR transports. Oversized requests fail before dispatch
+  with the stable `REQUEST_TOO_LARGE` error code.
+- 05e65d7: Add privacy-safe cache observability with aggregate statistics, reset support,
+  and isolated lifecycle event callbacks for cache decisions and background
+  refresh outcomes.
+- 05e65d7: Add bounded cache tags and grouped invalidation with default memory-store
+  support, optional custom-store integration, asynchronous coordination, and
+  in-flight generation isolation.
+- 05e65d7: Add privacy-safe BroadcastChannel invalidation to tiered caches, including
+  bounded key fingerprint tracking, remote primary eviction, broad fallback for
+  unknown keys and tags, listener disposal, and partial-write recovery.
+- 05e65d7: Add optional Web Locks coordination to `TieredCacheStore` so independent
+  same-origin clients can coalesce cache misses and revalidations through a
+  shared secondary cache.
+- 05e65d7: Add approximate byte-budget LRU eviction and scoped quota-exceeded recovery to
+  the IndexedDB cache store.
+- 05e65d7: Add synchronous and asynchronous admission policies to the IndexedDB cache
+  store for selectively excluding persistent entries.
+- 05e65d7: Add bounded IndexedDB cache compaction and cursor-based constant-memory usage
+  inspection with privacy-safe expired-entry events.
+- 05e65d7: Add aggregate usage inspection and privacy-safe lifecycle events to the
+  IndexedDB cache store.
+- 05e65d7: Add an asynchronous, namespaced IndexedDB cache with structured-clone data,
+  bounded LRU eviction, tag invalidation, scoped clearing, malformed-record
+  recovery, connection cleanup, and safe native Response omission.
+- 05e65d7: Add monotonic IndexedDB cache schema versions with backward-compatible version
+  1 records, rolling-deployment isolation, and automatic pruning of older data.
+- 05e65d7: Add tree-shakeable ESM and CommonJS subpath exports for the core client,
+  aggregate and individual official plugins, and MockAdapter testing utilities.
+  Keep the root entry point backward compatible while sharing internal chunks so
+  constructors and errors retain identity across entry points.
+- 05e65d7: Add programmatic cache seeding and functional updates with effective-key
+  matching, asynchronous store serialization, tag support, defensive value
+  cloning, raw-response invalidation, and stale in-flight write isolation.
+- 05e65d7: Add `allowAbsoluteUrls` so clients can prevent absolute request URLs from
+  bypassing a configured `baseURL`, including URLs introduced by lifecycle
+  extensions. Serialize `null` query and form values as empty values while
+  continuing to omit `undefined`, matching the documented request contract.
+- 05e65d7: Add bounded stale-if-error recovery to the cache plugin. Response
+  `stale-if-error` directives and the request `staleIfError` limit may recover
+  network, timeout, and 5xx failures after retries are exhausted without hiding
+  abort, parsing, configuration, schema, or non-5xx errors.
+- 05e65d7: Add stale-while-revalidate caching with response directive and request-level
+  window support. Eligible stale entries return immediately while one abortable,
+  deduplicated refresh runs through the owning client pipeline in the background.
+- 05e65d7: Add targeted cache deletion by effective request configuration, including
+  per-key in-flight generation isolation, asynchronous store coordination,
+  background refresh cancellation, and invalidation observability.
+- 05e65d7: Add a read-through, write-through tiered cache that preserves synchronous
+  primary hits, promotes secondary results, commits durable writes first, and
+  coordinates deletion, clearing, tag invalidation, and partial failures across
+  both stores.
+- 05e65d7: Add a namespaced Web Storage cache with JSON persistence, bounded LRU eviction,
+  tag invalidation, scoped clearing, corrupt-record recovery, and safe raw
+  response omission for localStorage and sessionStorage.
+
+### Patch Changes
+
+- 05e65d7: Conditionally revalidate stale cache entries with `ETag` and `Last-Modified`.
+  Successful `304 Not Modified` responses reuse the cached entity, merge updated
+  metadata, and refresh the entry lifetime without overriding application-owned
+  conditional or range request headers.
+- 05e65d7: Honor response Cache-Control freshness conservatively in the cache plugin.
+  Valid `max-age` and `Age` values cap the configured TTL, while `no-cache`
+  responses without validators, invalid or repeated `max-age`, `no-store`, and
+  `Vary: *` responses are not persisted. Concurrent in-flight deduplication
+  remains available.
+- 05e65d7: Preserve every higher-version IndexedDB cache record without interpreting its
+  envelope, abort failed cursor maintenance transactions safely, and make LRU
+  eviction deterministic when access timestamps are equal.
+- 05e65d7: Honor request cache directives in the cache plugin. `no-cache`, `max-age=0`,
+  and legacy `Pragma: no-cache` force revalidation, while request `no-store`
+  bypasses cache reads, writes, and in-flight deduplication without replacing an
+  existing entry.
+
 ## 1.14.4
 
 ### Patch Changes
