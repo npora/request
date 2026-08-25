@@ -31,41 +31,19 @@ authentication, and upload/download progress.
   verifies public exports, browser behavior, security regressions, and size
   budgets before release.
 
-## Where it stands out
+## Design focus
 
-Npora Request is aimed at applications that would otherwise assemble several
-Axios interceptors, cache packages, queue utilities and stream parsers around
-one HTTP client. The differentiation is the integrated lifecycle, not a claim
-that one library is best for every transport.
-
-| Area | Npora Request | Axios | Ky | Got |
-| --- | --- | --- | --- | --- |
-| Runtime dependencies | **0** | 4 | **0** | 12 |
-| Standard Schema validation | **First-party** | Application code | First-party | Application code |
-| Retry + circuit breaker + concurrency queue | **Composable plugins** | Retry/coordination added separately | Retry only | Retry; Node transport controls |
-| Parsed SSE and NDJSON | **Incremental async iterables** | Raw response stream | Raw response stream | Raw response stream |
-| Persistent response cache | **Web Storage, IndexedDB, tiered, cross-tab** | Application package | Application package | First-party cache |
-| IndexedDB controls | **Schema, bytes, admission, metrics, compaction** | — | — | — |
-| Node proxy/HTTP2/socket depth | Custom adapter | **Strong** | Fetch-dependent | **Strongest** |
-| ESM and CommonJS exports | **Both** | Both | ESM | ESM |
-
-Axios remains the safer choice when ecosystem adoption or mature Node adapter
-compatibility dominates. Ky is excellent when a smaller Fetch convenience API
-is enough. Got is the stronger Node-only transport specialist. Npora Request's
-advantage is combining runtime validation, streaming, cache correctness,
-resilience, observability and cancellation under one typed, deterministic,
-zero-runtime-dependency lifecycle. See the dated, source-linked
-[comparison](docs/comparison.md) for tradeoffs rather than marketing-only
-claims.
+Npora Request combines runtime validation, incremental streaming, persistent
+cache correctness, resilience, observability, and cancellation under one
+typed, deterministic lifecycle. It keeps the standard Fetch model, ships with
+zero runtime dependencies, supports ESM and CommonJS, and exposes optional
+capabilities through tree-shakeable subpath exports.
 
 The current stress gate completed **10,000,000 logical operations at concurrency
 256 with zero unexpected failures**, followed by **100,000 real localhost HTTP
-requests at concurrency 256**. In a separate reproducible five-library
-localhost JSON test, the pending release delivered **22,390 req/s median**,
-within 1.2% of ofetch and ahead of Ky, Axios, and Got on that machine. These are
-engineering checks, not claims about every remote workload; commands,
-per-round results, and limitations are in the [benchmark
-documentation](docs/benchmark.md).
+requests at concurrency 256**. These are reproducible engineering checks, not
+claims about every remote workload; commands and limitations are in the
+[benchmark documentation](docs/benchmark.md).
 
 ## Features
 
@@ -681,7 +659,6 @@ allowlist, and size budgets.
 - [Architecture](https://github.com/npora/request/blob/main/docs/architecture.md)
 - [Migration from 0.x](https://github.com/npora/request/blob/main/docs/migration.md)
 - [Migration from Axios or Ky](https://github.com/npora/request/blob/main/docs/migration-from-axios-and-ky.md)
-- [HTTP client comparison](https://github.com/npora/request/blob/main/docs/comparison.md)
 - [Security model](https://github.com/npora/request/blob/main/docs/security.md)
 - [Testing and release gates](https://github.com/npora/request/blob/main/docs/testing.md)
 - [Performance benchmarks](https://github.com/npora/request/blob/main/docs/benchmark.md)
