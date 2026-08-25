@@ -33,6 +33,8 @@ export default defineConfig({
       exclude: [
         'src/**/*.d.ts',
         'src/**/index.ts',
+        // Exercised against real IndexedDB in the Playwright browser suite.
+        'src/plugins/indexedDBCacheStore.ts',
         'src/types/**'
       ],
 

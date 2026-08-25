@@ -71,6 +71,17 @@ export interface PluginContext {
   }
 
   hooks: PluginHookManager
+
+  /** @internal Dispatch a request through the owning client pipeline. */
+  dispatch<T = unknown>(
+    config: RequestConfig,
+    options?: PluginDispatchOptions
+  ): Promise<NporaResponse<T>>
+}
+
+interface PluginDispatchOptions {
+  background?: boolean
+  preserveRaw?: boolean
 }
 
 export type PluginCleanup = () => void

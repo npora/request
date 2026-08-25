@@ -1,10 +1,18 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { CacheEntry, CacheStore, Plugin } from '../src'
+import type {
+  Adapter,
+  CacheEntry,
+  CacheEvent,
+  CacheStore,
+  Plugin
+} from '../src'
 import {
   cachePlugin,
   createClient,
+  IndexedDBCacheStore,
   MemoryCacheStore,
-  retryPlugin
+  retryPlugin,
+  WebStorageCacheStore
 } from '../src'
 
 function createJsonResponse(data: unknown): Response {
@@ -14,6 +22,31 @@ function createJsonResponse(data: unknown): Response {
       'content-type': 'application/json'
     }
   })
+}
+
+function createWebStorage(): Storage {
+  const values = new Map<string, string>()
+
+  return {
+    get length() {
+      return values.size
+    },
+    clear() {
+      values.clear()
+    },
+    getItem(key) {
+      return values.get(key) ?? null
+    },
+    key(index) {
+      return [...values.keys()][index] ?? null
+    },
+    removeItem(key) {
+      values.delete(key)
+    },
+    setItem(key, value) {
+      values.set(key, value)
+    }
+  }
 }
 
 afterEach(() => {
@@ -124,7 +157,7 @@ describe('cachePlugin', () => {
     expect(store.get('third')?.data).toBe('third')
   })
 
-  it('should remove expired memory entries when they are read', () => {
+  it('should retain expired memory entries for revalidation', () => {
     vi.useFakeTimers()
 
     const store = new MemoryCacheStore()
@@ -139,7 +172,7 @@ describe('cachePlugin', () => {
 
     vi.advanceTimersByTime(100)
 
-    expect(store.get('temporary')).toBeUndefined()
+    expect(store.get('temporary')?.data).toBe(true)
   })
 
   it('should retain memory entries with no expiration', () => {
@@ -170,6 +203,131 @@ describe('cachePlugin', () => {
     })
 
     expect(store.get('ignored')).toBeUndefined()
+  })
+
+  it('should persist portable entries across web storage instances', () => {
+    const storage = createWebStorage()
+    const first = new WebStorageCacheStore(storage, {
+      namespace: 'persistent-test'
+    })
+
+    first.set('profile', {
+      data: { name: 'Npora' },
+      expiresAt: Infinity,
+      status: 200,
+      statusText: 'OK',
+      headers: [['content-type', 'application/json']],
+      tags: ['profile'],
+      raw: createJsonResponse({ name: 'Npora' })
+    })
+
+    const restored = new WebStorageCacheStore(storage, {
+      namespace: 'persistent-test'
+    }).get('profile')
+
+    expect(restored).toMatchObject({
+      data: { name: 'Npora' },
+      expiresAt: Infinity,
+      status: 200,
+      tags: ['profile']
+    })
+    expect(restored?.raw).toBeUndefined()
+  })
+
+  it('should isolate web storage clearing and tags by namespace', () => {
+    const storage = createWebStorage()
+    const first = new WebStorageCacheStore(storage, { namespace: 'first' })
+    const second = new WebStorageCacheStore(storage, { namespace: 'second' })
+    const entry: CacheEntry = {
+      data: true,
+      expiresAt: Infinity,
+      status: 200,
+      statusText: 'OK',
+      headers: [],
+      tags: ['shared-tag']
+    }
+
+    first.set('entry', entry)
+    second.set('entry', entry)
+
+    expect(first.invalidateTags(['shared-tag'])).toBe(1)
+    expect(second.get('entry')?.data).toBe(true)
+
+    first.set('entry', entry)
+    first.clear()
+    expect(first.get('entry')).toBeUndefined()
+    expect(second.get('entry')?.data).toBe(true)
+  })
+
+  it('should evict least recently used web storage entries', () => {
+    vi.useFakeTimers()
+
+    const storage = createWebStorage()
+    const store = new WebStorageCacheStore(storage, {
+      namespace: 'lru',
+      maxEntries: 2
+    })
+    const entry = (data: string): CacheEntry => ({
+      data,
+      expiresAt: Infinity,
+      status: 200,
+      statusText: 'OK',
+      headers: []
+    })
+
+    store.set('first', entry('first'))
+    vi.advanceTimersByTime(1)
+    store.set('second', entry('second'))
+    vi.advanceTimersByTime(1)
+    store.get('first')
+    vi.advanceTimersByTime(1)
+    store.set('third', entry('third'))
+
+    expect(store.get('first')?.data).toBe('first')
+    expect(store.get('second')).toBeUndefined()
+    expect(store.get('third')?.data).toBe('third')
+  })
+
+  it('should remove malformed web storage entries', () => {
+    const storage = createWebStorage()
+    const store = new WebStorageCacheStore(storage, {
+      namespace: 'malformed'
+    })
+    const key = '@npora/request:malformed:entry'
+
+    storage.setItem(key, '{invalid json')
+
+    expect(store.get('entry')).toBeUndefined()
+    expect(storage.getItem(key)).toBeNull()
+  })
+
+  it('should validate IndexedDB cache schema versions', () => {
+    const factory = {} as IDBFactory
+
+    expect(() => new IndexedDBCacheStore(factory, {
+      schemaVersion: 0
+    })).toThrow(/schemaVersion/)
+    expect(() => new IndexedDBCacheStore(factory, {
+      schemaVersion: 1.5
+    })).toThrow(/schemaVersion/)
+    expect(() => new IndexedDBCacheStore(factory, {
+      schemaVersion: 2
+    })).not.toThrow()
+    expect(() => new IndexedDBCacheStore(factory, {
+      maxBytes: -1
+    })).toThrow(/maxBytes/)
+    expect(() => new IndexedDBCacheStore(factory, {
+      maxBytes: 1024,
+      quotaRecovery: false
+    })).not.toThrow()
+    expect(() => new IndexedDBCacheStore(factory, {
+      // @ts-expect-error Verifies runtime validation for JavaScript callers.
+      onEvent: true
+    })).toThrow(/onEvent/)
+    expect(() => new IndexedDBCacheStore(factory, {
+      // @ts-expect-error Verifies runtime validation for JavaScript callers.
+      shouldPersist: true
+    })).toThrow(/shouldPersist/)
   })
 
   it('should cache response when cache is enabled', async () => {
@@ -228,6 +386,1234 @@ describe('cachePlugin', () => {
     await expect(request.get('/version', config)).resolves.toEqual({
       version: 2
     })
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('should not reuse responses marked as no-cache without revalidation', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(new Response('{"version":1}', {
+        headers: {
+          'cache-control': 'public, no-cache',
+          'content-type': 'application/json'
+        }
+      }))
+      .mockResolvedValueOnce(new Response('{"version":2}', {
+        headers: {
+          'cache-control': 'public, no-cache',
+          'content-type': 'application/json'
+        }
+      }))
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient().use(cachePlugin())
+    const config = {
+      extensions: {
+        cache: {
+          enabled: true,
+          ttl: Infinity
+        }
+      }
+    }
+
+    await expect(request.get('/no-cache', config)).resolves.toEqual({
+      version: 1
+    })
+    await expect(request.get('/no-cache', config)).resolves.toEqual({
+      version: 2
+    })
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('should revalidate an expired ETag response and refresh its ttl', async () => {
+    vi.useFakeTimers()
+
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(new Response('{"version":1}', {
+        headers: {
+          'cache-control': 'max-age=1',
+          'content-type': 'application/json',
+          etag: '"version-1"',
+          'x-version': 'original'
+        }
+      }))
+      .mockResolvedValueOnce(new Response(null, {
+        status: 304,
+        headers: {
+          'cache-control': 'max-age=10',
+          etag: '"version-1"',
+          'x-version': 'revalidated'
+        }
+      }))
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient().use(cachePlugin())
+    const config = {
+      extensions: {
+        cache: {
+          enabled: true,
+          ttl: 30000
+        }
+      }
+    }
+
+    await expect(request.getResponse('/etag', config)).resolves.toMatchObject({
+      data: { version: 1 }
+    })
+    vi.advanceTimersByTime(1000)
+
+    const revalidated = await request.getResponse('/etag', config)
+
+    expect(revalidated.data).toEqual({ version: 1 })
+    expect(revalidated.status).toBe(200)
+    expect(revalidated.headers.get('x-version')).toBe('revalidated')
+    expect(revalidated.raw.headers.get('x-version')).toBe('revalidated')
+    expect(
+      new Headers(fetchMock.mock.calls[1]?.[1]?.headers).get('if-none-match')
+    ).toBe('"version-1"')
+
+    vi.advanceTimersByTime(9999)
+    await expect(request.get('/etag', config)).resolves.toEqual({
+      version: 1
+    })
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('should revalidate no-cache responses with Last-Modified every time', async () => {
+    const lastModified = 'Tue, 25 Aug 2026 00:00:00 GMT'
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(new Response('{"version":1}', {
+        headers: {
+          'cache-control': 'no-cache',
+          'content-type': 'application/json',
+          'last-modified': lastModified
+        }
+      }))
+      .mockResolvedValue(new Response(null, {
+        status: 304,
+        headers: {
+          'cache-control': 'no-cache',
+          'last-modified': lastModified
+        }
+      }))
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient().use(cachePlugin())
+    const config = {
+      extensions: {
+        cache: {
+          enabled: true,
+          ttl: 10000
+        }
+      }
+    }
+
+    await request.get('/last-modified', config)
+    await request.get('/last-modified', config)
+    await expect(request.get('/last-modified', config)).resolves.toEqual({
+      version: 1
+    })
+
+    expect(fetchMock).toHaveBeenCalledTimes(3)
+    expect(
+      new Headers(fetchMock.mock.calls[1]?.[1]?.headers)
+        .get('if-modified-since')
+    ).toBe(lastModified)
+  })
+
+  it('should replace a stale validator entry when the entity changed', async () => {
+    vi.useFakeTimers()
+
+    const createResponse = (version: number) => {
+      return new Response(JSON.stringify({ version }), {
+        headers: {
+          'cache-control': 'max-age=1',
+          'content-type': 'application/json',
+          etag: `"version-${version}"`
+        }
+      })
+    }
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(createResponse(1))
+      .mockResolvedValueOnce(createResponse(2))
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient().use(cachePlugin())
+    const config = {
+      extensions: {
+        cache: {
+          enabled: true,
+          ttl: 10000
+        }
+      }
+    }
+
+    await request.get('/changed', config)
+    vi.advanceTimersByTime(1000)
+    await expect(request.get('/changed', config)).resolves.toEqual({
+      version: 2
+    })
+    await expect(request.get('/changed', config)).resolves.toEqual({
+      version: 2
+    })
+
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('should not override application conditional request headers', async () => {
+    vi.useFakeTimers()
+
+    const fetchMock = vi.fn().mockImplementation(() => {
+      return Promise.resolve(new Response('{"ok":true}', {
+        headers: {
+          'cache-control': 'max-age=1',
+          'content-type': 'application/json',
+          etag: '"stored"'
+        }
+      }))
+    })
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient().use(cachePlugin())
+    const extensions = {
+      cache: {
+        enabled: true,
+        key: 'user-condition',
+        ttl: 10000
+      }
+    }
+
+    await request.get('/user-condition', { extensions })
+    vi.advanceTimersByTime(1000)
+    await request.get('/user-condition', {
+      extensions,
+      headers: {
+        'if-none-match': '"application"'
+      }
+    })
+
+    expect(
+      new Headers(fetchMock.mock.calls[1]?.[1]?.headers).get('if-none-match')
+    ).toBe('"application"')
+  })
+
+  it.each([
+    'no-cache',
+    'max-age=0'
+  ])('should force ETag revalidation for request Cache-Control: %s', async directive => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(new Response('{"version":1}', {
+        headers: {
+          'cache-control': 'max-age=60',
+          'content-type': 'application/json',
+          etag: '"version-1"'
+        }
+      }))
+      .mockResolvedValueOnce(new Response(null, {
+        status: 304,
+        headers: {
+          'cache-control': 'max-age=60',
+          etag: '"version-1"'
+        }
+      }))
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient().use(cachePlugin())
+    const extensions = {
+      cache: {
+        enabled: true,
+        ttl: 60000
+      }
+    }
+
+    await request.get('/request-revalidation', { extensions })
+    await expect(request.get('/request-revalidation', {
+      extensions,
+      headers: {
+        'cache-control': directive
+      }
+    })).resolves.toEqual({ version: 1 })
+
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    expect(
+      new Headers(fetchMock.mock.calls[1]?.[1]?.headers).get('if-none-match')
+    ).toBe('"version-1"')
+  })
+
+  it('should support Pragma no-cache when Cache-Control is absent', async () => {
+    const lastModified = 'Tue, 25 Aug 2026 00:00:00 GMT'
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(new Response('{"version":1}', {
+        headers: {
+          'cache-control': 'max-age=60',
+          'content-type': 'application/json',
+          'last-modified': lastModified
+        }
+      }))
+      .mockResolvedValueOnce(new Response(null, {
+        status: 304,
+        headers: {
+          'cache-control': 'max-age=60',
+          'last-modified': lastModified
+        }
+      }))
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient().use(cachePlugin())
+    const extensions = {
+      cache: {
+        enabled: true,
+        ttl: 60000
+      }
+    }
+
+    await request.get('/pragma-revalidation', { extensions })
+    await request.get('/pragma-revalidation', {
+      extensions,
+      headers: {
+        pragma: 'no-cache'
+      }
+    })
+
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    expect(
+      new Headers(fetchMock.mock.calls[1]?.[1]?.headers)
+        .get('if-modified-since')
+    ).toBe(lastModified)
+  })
+
+  it('should bypass cache reads, writes and dedupe for request no-store', async () => {
+    const createResponse = (version: number) => {
+      return new Response(JSON.stringify({ version }), {
+        headers: {
+          'cache-control': 'max-age=60',
+          'content-type': 'application/json'
+        }
+      })
+    }
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(createResponse(1))
+      .mockResolvedValueOnce(createResponse(2))
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient().use(cachePlugin())
+    const extensions = {
+      cache: {
+        enabled: true,
+        ttl: 60000
+      }
+    }
+
+    await request.get('/request-no-store', { extensions })
+    await expect(request.get('/request-no-store', {
+      extensions,
+      headers: {
+        'cache-control': 'no-store'
+      }
+    })).resolves.toEqual({ version: 2 })
+    await expect(request.get('/request-no-store', { extensions }))
+      .resolves.toEqual({ version: 1 })
+
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('should replace a fresh entry when forced revalidation has no validator', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(new Response('{"version":1}', {
+        headers: {
+          'cache-control': 'max-age=60',
+          'content-type': 'application/json'
+        }
+      }))
+      .mockResolvedValueOnce(new Response('{"version":2}', {
+        headers: {
+          'cache-control': 'max-age=60',
+          'content-type': 'application/json'
+        }
+      }))
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient().use(cachePlugin())
+    const extensions = {
+      cache: {
+        enabled: true,
+        ttl: 60000
+      }
+    }
+
+    await request.get('/forced-refresh', { extensions })
+    await expect(request.get('/forced-refresh', {
+      extensions,
+      headers: {
+        'cache-control': 'no-cache'
+      }
+    })).resolves.toEqual({ version: 2 })
+    await expect(request.get('/forced-refresh', { extensions }))
+      .resolves.toEqual({ version: 2 })
+
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it.each([
+    'Cache-Control',
+    'Pragma'
+  ])('should not persist responses varying on request control header %s', async vary => {
+    const fetchMock = vi.fn().mockImplementation(() => {
+      return Promise.resolve(new Response('{"ok":true}', {
+        headers: {
+          'cache-control': 'max-age=60',
+          'content-type': 'application/json',
+          vary
+        }
+      }))
+    })
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient().use(cachePlugin())
+    const config = {
+      extensions: {
+        cache: {
+          enabled: true,
+          ttl: 60000
+        }
+      }
+    }
+
+    await request.get('/vary-request-control', config)
+    await request.get('/vary-request-control', config)
+
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('should serve stale on a network error within the response window', async () => {
+    vi.useFakeTimers()
+
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(new Response('{"version":1}', {
+        headers: {
+          'cache-control': 'max-age=1, stale-if-error=5',
+          'content-type': 'application/json'
+        }
+      }))
+      .mockRejectedValueOnce(new Error('offline'))
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient().use(cachePlugin())
+    const config = {
+      extensions: {
+        cache: {
+          enabled: true,
+          ttl: 10000
+        }
+      }
+    }
+
+    await request.get('/stale-network', config)
+    vi.advanceTimersByTime(1000)
+
+    await expect(request.get('/stale-network', config)).resolves.toEqual({
+      version: 1
+    })
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('should allow an application stale-if-error window without a directive', async () => {
+    vi.useFakeTimers()
+
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(new Response('{"version":1}', {
+        headers: {
+          'cache-control': 'max-age=1',
+          'content-type': 'application/json'
+        }
+      }))
+      .mockRejectedValueOnce(new Error('offline'))
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient().use(cachePlugin())
+    const config = {
+      extensions: {
+        cache: {
+          enabled: true,
+          staleIfError: 5000,
+          ttl: 10000
+        }
+      }
+    }
+
+    await request.get('/configured-stale', config)
+    vi.advanceTimersByTime(1000)
+
+    await expect(request.get('/configured-stale', config)).resolves.toEqual({
+      version: 1
+    })
+  })
+
+  it('should cap the response stale window with the application limit', async () => {
+    vi.useFakeTimers()
+
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(new Response('{"version":1}', {
+        headers: {
+          'cache-control': 'max-age=1, stale-if-error=60',
+          'content-type': 'application/json'
+        }
+      }))
+      .mockRejectedValueOnce(new Error('offline'))
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient().use(cachePlugin())
+    const config = {
+      extensions: {
+        cache: {
+          enabled: true,
+          staleIfError: 1000,
+          ttl: 10000
+        }
+      }
+    }
+
+    await request.get('/capped-stale', config)
+    vi.advanceTimersByTime(2000)
+
+    await expect(request.get('/capped-stale', config))
+      .rejects.toMatchObject({ code: 'NETWORK_ERROR' })
+  })
+
+  it.each([
+    'stale-if-error=invalid',
+    'stale-if-error=5, stale-if-error=10'
+  ])('should reject unsafe stale fallback directive %s', async cacheControl => {
+    vi.useFakeTimers()
+
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(new Response('{"version":1}', {
+        headers: {
+          'cache-control': `max-age=1, ${cacheControl}`,
+          'content-type': 'application/json'
+        }
+      }))
+      .mockRejectedValueOnce(new Error('offline'))
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient().use(cachePlugin())
+    const config = {
+      extensions: {
+        cache: {
+          enabled: true,
+          ttl: 10000
+        }
+      }
+    }
+
+    await request.get('/unsafe-stale-directive', config)
+    vi.advanceTimersByTime(1000)
+
+    await expect(request.get('/unsafe-stale-directive', config))
+      .rejects.toMatchObject({ code: 'NETWORK_ERROR' })
+  })
+
+  it('should use stale only after configured retries are exhausted', async () => {
+    vi.useFakeTimers()
+
+    const unavailable = () => new Response('Unavailable', { status: 503 })
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(new Response('{"version":1}', {
+        headers: {
+          'cache-control': 'max-age=1, stale-if-error=5',
+          'content-type': 'application/json'
+        }
+      }))
+      .mockResolvedValueOnce(unavailable())
+      .mockResolvedValueOnce(unavailable())
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient()
+      .use(cachePlugin())
+      .use(retryPlugin({ retries: 1, delay: 0 }))
+    const config = {
+      extensions: {
+        cache: {
+          enabled: true,
+          ttl: 10000
+        }
+      }
+    }
+
+    await request.get('/retry-stale', config)
+    vi.advanceTimersByTime(1000)
+
+    await expect(request.get('/retry-stale', config)).resolves.toEqual({
+      version: 1
+    })
+    expect(fetchMock).toHaveBeenCalledTimes(3)
+  })
+
+  it('should not use stale for parser, non-5xx HTTP or abort errors', async () => {
+    vi.useFakeTimers()
+
+    const responses = [
+      new Response('not-json', {
+        headers: { 'content-type': 'application/json' }
+      }),
+      new Response('Missing', { status: 404 })
+    ]
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(new Response('{"version":1}', {
+        headers: {
+          'cache-control': 'max-age=1, stale-if-error=60',
+          'content-type': 'application/json',
+          etag: '"strict"'
+        }
+      }))
+      .mockImplementation(() => Promise.resolve(responses.shift()!))
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient().use(cachePlugin())
+    const config = {
+      extensions: {
+        cache: {
+          enabled: true,
+          ttl: 10000
+        }
+      }
+    }
+
+    await request.get('/strict-stale', config)
+    vi.advanceTimersByTime(1000)
+
+    await expect(request.get('/strict-stale', config))
+      .rejects.toMatchObject({ code: 'PARSER_ERROR' })
+    await expect(request.get('/strict-stale', config))
+      .rejects.toMatchObject({ code: 'HTTP_ERROR', status: 404 })
+
+    const controller = new AbortController()
+
+    controller.abort('cancelled')
+    await expect(request.get('/strict-stale', {
+      ...config,
+      signal: controller.signal
+    })).rejects.toMatchObject({ code: 'ABORT_ERROR' })
+    expect(fetchMock).toHaveBeenCalledTimes(3)
+  })
+
+  it('should validate staleIfError before reading or sending', async () => {
+    const store = new MemoryCacheStore()
+    const read = vi.spyOn(store, 'get')
+    const fetchMock = vi.fn()
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient().use(cachePlugin({ store }))
+
+    await expect(request.get('/invalid-stale-window', {
+      extensions: {
+        cache: {
+          enabled: true,
+          staleIfError: -1
+        }
+      }
+    })).rejects.toMatchObject({ code: 'CONFIG_ERROR' })
+    expect(read).not.toHaveBeenCalled()
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('should not share a leader stale fallback with waiting requests', async () => {
+    vi.useFakeTimers()
+
+    let rejectFailure!: (error: unknown) => void
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(new Response('{"version":1}', {
+        headers: {
+          'cache-control': 'max-age=1, stale-if-error=5',
+          'content-type': 'application/json'
+        }
+      }))
+      .mockImplementationOnce(() => {
+        return new Promise<Response>((_resolve, reject) => {
+          rejectFailure = reject
+        })
+      })
+      .mockResolvedValueOnce(new Response('{"version":2}', {
+        headers: {
+          'cache-control': 'max-age=60',
+          'content-type': 'application/json'
+        }
+      }))
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient().use(cachePlugin())
+    const config = {
+      extensions: {
+        cache: {
+          enabled: true,
+          ttl: 10000
+        }
+      }
+    }
+
+    await request.get('/stale-leader', config)
+    vi.advanceTimersByTime(1000)
+
+    const leader = request.get('/stale-leader', config)
+
+    await vi.waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledTimes(2)
+    })
+
+    const follower = request.get('/stale-leader', config)
+
+    rejectFailure(new Error('offline'))
+
+    await expect(leader).resolves.toEqual({ version: 1 })
+    await expect(follower).resolves.toEqual({ version: 2 })
+    expect(fetchMock).toHaveBeenCalledTimes(3)
+  })
+
+  it('should return stale immediately and refresh in the background', async () => {
+    vi.useFakeTimers()
+
+    let resolveRefresh!: (response: Response) => void
+    const store = new MemoryCacheStore()
+    const write = vi.spyOn(store, 'set')
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(new Response('{"version":1}', {
+        headers: {
+          'cache-control': 'max-age=0, stale-while-revalidate=5',
+          'content-type': 'application/json'
+        }
+      }))
+      .mockImplementationOnce(() => {
+        return new Promise<Response>(resolve => {
+          resolveRefresh = resolve
+        })
+      })
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient().use(cachePlugin({ store }))
+    const config = {
+      extensions: {
+        cache: {
+          enabled: true,
+          ttl: 10000
+        }
+      }
+    }
+
+    await request.get('/swr', config)
+    await expect(request.get('/swr', config)).resolves.toEqual({
+      version: 1
+    })
+
+    await vi.waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledTimes(2)
+    })
+
+    await expect(request.get('/swr', config)).resolves.toEqual({
+      version: 1
+    })
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+
+    resolveRefresh(new Response('{"version":2}', {
+      headers: {
+        'cache-control': 'max-age=60',
+        'content-type': 'application/json'
+      }
+    }))
+
+    await vi.waitFor(() => {
+      expect(write).toHaveBeenCalledTimes(2)
+    })
+    await expect(request.get('/swr', config)).resolves.toEqual({
+      version: 2
+    })
+  })
+
+  it('should support and cap an application stale-while-revalidate window', async () => {
+    vi.useFakeTimers()
+
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(new Response('{"version":1}', {
+        headers: {
+          'cache-control': 'max-age=1, stale-while-revalidate=60',
+          'content-type': 'application/json'
+        }
+      }))
+      .mockResolvedValueOnce(new Response('{"version":2}', {
+        headers: {
+          'cache-control': 'max-age=60',
+          'content-type': 'application/json'
+        }
+      }))
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient().use(cachePlugin())
+    const config = {
+      extensions: {
+        cache: {
+          enabled: true,
+          staleWhileRevalidate: 1000,
+          ttl: 10000
+        }
+      }
+    }
+
+    await request.get('/capped-swr', config)
+    vi.advanceTimersByTime(2000)
+
+    await expect(request.get('/capped-swr', config)).resolves.toEqual({
+      version: 2
+    })
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('should enable stale-while-revalidate from application config', async () => {
+    vi.useFakeTimers()
+
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(new Response('{"version":1}', {
+        headers: {
+          'cache-control': 'max-age=1',
+          'content-type': 'application/json'
+        }
+      }))
+      .mockResolvedValueOnce(new Response('{"version":2}', {
+        headers: {
+          'cache-control': 'max-age=60',
+          'content-type': 'application/json'
+        }
+      }))
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient().use(cachePlugin())
+    const config = {
+      extensions: {
+        cache: {
+          enabled: true,
+          staleWhileRevalidate: 5000,
+          ttl: 10000
+        }
+      }
+    }
+
+    await request.get('/configured-swr', config)
+    vi.advanceTimersByTime(1000)
+    await expect(request.get('/configured-swr', config)).resolves.toEqual({
+      version: 1
+    })
+
+    await vi.waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledTimes(2)
+    })
+  })
+
+  it('should not use stale-while-revalidate for forced or must-revalidate requests', async () => {
+    vi.useFakeTimers()
+
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(new Response('{"version":1}', {
+        headers: {
+          'cache-control': 'max-age=1, stale-while-revalidate=60',
+          'content-type': 'application/json'
+        }
+      }))
+      .mockResolvedValueOnce(new Response('{"version":2}', {
+        headers: {
+          'cache-control': 'max-age=1, must-revalidate',
+          'content-type': 'application/json'
+        }
+      }))
+      .mockResolvedValueOnce(new Response('{"version":3}', {
+        headers: {
+          'cache-control': 'max-age=60',
+          'content-type': 'application/json'
+        }
+      }))
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient().use(cachePlugin())
+    const extensions = {
+      cache: {
+        enabled: true,
+        staleWhileRevalidate: 60000,
+        ttl: 10000
+      }
+    }
+
+    await request.get('/strict-swr', { extensions })
+    vi.advanceTimersByTime(1000)
+    await expect(request.get('/strict-swr', {
+      extensions,
+      headers: {
+        'cache-control': 'no-cache'
+      }
+    })).resolves.toEqual({ version: 2 })
+
+    vi.advanceTimersByTime(1000)
+    await expect(request.get('/strict-swr', { extensions })).resolves.toEqual({
+      version: 3
+    })
+    expect(fetchMock).toHaveBeenCalledTimes(3)
+  })
+
+  it.each([
+    'stale-while-revalidate=invalid',
+    'stale-while-revalidate=5, stale-while-revalidate=10'
+  ])('should reject unsafe stale-while-revalidate directive %s', async cacheControl => {
+    vi.useFakeTimers()
+
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(new Response('{"version":1}', {
+        headers: {
+          'cache-control': `max-age=1, ${cacheControl}`,
+          'content-type': 'application/json'
+        }
+      }))
+      .mockResolvedValueOnce(new Response('{"version":2}', {
+        headers: {
+          'cache-control': 'max-age=60',
+          'content-type': 'application/json'
+        }
+      }))
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient().use(cachePlugin())
+    const config = {
+      extensions: {
+        cache: {
+          enabled: true,
+          ttl: 10000
+        }
+      }
+    }
+
+    await request.get('/unsafe-swr', config)
+    vi.advanceTimersByTime(1000)
+    await expect(request.get('/unsafe-swr', config)).resolves.toEqual({
+      version: 2
+    })
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('should run each background refresh through request interceptors once', async () => {
+    vi.useFakeTimers()
+
+    const observedHeaders: string[] = []
+    const fetchMock = vi
+      .fn()
+      .mockImplementationOnce((_url, init) => {
+        observedHeaders.push(new Headers(init?.headers).get('x-pass') ?? '')
+        return Promise.resolve(new Response('{"version":1}', {
+          headers: {
+            'cache-control': 'max-age=0, stale-while-revalidate=5',
+            'content-type': 'application/json'
+          }
+        }))
+      })
+      .mockImplementationOnce((_url, init) => {
+        observedHeaders.push(new Headers(init?.headers).get('x-pass') ?? '')
+        return Promise.resolve(new Response('{"version":2}', {
+          headers: {
+            'cache-control': 'max-age=60',
+            'content-type': 'application/json'
+          }
+        }))
+      })
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient().use(cachePlugin())
+
+    request.interceptors.request.use(config => {
+      const headers = new Headers(config.headers)
+      const previous = Number(headers.get('x-pass') ?? 0)
+
+      headers.set('x-pass', String(previous + 1))
+      return { ...config, headers }
+    })
+
+    const config = {
+      extensions: {
+        cache: {
+          enabled: true,
+          ttl: 10000
+        }
+      }
+    }
+
+    await request.get('/intercepted-swr', config)
+    await request.get('/intercepted-swr', config)
+
+    await vi.waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledTimes(2)
+    })
+    expect(observedHeaders).toEqual(['1', '1'])
+  })
+
+  it('should use the owning custom adapter for background refresh', async () => {
+    let calls = 0
+    const adapter: Adapter = {
+      async request(config) {
+        calls += 1
+        const headers = new Headers({
+          'cache-control': calls === 1
+            ? 'max-age=0, stale-while-revalidate=5'
+            : 'max-age=60',
+          'content-type': 'application/json'
+        })
+
+        return {
+          data: { version: calls },
+          status: 200,
+          statusText: 'OK',
+          headers,
+          config,
+          raw: new Response(JSON.stringify({ version: calls }), { headers })
+        }
+      }
+    }
+    const request = createClient({ adapter }).use(cachePlugin())
+    const config = {
+      extensions: {
+        cache: {
+          enabled: true,
+          ttl: 10000
+        }
+      }
+    }
+
+    await request.get('/custom-adapter-swr', config)
+    await expect(request.get('/custom-adapter-swr', config)).resolves.toEqual({
+      version: 1
+    })
+
+    await vi.waitFor(() => {
+      expect(calls).toBe(2)
+    })
+    await expect(request.get('/custom-adapter-swr', config)).resolves.toEqual({
+      version: 2
+    })
+  })
+
+  it.each([
+    'clear',
+    'remove'
+  ])('should abort background refresh when cache is %s', async action => {
+    let refreshSignal: AbortSignal | undefined
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(new Response('{"version":1}', {
+        headers: {
+          'cache-control': 'max-age=0, stale-while-revalidate=5',
+          'content-type': 'application/json'
+        }
+      }))
+      .mockImplementationOnce((_url, init) => {
+        refreshSignal = init?.signal ?? undefined
+
+        return new Promise<Response>((_resolve, reject) => {
+          refreshSignal?.addEventListener('abort', () => {
+            reject(refreshSignal?.reason)
+          }, { once: true })
+        })
+      })
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const cache = cachePlugin()
+    const request = createClient().use(cache)
+    const config = {
+      extensions: {
+        cache: {
+          enabled: true,
+          ttl: 10000
+        }
+      }
+    }
+
+    await request.get('/abort-swr', config)
+    await request.get('/abort-swr', config)
+
+    await vi.waitFor(() => {
+      expect(refreshSignal).toBeDefined()
+    })
+
+    if (action === 'clear') {
+      await cache.clear()
+    } else {
+      request.unuse('cache')
+    }
+
+    expect(refreshSignal?.aborted).toBe(true)
+  })
+
+  it('should validate staleWhileRevalidate before cache reads', async () => {
+    const store = new MemoryCacheStore()
+    const read = vi.spyOn(store, 'get')
+    const fetchMock = vi.fn()
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient().use(cachePlugin({ store }))
+
+    await expect(request.get('/invalid-swr-window', {
+      extensions: {
+        cache: {
+          enabled: true,
+          staleWhileRevalidate: Number.NaN
+        }
+      }
+    })).rejects.toMatchObject({ code: 'CONFIG_ERROR' })
+    expect(read).not.toHaveBeenCalled()
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('should cap configured ttl with response max-age and Age', async () => {
+    vi.useFakeTimers()
+
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(new Response('{"version":1}', {
+        headers: {
+          age: '1',
+          'cache-control': 'public, MAX-AGE="3"',
+          'content-type': 'application/json'
+        }
+      }))
+      .mockResolvedValueOnce(createJsonResponse({ version: 2 }))
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient().use(cachePlugin())
+    const config = {
+      extensions: {
+        cache: {
+          enabled: true,
+          ttl: 10000
+        }
+      }
+    }
+
+    await expect(request.get('/max-age', config)).resolves.toEqual({
+      version: 1
+    })
+
+    vi.advanceTimersByTime(1999)
+
+    await expect(request.get('/max-age', config)).resolves.toEqual({
+      version: 1
+    })
+
+    vi.advanceTimersByTime(1)
+
+    await expect(request.get('/max-age', config)).resolves.toEqual({
+      version: 2
+    })
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('should not let max-age extend the configured ttl', async () => {
+    vi.useFakeTimers()
+
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(new Response('{"version":1}', {
+        headers: {
+          'cache-control': 'max-age=60',
+          'content-type': 'application/json'
+        }
+      }))
+      .mockResolvedValueOnce(createJsonResponse({ version: 2 }))
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient().use(cachePlugin())
+    const config = {
+      extensions: {
+        cache: {
+          enabled: true,
+          ttl: 100
+        }
+      }
+    }
+
+    await request.get('/local-cap', config)
+    vi.advanceTimersByTime(100)
+    await expect(request.get('/local-cap', config)).resolves.toEqual({
+      version: 2
+    })
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it.each([
+    'max-age=invalid',
+    'max-age=10, max-age=20'
+  ])('should not persist ambiguous cache freshness %s', async cacheControl => {
+    const fetchMock = vi.fn().mockImplementation(() => {
+      return Promise.resolve(new Response('{"ok":true}', {
+        headers: {
+          'cache-control': cacheControl,
+          'content-type': 'application/json'
+        }
+      }))
+    })
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient().use(cachePlugin())
+    const config = {
+      extensions: {
+        cache: {
+          enabled: true,
+          ttl: Infinity
+        }
+      }
+    }
+
+    await request.get('/ambiguous-freshness', config)
+    await request.get('/ambiguous-freshness', config)
+
     expect(fetchMock).toHaveBeenCalledTimes(2)
   })
 
@@ -1330,6 +2716,778 @@ describe('cachePlugin', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2)
   })
 
+  it('should delete only the matching cache entry', async () => {
+    const events: string[] = []
+    const fetchMock = vi
+      .fn()
+      .mockImplementationOnce(() => Promise.resolve(
+        createJsonResponse({ resource: 'first', version: 1 })
+      ))
+      .mockImplementationOnce(() => Promise.resolve(
+        createJsonResponse({ resource: 'second', version: 1 })
+      ))
+      .mockImplementationOnce(() => Promise.resolve(
+        createJsonResponse({ resource: 'first', version: 2 })
+      ))
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const cache = cachePlugin({
+      onEvent(event) {
+        events.push(event.type)
+      }
+    })
+    const request = createClient().use(cache)
+    const first = {
+      url: '/delete-first',
+      extensions: {
+        cache: {
+          enabled: true,
+          ttl: Infinity
+        }
+      }
+    }
+    const second = {
+      url: '/delete-second',
+      extensions: first.extensions
+    }
+
+    await request.get(first.url, first)
+    await request.get(second.url, second)
+    await cache.delete(first)
+
+    await expect(request.get(second.url, second)).resolves.toEqual({
+      resource: 'second',
+      version: 1
+    })
+    await expect(request.get(first.url, first)).resolves.toEqual({
+      resource: 'first',
+      version: 2
+    })
+    expect(fetchMock).toHaveBeenCalledTimes(3)
+    expect(cache.getStats().invalidations).toBe(1)
+    expect(events).toContain('invalidated')
+  })
+
+  it('should invalidate a custom key independently of the URL', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockImplementationOnce(() => Promise.resolve(
+        createJsonResponse({ version: 1 })
+      ))
+      .mockImplementationOnce(() => Promise.resolve(
+        createJsonResponse({ version: 2 })
+      ))
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const cache = cachePlugin()
+    const request = createClient().use(cache)
+    const cacheOptions = {
+      enabled: true,
+      key: 'current-user',
+      ttl: Infinity
+    }
+
+    await request.get('/profile', {
+      extensions: { cache: cacheOptions }
+    })
+    await cache.delete({
+      url: '/different-url',
+      extensions: {
+        cache: { key: 'current-user' }
+      }
+    })
+
+    await expect(request.get('/profile', {
+      extensions: { cache: cacheOptions }
+    })).resolves.toEqual({ version: 2 })
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('should prevent an invalidated in-flight response from repopulating', async () => {
+    const targetResolvers: Array<(response: Response) => void> = []
+    let resolveOther!: (response: Response) => void
+    const fetchMock = vi.fn((url: string | URL | Request) => {
+      if (String(url).endsWith('/unrelated-flight')) {
+        return new Promise<Response>(resolve => {
+          resolveOther = resolve
+        })
+      }
+
+      return new Promise<Response>(resolve => {
+        targetResolvers.push(resolve)
+      })
+    })
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const cache = cachePlugin()
+    const request = createClient().use(cache)
+    const extensions = {
+      cache: {
+        enabled: true,
+        ttl: Infinity
+      }
+    }
+    const targetConfig = {
+      url: '/target-flight',
+      extensions
+    }
+    const oldTarget = request.get(targetConfig.url, targetConfig)
+    const otherLeader = request.get('/unrelated-flight', { extensions })
+
+    await vi.waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledTimes(2)
+    })
+
+    await cache.delete(targetConfig)
+
+    const currentTarget = request.get(targetConfig.url, targetConfig)
+    const otherFollower = request.get('/unrelated-flight', { extensions })
+
+    await vi.waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledTimes(3)
+    })
+
+    targetResolvers[1]?.(createJsonResponse({ generation: 'current' }))
+    await expect(currentTarget).resolves.toEqual({ generation: 'current' })
+
+    targetResolvers[0]?.(createJsonResponse({ generation: 'old' }))
+    resolveOther(createJsonResponse({ generation: 'unrelated' }))
+
+    await expect(oldTarget).resolves.toEqual({ generation: 'old' })
+    await expect(Promise.all([otherLeader, otherFollower])).resolves.toEqual([
+      { generation: 'unrelated' },
+      { generation: 'unrelated' }
+    ])
+    await expect(
+      request.get(targetConfig.url, targetConfig)
+    ).resolves.toEqual({
+      generation: 'current'
+    })
+    expect(fetchMock).toHaveBeenCalledTimes(3)
+  })
+
+  it('should wait for an asynchronous targeted deletion before reading', async () => {
+    let finishDeletion!: () => void
+    const store: CacheStore = {
+      get: vi.fn(() => undefined),
+      set() {},
+      delete: vi.fn(() => new Promise<void>(resolve => {
+        finishDeletion = resolve
+      })),
+      clear() {}
+    }
+    const fetchMock = vi.fn(() => Promise.resolve(
+      createJsonResponse({ source: 'network' })
+    ))
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const cache = cachePlugin({ store })
+    const request = createClient().use(cache)
+    const config = {
+      url: '/async-delete',
+      extensions: {
+        cache: {
+          enabled: true
+        }
+      }
+    }
+    const deletion = cache.delete(config)
+    const pending = request.get(config.url, config)
+
+    await Promise.resolve()
+    expect(store.get).not.toHaveBeenCalled()
+    expect(fetchMock).not.toHaveBeenCalled()
+
+    finishDeletion()
+    await deletion
+
+    await expect(pending).resolves.toEqual({ source: 'network' })
+    expect(store.get).toHaveBeenCalledTimes(1)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('should serialize repeated asynchronous deletions for one key', async () => {
+    const resolvers: Array<() => void> = []
+    const store: CacheStore = {
+      get() {
+        return undefined
+      },
+      set() {},
+      delete: vi.fn(() => new Promise<void>(resolve => {
+        resolvers.push(resolve)
+      })),
+      clear() {}
+    }
+    const cache = cachePlugin({ store })
+    const config = { url: '/repeated-delete' }
+    const first = cache.delete(config)
+    const second = cache.delete(config)
+
+    expect(store.delete).toHaveBeenCalledTimes(1)
+
+    resolvers[0]?.()
+    await vi.waitFor(() => {
+      expect(store.delete).toHaveBeenCalledTimes(2)
+    })
+
+    resolvers[1]?.()
+    await expect(Promise.all([first, second])).resolves.toEqual([
+      undefined,
+      undefined
+    ])
+    expect(cache.getStats().invalidations).toBe(2)
+  })
+
+  it('should seed a tagged cache entry without a network request', async () => {
+    const fetchMock = vi.fn()
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const cache = cachePlugin()
+    const request = createClient().use(cache)
+    const config = {
+      url: '/seeded-entry',
+      extensions: {
+        cache: {
+          enabled: true,
+          ttl: Infinity
+        }
+      }
+    }
+
+    await cache.set(config, { version: 1 }, {
+      ttl: Infinity,
+      tags: ['seeded']
+    })
+
+    await expect(request.get(config.url, config)).resolves.toEqual({
+      version: 1
+    })
+    expect(fetchMock).not.toHaveBeenCalled()
+    expect(cache.invalidateTags('seeded')).toBe(1)
+  })
+
+  it('should update and delete parsed cache values', async () => {
+    const cache = cachePlugin()
+    const request = createClient().use(cache)
+    const config = {
+      url: '/updated-entry',
+      extensions: {
+        cache: {
+          enabled: true,
+          ttl: Infinity
+        }
+      }
+    }
+
+    await cache.set(config, { count: 1 }, { ttl: Infinity })
+    expect(await cache.update<{ count: number }>(config, value => ({
+      count: value.count + 1
+    }))).toBe(true)
+    await expect(request.get(config.url, config)).resolves.toEqual({
+      count: 2
+    })
+    expect(await cache.update(config, () => undefined)).toBe(true)
+    expect(await cache.update(config, value => value)).toBe(false)
+  })
+
+  it('should prevent an older response from overwriting a seeded value', async () => {
+    let resolveFetch!: (response: Response) => void
+    const fetchMock = vi.fn(() => new Promise<Response>(resolve => {
+      resolveFetch = resolve
+    }))
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const cache = cachePlugin()
+    const request = createClient().use(cache)
+    const config = {
+      url: '/seed-during-flight',
+      extensions: {
+        cache: {
+          enabled: true,
+          ttl: Infinity
+        }
+      }
+    }
+    const oldRequest = request.get(config.url, config)
+
+    await vi.waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledTimes(1)
+    })
+    await cache.set(config, { source: 'seed' }, { ttl: Infinity })
+    resolveFetch(createJsonResponse({ source: 'old-network' }))
+
+    await expect(oldRequest).resolves.toEqual({ source: 'old-network' })
+    await expect(request.get(config.url, config)).resolves.toEqual({
+      source: 'seed'
+    })
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('should serialize manual writes and cache reads for one key', async () => {
+    let finishWrite!: () => void
+    let entry: CacheEntry | undefined
+    const store: CacheStore = {
+      get: vi.fn(() => entry),
+      set: vi.fn((_key, value) => new Promise<void>(resolve => {
+        finishWrite = () => {
+          entry = value
+          resolve()
+        }
+      })),
+      delete() {},
+      clear() {}
+    }
+    const fetchMock = vi.fn()
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const cache = cachePlugin({ store })
+    const request = createClient().use(cache)
+    const config = {
+      url: '/pending-seed',
+      extensions: {
+        cache: { enabled: true, ttl: Infinity }
+      }
+    }
+    const write = cache.set(config, { ready: true }, { ttl: Infinity })
+    const read = request.get(config.url, config)
+
+    await Promise.resolve()
+    expect(store.get).not.toHaveBeenCalled()
+
+    finishWrite()
+    await write
+    await expect(read).resolves.toEqual({ ready: true })
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('should order tag invalidation after a pending manual write', async () => {
+    let finishWrite!: () => void
+    let entry: CacheEntry | undefined
+    const invalidateTags = vi.fn((tags: readonly string[]) => {
+      if (entry?.tags?.some(tag => tags.includes(tag))) {
+        entry = undefined
+        return 1
+      }
+
+      return 0
+    })
+    const store: CacheStore = {
+      get() {
+        return entry
+      },
+      set(_key, value) {
+        return new Promise<void>(resolve => {
+          finishWrite = () => {
+            entry = value
+            resolve()
+          }
+        })
+      },
+      delete() {},
+      invalidateTags,
+      clear() {}
+    }
+    const cache = cachePlugin({ store })
+    const config = { url: '/write-before-tag-invalidation' }
+    const write = cache.set(config, { ready: true }, {
+      ttl: Infinity,
+      tags: ['pending-write']
+    })
+    const invalidation = cache.invalidateTags('pending-write')
+
+    expect(invalidateTags).not.toHaveBeenCalled()
+    finishWrite()
+
+    await write
+    await expect(invalidation).resolves.toBe(1)
+    expect(entry).toBeUndefined()
+  })
+
+  it('should invalidate memory cache entries carrying any matching tag', async () => {
+    const counts = new Map<string, number>()
+    const fetchMock = vi.fn((url: string | URL | Request) => {
+      const key = String(url)
+      const count = (counts.get(key) ?? 0) + 1
+
+      counts.set(key, count)
+      return Promise.resolve(createJsonResponse({ count }))
+    })
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const cache = cachePlugin()
+    const request = createClient().use(cache)
+    const config = (tags: readonly string[]) => ({
+      extensions: {
+        cache: {
+          enabled: true,
+          tags,
+          ttl: Infinity
+        }
+      }
+    })
+
+    await request.get('/tagged-user', config(['user:1']))
+    await request.get('/tagged-list', config(['users', 'user:1']))
+    await request.get('/tagged-other', config(['user:2']))
+
+    expect(cache.invalidateTags('user:1')).toBe(2)
+
+    await expect(
+      request.get('/tagged-user', config(['user:1']))
+    ).resolves.toEqual({ count: 2 })
+    await expect(
+      request.get('/tagged-list', config(['users', 'user:1']))
+    ).resolves.toEqual({ count: 2 })
+    await expect(
+      request.get('/tagged-other', config(['user:2']))
+    ).resolves.toEqual({ count: 1 })
+    expect(fetchMock).toHaveBeenCalledTimes(5)
+    expect(cache.getStats().invalidations).toBe(1)
+  })
+
+  it('should isolate tagged in-flight work from invalidation', async () => {
+    const resolvers: Array<(response: Response) => void> = []
+    const fetchMock = vi.fn(() => new Promise<Response>(resolve => {
+      resolvers.push(resolve)
+    }))
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const cache = cachePlugin()
+    const request = createClient().use(cache)
+    const config = {
+      extensions: {
+        cache: {
+          enabled: true,
+          tags: ['account:1'],
+          ttl: Infinity
+        }
+      }
+    }
+    const oldRequest = request.get('/tag-flight', config)
+
+    await vi.waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledTimes(1)
+    })
+
+    expect(cache.invalidateTags('account:1')).toBe(0)
+    const currentRequest = request.get('/tag-flight', config)
+
+    await vi.waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledTimes(2)
+    })
+
+    resolvers[1]?.(createJsonResponse({ generation: 'current' }))
+    await expect(currentRequest).resolves.toEqual({ generation: 'current' })
+
+    resolvers[0]?.(createJsonResponse({ generation: 'old' }))
+    await expect(oldRequest).resolves.toEqual({ generation: 'old' })
+    await expect(request.get('/tag-flight', config)).resolves.toEqual({
+      generation: 'current'
+    })
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('should coordinate asynchronous tag invalidation by matching tag', async () => {
+    let finishInvalidation!: (count: number) => void
+    const store: CacheStore = {
+      get: vi.fn(() => undefined),
+      set() {},
+      delete() {},
+      invalidateTags: vi.fn(() => new Promise<number>(resolve => {
+        finishInvalidation = resolve
+      })),
+      clear() {}
+    }
+    const fetchMock = vi.fn(() => Promise.resolve(
+      createJsonResponse({ source: 'network' })
+    ))
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const cache = cachePlugin({ store })
+    const request = createClient().use(cache)
+    const invalidation = cache.invalidateTags('group:pending')
+    const matching = request.get('/matching-tag', {
+      extensions: {
+        cache: {
+          enabled: true,
+          tags: ['group:pending']
+        }
+      }
+    })
+    const unrelated = request.get('/unrelated-tag', {
+      extensions: {
+        cache: {
+          enabled: true,
+          tags: ['group:other']
+        }
+      }
+    })
+
+    await expect(unrelated).resolves.toEqual({ source: 'network' })
+    expect(store.get).toHaveBeenCalledTimes(1)
+
+    finishInvalidation(3)
+    await expect(invalidation).resolves.toBe(3)
+    await expect(matching).resolves.toEqual({ source: 'network' })
+    expect(store.get).toHaveBeenCalledTimes(2)
+  })
+
+  it('should require safe tags and custom-store invalidation support', async () => {
+    const store: CacheStore = {
+      get: vi.fn(() => undefined),
+      set() {},
+      delete() {},
+      clear() {}
+    }
+    const fetchMock = vi.fn()
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const cache = cachePlugin({ store })
+    const request = createClient().use(cache)
+
+    expect(() => cache.invalidateTags([])).toThrow(/at least one tag/)
+    expect(() => cache.invalidateTags('unsupported')).toThrow(
+      /does not support tag invalidation/
+    )
+    await expect(request.get('/invalid-tags', {
+      extensions: {
+        cache: {
+          enabled: true,
+          tags: ['x'.repeat(129)]
+        }
+      }
+    })).rejects.toMatchObject({ code: 'CONFIG_ERROR' })
+    expect(store.get).not.toHaveBeenCalled()
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('should invalidate tags after a successful mutation', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockImplementationOnce(() => Promise.resolve(
+        createJsonResponse({ version: 1 })
+      ))
+      .mockImplementationOnce(() => Promise.resolve(
+        createJsonResponse({ updated: true })
+      ))
+      .mockImplementationOnce(() => Promise.resolve(
+        createJsonResponse({ version: 2 })
+      ))
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const cache = cachePlugin()
+    const request = createClient().use(cache)
+    const readConfig = {
+      extensions: {
+        cache: {
+          enabled: true,
+          tags: ['users'],
+          ttl: Infinity
+        }
+      }
+    }
+
+    await request.get('/automatic-tags', readConfig)
+    await expect(request.post('/automatic-tags', {
+      json: { name: 'updated' },
+      extensions: {
+        cache: {
+          invalidateTags: ['users']
+        }
+      }
+    })).resolves.toEqual({ updated: true })
+    await expect(
+      request.get('/automatic-tags', readConfig)
+    ).resolves.toEqual({ version: 2 })
+    expect(fetchMock).toHaveBeenCalledTimes(3)
+    expect(cache.getStats().invalidations).toBe(1)
+  })
+
+  it('should retain tagged entries after a failed mutation', async () => {
+    const store = new MemoryCacheStore()
+    const invalidate = vi.spyOn(store, 'invalidateTags')
+    const fetchMock = vi
+      .fn()
+      .mockImplementationOnce(() => Promise.resolve(
+        createJsonResponse({ version: 1 })
+      ))
+      .mockResolvedValueOnce(new Response('{"error":true}', {
+        status: 503,
+        headers: {
+          'content-type': 'application/json'
+        }
+      }))
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient().use(cachePlugin({ store }))
+    const readConfig = {
+      extensions: {
+        cache: {
+          enabled: true,
+          tags: ['stable-entry'],
+          ttl: Infinity
+        }
+      }
+    }
+
+    await request.get('/failed-auto-tags', readConfig)
+    await expect(request.patch('/failed-auto-tags', {
+      json: { value: 2 },
+      extensions: {
+        cache: {
+          invalidateTags: ['stable-entry']
+        }
+      }
+    })).rejects.toMatchObject({ code: 'HTTP_ERROR', status: 503 })
+    await expect(
+      request.get('/failed-auto-tags', readConfig)
+    ).resolves.toEqual({ version: 1 })
+    expect(invalidate).not.toHaveBeenCalled()
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('should not auto-invalidate after a response interceptor fails', async () => {
+    const store = new MemoryCacheStore()
+    const invalidate = vi.spyOn(store, 'invalidateTags')
+    const fetchMock = vi.fn(() => Promise.resolve(
+      createJsonResponse({ updated: true })
+    ))
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient().use(cachePlugin({ store }))
+
+    request.interceptors.response.use(() => {
+      throw new Error('application response failure')
+    })
+
+    await expect(request.post('/interceptor-auto-tags', {
+      extensions: {
+        cache: {
+          invalidateTags: ['preserved-entry']
+        }
+      }
+    })).rejects.toThrow('application response failure')
+    expect(invalidate).not.toHaveBeenCalled()
+  })
+
+  it('should invalidate once after a mutation eventually retries successfully', async () => {
+    const store = new MemoryCacheStore()
+    const invalidate = vi.spyOn(store, 'invalidateTags')
+    const fetchMock = vi
+      .fn()
+      .mockRejectedValueOnce(new Error('offline'))
+      .mockImplementationOnce(() => Promise.resolve(
+        createJsonResponse({ updated: true })
+      ))
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient()
+      .use(retryPlugin({
+        retries: 1,
+        delay: 0,
+        methods: ['POST']
+      }))
+      .use(cachePlugin({ store }))
+
+    await expect(request.post('/retry-auto-tags', {
+      json: { value: 2 },
+      extensions: {
+        cache: {
+          invalidateTags: ['retried-entry']
+        }
+      }
+    })).resolves.toEqual({ updated: true })
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    expect(invalidate).toHaveBeenCalledTimes(1)
+  })
+
+  it('should await automatic asynchronous invalidation and preflight support', async () => {
+    let finishInvalidation!: (count: number) => void
+    const invalidateTags = vi.fn(() => new Promise<number>(resolve => {
+      finishInvalidation = resolve
+    }))
+    const store: CacheStore = {
+      get() {
+        return undefined
+      },
+      set() {},
+      delete() {},
+      invalidateTags,
+      clear() {}
+    }
+    const fetchMock = vi.fn(() => Promise.resolve(
+      createJsonResponse({ updated: true })
+    ))
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const cache = cachePlugin({ store })
+    const request = createClient().use(cache)
+    let settled = false
+    const pending = request.delete('/async-auto-tags', {
+      extensions: {
+        cache: {
+          invalidateTags: ['async-entry']
+        }
+      }
+    }).then(value => {
+      settled = true
+      return value
+    })
+
+    await vi.waitFor(() => {
+      expect(invalidateTags).toHaveBeenCalledTimes(1)
+    })
+    expect(settled).toBe(false)
+
+    finishInvalidation(1)
+    await expect(pending).resolves.toEqual({ updated: true })
+
+    invalidateTags.mockRejectedValueOnce(new Error('invalidation failed'))
+    await expect(request.post('/failed-async-auto-tags', {
+      extensions: {
+        cache: {
+          invalidateTags: ['failed-async-entry']
+        }
+      }
+    })).resolves.toEqual({ updated: true })
+    expect(cache.getStats().invalidationErrors).toBe(1)
+
+    const unsupported: CacheStore = {
+      get() {},
+      set() {},
+      delete() {},
+      clear() {}
+    }
+    const unsupportedRequest = createClient().use(cachePlugin({
+      store: unsupported
+    }))
+
+    await expect(unsupportedRequest.post('/unsupported-auto-tags', {
+      extensions: {
+        cache: {
+          invalidateTags: ['missing-capability']
+        }
+      }
+    })).rejects.toMatchObject({ code: 'CONFIG_ERROR' })
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
   it('should isolate requests started after clear from an older shared request', async () => {
     const resolvers: Array<(response: Response) => void> = []
     const fetchMock = vi.fn().mockImplementation(() => {
@@ -1576,6 +3734,155 @@ describe('cachePlugin', () => {
       value: 1
     })
     expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('should coalesce equivalent requests through a cache-store lease', async () => {
+    const entries = new Map<string, CacheEntry>()
+    const waiters: Array<() => void> = []
+    let held = false
+    const acquire = (contended: boolean) => new Promise<{
+      contended: boolean
+      release(): void
+    }>(resolve => {
+      const grant = () => {
+        held = true
+        let active = true
+
+        resolve({
+          contended,
+          release() {
+            if (!active) {
+              return
+            }
+
+            active = false
+            held = false
+            waiters.shift()?.()
+          }
+        })
+      }
+
+      if (held) {
+        waiters.push(grant)
+      } else {
+        grant()
+      }
+    })
+    const store: CacheStore = {
+      get(key) {
+        return entries.get(key)
+      },
+      set(key, entry) {
+        entries.set(key, entry)
+      },
+      delete(key) {
+        entries.delete(key)
+      },
+      clear() {
+        entries.clear()
+      },
+      acquireRefreshLease() {
+        return acquire(held)
+      }
+    }
+    let resolveFetch!: (response: Response) => void
+    const fetchMock = vi.fn().mockImplementation(() => {
+      return new Promise<Response>(resolve => {
+        resolveFetch = resolve
+      })
+    })
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const firstClient = createClient().use(cachePlugin({ store }))
+    const secondClient = createClient().use(cachePlugin({ store }))
+    const config = {
+      extensions: {
+        cache: {
+          enabled: true,
+          ttl: Infinity
+        }
+      }
+    }
+    const first = firstClient.get('/cross-context', config)
+
+    await vi.waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledTimes(1)
+    })
+
+    const second = secondClient.get('/cross-context', config)
+
+    await Promise.resolve()
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+
+    resolveFetch(createJsonResponse({ shared: true }))
+
+    await expect(Promise.all([first, second])).resolves.toEqual([
+      { shared: true },
+      { shared: true }
+    ])
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('should fall back to the network when lease coordination fails', async () => {
+    const store: CacheStore = {
+      get() {
+        return undefined
+      },
+      set() {},
+      delete() {},
+      clear() {},
+      acquireRefreshLease() {
+        return Promise.reject(new Error('Lock manager unavailable'))
+      }
+    }
+    const fetchMock = vi.fn().mockResolvedValue(
+      createJsonResponse({ fallback: true })
+    )
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient().use(cachePlugin({ store }))
+
+    await expect(request.get('/lease-fallback', {
+      extensions: {
+        cache: { enabled: true }
+      }
+    })).resolves.toEqual({ fallback: true })
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('should abort while waiting for a cache-store lease', async () => {
+    const acquireRefreshLease = vi.fn(() => new Promise<never>(() => {}))
+    const store: CacheStore = {
+      get() {
+        return undefined
+      },
+      set() {},
+      delete() {},
+      clear() {},
+      acquireRefreshLease
+    }
+    const fetchMock = vi.fn()
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const controller = new AbortController()
+    const request = createClient().use(cachePlugin({ store }))
+    const pending = request.get('/lease-abort', {
+      signal: controller.signal,
+      extensions: {
+        cache: { enabled: true }
+      }
+    })
+
+    await vi.waitFor(() => {
+      expect(acquireRefreshLease).toHaveBeenCalledTimes(1)
+    })
+    controller.abort('Stop waiting for cache refresh')
+
+    await expect(pending).rejects.toMatchObject({ code: 'ABORT_ERROR' })
+    expect(fetchMock).not.toHaveBeenCalled()
   })
 
   it('should not cache or share automatically detected streaming responses', async () => {
@@ -2112,5 +4419,218 @@ describe('cachePlugin', () => {
       ok: true
     })
     expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('should expose isolated cache statistics and reset them', async () => {
+    const fetchMock = vi.fn(() => Promise.resolve(
+      createJsonResponse({ ok: true })
+    ))
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const cache = cachePlugin()
+    const request = createClient().use(cache)
+    const extensions = {
+      cache: {
+        enabled: true,
+        ttl: 1000
+      }
+    }
+
+    await request.get('/observed-cache', { extensions })
+    await request.get('/observed-cache', { extensions })
+    await request.get('/observed-cache', {
+      extensions,
+      headers: {
+        'cache-control': 'no-store'
+      }
+    })
+
+    const snapshot = cache.getStats()
+
+    expect(snapshot).toEqual({
+      hits: 1,
+      misses: 1,
+      bypasses: 1,
+      invalidations: 0,
+      invalidationErrors: 0,
+      deduplicated: 0,
+      revalidations: 0,
+      staleIfError: 0,
+      staleWhileRevalidate: 0,
+      backgroundRefreshes: 0,
+      backgroundRefreshSuccesses: 0,
+      backgroundRefreshErrors: 0
+    })
+
+    ;(snapshot as { hits: number }).hits = 99
+    expect(cache.getStats().hits).toBe(1)
+
+    cache.resetStats()
+    expect(Object.values(cache.getStats()).every(value => value === 0)).toBe(true)
+  })
+
+  it('should observe deduplication without exposing request details', async () => {
+    let resolveFetch!: (response: Response) => void
+    const events: Array<Record<string, unknown>> = []
+    const fetchMock = vi.fn(() => new Promise<Response>(resolve => {
+      resolveFetch = resolve
+    }))
+    const onEvent = vi
+      .fn((event: CacheEvent) => {
+        events.push({ ...event })
+
+        if (events.length === 1) {
+          throw new Error('observer failed')
+        }
+
+        return Promise.reject(new Error('async observer failed'))
+      })
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const cache = cachePlugin({ onEvent })
+    const request = createClient().use(cache)
+    const config = {
+      extensions: {
+        cache: {
+          enabled: true,
+          ttl: 1000
+        }
+      }
+    }
+    const leader = request.get('/private-path?token=secret', config)
+
+    await vi.waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledTimes(1)
+    })
+
+    const follower = request.get('/private-path?token=secret', config)
+
+    await vi.waitFor(() => {
+      expect(cache.getStats().deduplicated).toBe(1)
+    })
+
+    resolveFetch(createJsonResponse({ ok: true }))
+    await expect(Promise.all([leader, follower])).resolves.toEqual([
+      { ok: true },
+      { ok: true }
+    ])
+    expect(cache.getStats()).toMatchObject({
+      misses: 1,
+      deduplicated: 1
+    })
+    expect(events.map(event => event.type)).toEqual([
+      'miss',
+      'deduplicated'
+    ])
+    expect(events.every(event => {
+      return Object.keys(event).sort().join(',') === 'timestamp,type'
+    })).toBe(true)
+  })
+
+  it('should report stale recovery and conditional revalidation', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(new Response('{"version":1}', {
+        headers: {
+          'cache-control': 'max-age=0, stale-if-error=5',
+          'content-type': 'application/json'
+        }
+      }))
+      .mockRejectedValueOnce(new Error('offline'))
+      .mockResolvedValueOnce(new Response('{"version":2}', {
+        headers: {
+          'cache-control': 'max-age=0',
+          'content-type': 'application/json',
+          etag: '"v2"'
+        }
+      }))
+      .mockResolvedValueOnce(new Response(null, {
+        status: 304,
+        headers: {
+          'cache-control': 'max-age=60'
+        }
+      }))
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const cache = cachePlugin()
+    const request = createClient().use(cache)
+    const config = {
+      extensions: {
+        cache: {
+          enabled: true,
+          ttl: 10000
+        }
+      }
+    }
+
+    await request.get('/stale-observed', config)
+    await expect(request.get('/stale-observed', config)).resolves.toEqual({
+      version: 1
+    })
+    await request.get('/etag-observed', config)
+    await expect(request.get('/etag-observed', config)).resolves.toEqual({
+      version: 2
+    })
+    expect(cache.getStats()).toMatchObject({
+      misses: 4,
+      staleIfError: 1,
+      revalidations: 1
+    })
+  })
+
+  it('should report background refresh outcomes without using stale fallback', async () => {
+    const events: string[] = []
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(new Response('{"version":1}', {
+        headers: {
+          'cache-control': [
+            'max-age=0',
+            'stale-if-error=5',
+            'stale-while-revalidate=5'
+          ].join(', '),
+          'content-type': 'application/json'
+        }
+      }))
+      .mockRejectedValueOnce(new Error('offline'))
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const cache = cachePlugin({
+      onEvent(event) {
+        events.push(event.type)
+      }
+    })
+    const request = createClient().use(cache)
+    const config = {
+      extensions: {
+        cache: {
+          enabled: true,
+          ttl: 10000
+        }
+      }
+    }
+
+    await request.get('/failed-background-refresh', config)
+    await expect(
+      request.get('/failed-background-refresh', config)
+    ).resolves.toEqual({ version: 1 })
+
+    await vi.waitFor(() => {
+      expect(cache.getStats().backgroundRefreshErrors).toBe(1)
+    })
+
+    expect(cache.getStats()).toMatchObject({
+      misses: 1,
+      staleIfError: 0,
+      staleWhileRevalidate: 1,
+      backgroundRefreshes: 1,
+      backgroundRefreshSuccesses: 0,
+      backgroundRefreshErrors: 1
+    })
+    expect(events).toContain('background-refresh-error')
   })
 })

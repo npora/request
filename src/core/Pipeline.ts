@@ -30,7 +30,8 @@ export class Pipeline {
 
   execute<T = unknown>(
     config: RequestConfig,
-    preserveRaw = true
+    preserveRaw = true,
+    background = false
   ): Promise<NporaResponse<T>> {
     if (
       !config.schema &&
@@ -59,18 +60,20 @@ export class Pipeline {
       }
     }
 
-    return this.executeLifecycle<T>(config, preserveRaw)
+    return this.executeLifecycle<T>(config, preserveRaw, background)
   }
 
   private async executeLifecycle<T>(
     config: RequestConfig,
-    preserveRaw: boolean
+    preserveRaw: boolean,
+    background: boolean
   ): Promise<NporaResponse<T>> {
     const context = new RequestContext<T>(
       config,
       preserveRaw ||
       this.hooks.hasRawResponseHooks ||
-      this.interceptors.response.active
+      this.interceptors.response.active,
+      background
     )
     const headersRequired = !!this.adapter.requestValidated
     let validatedHeaders: Headers | undefined
@@ -172,6 +175,10 @@ export class Pipeline {
           }
 
           if (!this.hooks.hasRetryHooks) {
+            if (context.fallbackResponse) {
+              return this.recoverFromError(context)
+            }
+
             return this.fail(context, context.error, false)
           }
 
@@ -188,11 +195,16 @@ export class Pipeline {
           }
 
           if (!decision.retry) {
+            if (context.fallbackResponse) {
+              return this.recoverFromError(context)
+            }
+
             return this.fail(context, context.error, false)
           }
 
           context.error = undefined
           context.response = undefined
+          context.fallbackResponse = undefined
           attempt += 1
           context.attempt = attempt
 
@@ -241,6 +253,25 @@ export class Pipeline {
     }
 
     return this.processValidatedResponse(context)
+  }
+
+  private async recoverFromError<T>(
+    context: RequestContext<T>
+  ): Promise<NporaResponse<T>> {
+    context.response = context.fallbackResponse
+    context.error = undefined
+
+    try {
+      const response = this.processResponse(context)
+
+      return isPromiseLike(response)
+        ? await response
+        : response
+    } catch (error) {
+      return this.fail(context, error)
+    } finally {
+      context.fallbackResponse = undefined
+    }
   }
 
   private processValidatedResponse<T>(

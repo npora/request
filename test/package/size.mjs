@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
 import { getNpmPackManifest } from './npm-pack-result.mjs'
 import {
+  existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -11,6 +12,7 @@ import {
 import { tmpdir } from 'node:os'
 import {
   dirname,
+  extname,
   join,
   resolve
 } from 'node:path'
@@ -60,23 +62,75 @@ function inspectFiles() {
   return Object.fromEntries(
     Object.entries(budget.files).map(
       ([path, limits]) => {
-        const contents = readFileSync(
-          join(rootDirectory, path)
-        )
+        const files = limits.transitive
+          ? collectDependencies(join(rootDirectory, path))
+          : [join(rootDirectory, path)]
+        const contents = files.map(file => readFileSync(file))
 
         return [
           path,
           {
-            bytes: contents.byteLength,
-            gzipBytes: gzipSync(contents, {
-              level: 9
-            }).byteLength,
+            bytes: contents.reduce(
+              (total, content) => total + content.byteLength,
+              0
+            ),
+            gzipBytes: contents.reduce(
+              (total, content) => total + gzipSync(content, {
+                level: 9
+              }).byteLength,
+              0
+            ),
+            files: files.length,
             budget: limits
           }
         ]
       }
     )
   )
+}
+
+function collectDependencies(entry) {
+  const pending = [entry]
+  const visited = new Set()
+
+  while (pending.length > 0) {
+    const file = pending.pop()
+
+    if (!file || visited.has(file)) {
+      continue
+    }
+
+    visited.add(file)
+
+    const source = readFileSync(file, 'utf8')
+    const imports = [
+      ...source.matchAll(/\bfrom\s*["']([^"']+)["']/g),
+      ...source.matchAll(/\bimport\s*["']([^"']+)["']/g),
+      ...source.matchAll(/\brequire\(\s*["']([^"']+)["']\s*\)/g)
+    ]
+
+    for (const match of imports) {
+      const specifier = match[1]
+
+      if (!specifier?.startsWith('.')) {
+        continue
+      }
+
+      let dependency = resolve(dirname(file), specifier)
+
+      if (!existsSync(dependency) && file.endsWith('.d.ts')) {
+        dependency = dependency.replace(/\.js$/, '.d.ts')
+      } else if (!existsSync(dependency) && file.endsWith('.d.cts')) {
+        dependency = dependency.replace(/\.cjs$/, '.d.cts')
+      }
+
+      if (extname(dependency) && existsSync(dependency)) {
+        pending.push(dependency)
+      }
+    }
+  }
+
+  return [...visited]
 }
 
 function inspectPackage() {
@@ -169,7 +223,8 @@ function printReport(report) {
       bytes: result.bytes,
       budget: result.budget.bytes,
       gzip: result.gzipBytes,
-      gzipBudget: result.budget.gzipBytes
+      gzipBudget: result.budget.gzipBytes,
+      files: result.files
     })
   )
 

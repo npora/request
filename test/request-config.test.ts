@@ -43,7 +43,7 @@ describe('request config', () => {
     })
 
     expect(url).toBe(
-      'https://api.example.com/users?page=1&keyword=npora&active=true&tags=ts&tags=fetch'
+      'https://api.example.com/users?page=1&keyword=npora&active=true&empty=&tags=ts&tags=fetch'
     )
   })
 
@@ -81,7 +81,7 @@ describe('request config', () => {
     })
 
     expect(url).toBe(
-      'https://api.example.com/search?search=hello+world%7E&tags=first&tags=second#results'
+      'https://api.example.com/search?search=hello+world%7E&tags=first&tags=&tags=second#results'
     )
   })
 
@@ -113,6 +113,74 @@ describe('request config', () => {
     })
 
     expect(url).toBe('https://uploads.example.com/file')
+  })
+
+  it.each([
+    'https://uploads.example.com/file',
+    '//uploads.example.com/file'
+  ])('should reject absolute URL %s when baseURL bypass is disabled', async url => {
+    const adapter = new MockAdapter()
+    const request = createClient({
+      adapter,
+      baseURL: 'https://api.example.com',
+      allowAbsoluteUrls: false
+    })
+
+    await expect(
+      request.get(url)
+    ).rejects.toMatchObject({
+      code: 'CONFIG_ERROR',
+      message: 'Absolute request URLs are not allowed with this baseURL'
+    })
+    expect(adapter.history).toHaveLength(0)
+  })
+
+  it('should allow absolute URLs without baseURL when bypass is disabled', async () => {
+    const adapter = new MockAdapter()
+
+    adapter.onGet('https://api.example.com/file').reply(200, {
+      ok: true
+    })
+
+    const result = await createClient({
+      adapter,
+      allowAbsoluteUrls: false
+    }).get('https://api.example.com/file')
+
+    expect(result).toEqual({ ok: true })
+  })
+
+  it('should validate allowAbsoluteUrls before adapter dispatch', async () => {
+    const adapter = new MockAdapter()
+    const request = createClient({ adapter })
+
+    await expect(request.get('/file', {
+      allowAbsoluteUrls: 'no' as never
+    })).rejects.toMatchObject({
+      code: 'CONFIG_ERROR',
+      message: 'Request allowAbsoluteUrls must be a boolean'
+    })
+    expect(adapter.history).toHaveLength(0)
+  })
+
+  it('should reject absolute URLs introduced by interceptors', async () => {
+    const adapter = new MockAdapter()
+    const request = createClient({
+      adapter,
+      baseURL: 'https://api.example.com',
+      allowAbsoluteUrls: false
+    })
+
+    request.interceptors.request.use(config => ({
+      ...config,
+      url: 'https://evil.example.com/redirected'
+    }))
+
+    await expect(request.get('/safe')).rejects.toMatchObject({
+      code: 'CONFIG_ERROR',
+      message: 'Absolute request URLs are not allowed with this baseURL'
+    })
+    expect(adapter.history).toHaveLength(0)
   })
 
   it.each([
@@ -255,13 +323,72 @@ describe('request config', () => {
     expect(init.body).toBe(JSON.stringify({ name: 'Npora' }))
   })
 
+  it.each([
+    {
+      name: 'UTF-8 text',
+      config: {
+        body: '你好',
+        maxRequestSize: 5
+      }
+    },
+    {
+      name: 'JSON',
+      config: {
+        json: { value: 'large' },
+        maxRequestSize: 10
+      }
+    },
+    {
+      name: 'URLSearchParams',
+      config: {
+        form: new URLSearchParams({ value: 'large' }),
+        maxRequestSize: 5
+      }
+    },
+    {
+      name: 'Blob',
+      config: {
+        body: new Blob(['large']),
+        maxRequestSize: 4
+      }
+    },
+    {
+      name: 'ArrayBufferView',
+      config: {
+        body: new Uint8Array(8).subarray(2, 6),
+        maxRequestSize: 3
+      }
+    }
+  ])('should reject an oversized $name request body', ({ config }) => {
+    expect(() => buildRequest({
+      url: '/upload',
+      method: 'POST',
+      ...config
+    })).toThrow(expect.objectContaining({
+      code: 'REQUEST_TOO_LARGE'
+    }))
+  })
+
+  it('should allow a request body exactly at maxRequestSize', () => {
+    const request = buildRequest({
+      url: '/upload',
+      method: 'POST',
+      body: '你好',
+      maxRequestSize: 6
+    })
+
+    expect(request.init.body).toBe('你好')
+  })
+
   it('should serialize form body', () => {
     const { init } = buildRequest({
       url: '/login',
       method: 'POST',
       form: {
         username: 'npora',
-        remember: true
+        remember: true,
+        empty: null,
+        omitted: undefined
       }
     })
 
@@ -271,7 +398,9 @@ describe('request config', () => {
     expect(headers.get('content-type')).toBe(
       'application/x-www-form-urlencoded;charset=UTF-8'
     )
-    expect(body.toString()).toBe('username=npora&remember=true')
+    expect(body.toString()).toBe(
+      'username=npora&remember=true&empty='
+    )
   })
 
   it('should ignore inherited form and FormData fields', () => {
@@ -371,6 +500,8 @@ describe('request config', () => {
   })
 
   it.each([
+    ['maxRequestSize', -1],
+    ['maxRequestSize', 1.5],
     ['maxResponseSize', -1],
     ['maxResponseSize', 1.5],
     ['maxFormDataDepth', -1],

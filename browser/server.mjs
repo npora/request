@@ -160,12 +160,18 @@ const server = createServer(
       if (url.pathname === '/api/count') {
         const key = url.searchParams.get('key') ?? 'default'
         const count = (requestCounts.get(key) ?? 0) + 1
+        const wait = Number(url.searchParams.get('delay') ?? 0)
         const cacheControl =
           url.searchParams.get('cache') === 'enabled'
             ? 'max-age=60'
             : 'no-store'
 
         requestCounts.set(key, count)
+
+        if (Number.isFinite(wait) && wait > 0) {
+          await delay(Math.min(wait, 1000))
+        }
+
         sendJson(
           response,
           200,
@@ -177,6 +183,71 @@ const server = createServer(
           }
         )
 
+        return
+      }
+
+      if (url.pathname === '/api/revalidate') {
+        const key = url.searchParams.get('key') ?? 'default'
+        const etag = `"${key}"`
+
+        if (request.headers['if-none-match'] === etag) {
+          response.writeHead(304, {
+            'cache-control': 'max-age=60',
+            etag,
+            'x-revalidated': 'true',
+            'access-control-allow-origin': '*'
+          })
+          response.end()
+          return
+        }
+
+        const count = (requestCounts.get(key) ?? 0) + 1
+        const cacheControl = url.searchParams.get('fresh') === 'true'
+          ? 'max-age=60'
+          : 'no-cache'
+
+        requestCounts.set(key, count)
+        sendJson(response, 200, { count }, {
+          'cache-control': cacheControl,
+          etag
+        })
+        return
+      }
+
+      if (url.pathname === '/api/stale-if-error') {
+        const key = url.searchParams.get('key') ?? 'default'
+        const count = (requestCounts.get(key) ?? 0) + 1
+
+        requestCounts.set(key, count)
+
+        if (count > 1) {
+          sendJson(response, 503, { unavailable: true }, {
+            'cache-control': 'no-store'
+          })
+          return
+        }
+
+        sendJson(response, 200, { count }, {
+          'cache-control': 'max-age=0, stale-if-error=60'
+        })
+        return
+      }
+
+      if (url.pathname === '/api/stale-while-revalidate') {
+        const key = url.searchParams.get('key') ?? 'default'
+        const count = (requestCounts.get(key) ?? 0) + 1
+
+        requestCounts.set(key, count)
+
+        if (count > 1) {
+          await delay(50)
+        }
+
+        sendJson(response, 200, { count }, {
+          'cache-control': count === 1
+            ? 'max-age=0, stale-while-revalidate=60'
+            : 'max-age=60'
+        })
         return
       }
 

@@ -9,9 +9,14 @@ const publicExports = [
   'AuthPluginOptions',
   'AuthTokenStorage',
   'CacheEntry',
+  'CacheEvent',
+  'CacheEventType',
   'CacheOptions',
   'CachePlugin',
   'CachePluginOptions',
+  'CacheRefreshLease',
+  'CacheSetOptions',
+  'CacheStats',
   'CacheStore',
   'CircuitBreakerOptions',
   'CircuitBreakerPlugin',
@@ -33,6 +38,12 @@ const publicExports = [
   'FetchAdapter',
   'FetchOptions',
   'HttpMethod',
+  'IndexedDBCacheCompactionOptions',
+  'IndexedDBCacheCompactionResult',
+  'IndexedDBCacheStore',
+  'IndexedDBCacheStoreEvent',
+  'IndexedDBCacheStoreOptions',
+  'IndexedDBCacheUsage',
   'Interceptor',
   'InterceptorManager',
   'InterceptorOptions',
@@ -72,12 +83,18 @@ const publicExports = [
   'SchemaValidationError',
   'ServerSentEvent',
   'StandardSchemaV1',
+  'TieredCacheStore',
+  'TieredCacheBroadcastOptions',
+  'TieredCacheCoordinationOptions',
+  'TieredCacheStoreOptions',
   'TransferProgress',
   'RetryEvent',
   'RetryOptions',
   'UploadData',
   'UploadOptions',
   'UploadProgress',
+  'WebStorageCacheStore',
+  'WebStorageCacheStoreOptions',
   'authPlugin',
   'cachePlugin',
   'circuitBreakerPlugin',
@@ -93,11 +110,14 @@ const runtimeExports = [
   'Client',
   'FetchAdapter',
   'InterceptorManager',
+  'IndexedDBCacheStore',
   'MemoryCacheStore',
   'MockAdapter',
   'PluginError',
   'RequestError',
   'SchemaValidationError',
+  'TieredCacheStore',
+  'WebStorageCacheStore',
   'authPlugin',
   'cachePlugin',
   'circuitBreakerPlugin',
@@ -114,6 +134,52 @@ const module = await import(
 )
 const require = createRequire(import.meta.url)
 const commonJSModule = require('../../dist/index.cjs')
+
+const subpathRuntimeExports = {
+  core: [
+    'Client',
+    'FetchAdapter',
+    'InterceptorManager',
+    'PluginError',
+    'RequestError',
+    'SchemaValidationError',
+    'createClient'
+  ],
+  plugins: [
+    'IndexedDBCacheStore',
+    'MemoryCacheStore',
+    'PluginError',
+    'TieredCacheStore',
+    'WebStorageCacheStore',
+    'authPlugin',
+    'cachePlugin',
+    'circuitBreakerPlugin',
+    'concurrencyPlugin',
+    'downloadPlugin',
+    'loggerPlugin',
+    'retryPlugin',
+    'uploadPlugin'
+  ],
+  'plugins/cache': [
+    'IndexedDBCacheStore',
+    'MemoryCacheStore',
+    'TieredCacheStore',
+    'WebStorageCacheStore',
+    'cachePlugin'
+  ],
+  'plugins/retry': ['retryPlugin'],
+  testing: ['MockAdapter']
+}
+
+for (const [path, exports] of Object.entries(subpathRuntimeExports)) {
+  const esm = await import(
+    new URL(`../../dist/${path}.js`, import.meta.url).href
+  )
+  const cjs = require(`../../dist/${path}.cjs`)
+
+  assert.deepEqual(Object.keys(esm).sort(), exports.sort())
+  assert.deepEqual(Object.keys(cjs).sort(), exports.sort())
+}
 
 assert.deepEqual(
   Object.keys(module).sort(),

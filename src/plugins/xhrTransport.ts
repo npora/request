@@ -396,6 +396,10 @@ function createConfigError(
   config: RequestConfig,
   cause: unknown
 ): RequestError {
+  if (cause instanceof RequestError) {
+    return cause
+  }
+
   return new RequestError(
     'Failed to create XMLHttpRequest',
     {

@@ -88,6 +88,13 @@ export class Client {
     const scope = createPluginScope(
       this.interceptors,
       this.hooks,
+      (config, dispatchOptions) => {
+        return this.pipeline.execute(
+          config,
+          dispatchOptions?.preserveRaw,
+          dispatchOptions?.background
+        )
+      },
       plugin.priority
     )
 

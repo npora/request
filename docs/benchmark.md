@@ -34,6 +34,30 @@ default):
 pnpm stress -- --output benchmark-results/stress.json
 ```
 
+Run a separate real localhost HTTP concurrency test:
+
+```sh
+pnpm benchmark:http -- \
+  --operations 100000 \
+  --concurrency 256 \
+  --output benchmark-results/http.json
+```
+
+Install competitor packages in their isolated benchmark workspace, then run
+the reproducible cross-library localhost test:
+
+```sh
+pnpm benchmark:libraries:install
+pnpm build
+pnpm benchmark:libraries
+```
+
+The competitor packages are deliberately absent from the root package and
+published tarball, preserving Npora Request's zero-runtime-dependency contract.
+The full JSON report is written to
+`benchmark/competitors/library-comparison-result.json`; this generated local
+result is excluded from the published package and should not be committed.
+
 The stress runner distributes an exact total across core dispatch,
 serialization, interceptors, cache hits, deduplication and clear races, immediate and
 contended concurrency, queued cancellation, closed and transitioning circuits,
@@ -44,15 +68,55 @@ mixed plugin pipeline. Latencies are bounded samples rather than a ten-million
 element allocation. With `--expose-gc`, retained heap is measured after each
 scenario while peak RSS records transient runtime pressure.
 
-On 2026-08-24, Node.js 24.18.0 completed the default matrix with 64 workers in
-18.13 seconds with zero unexpected failures. It included 1,200,000 adapter
-attempts for 600,000 retrying requests, 18,184 adapter attempts for 400,000
+On 2026-08-25, Node.js 24.18.0 on Darwin arm64 completed the final matrix with
+256 workers in 19.84 seconds with zero unexpected failures. It included 1,200,000
+adapter attempts for 600,000 retrying requests, 4,655 adapter attempts for 400,000
 deduplicated cache requests, 100,000 cache-clear races covering 200,000 callers,
 100,000 asynchronous circuit-failure classifications, 100,000 shared auth
 refresh/cancellation operations, 100,000 initial-auth/cache/retry/circuit async
 extension cancellations, 100,000 events for each upload/download progress path,
 and 150,000 parsed SSE/NDJSON records. These are in-memory transport stress
 results, not network throughput claims.
+
+Key 256-worker in-memory results from that run:
+
+| Scenario | Operations | Throughput | Sampled p99 | Failures |
+| --- | ---: | ---: | ---: | ---: |
+| Bare core dispatch | 1,600,000 | 9,370,964 ops/s | 0.087 ms | 0 |
+| Immediately admitted concurrency | 700,000 | 2,396,071 ops/s | 0.200 ms | 0 |
+| Single-permit FIFO contention | 600,000 | 778,637 ops/s | 0.666 ms | 0 |
+| Cache miss deduplication | 400,000 | 455,677 ops/s | 1.401 ms | 0 |
+| Queue cancellation | 200,000 | 225,874 ops/s | 3.961 ms | 0 |
+
+The full run's maximum sampled scenario RSS was 388.42 MiB and its largest
+post-GC retained heap delta was 0.88 MiB. These values include Node, Fetch/XHR
+test doubles, payload objects, latency samples, and runtime allocator behavior.
+
+The separate localhost run sent 100,000 actual HTTP requests through the
+native Node Fetch transport with concurrency 256. The server received every
+request; throughput was 21,029 requests/s, sampled p50 was 10.627 ms, p95 was
+15.808 ms, and p99 was 17.624 ms. This loopback result includes sockets, HTTP
+parsing, body streaming, and JSON parsing, but still does not predict remote
+service latency or production proxy/TLS behavior.
+
+The isolated five-library run used the same machine and runtime, one local JSON
+server, concurrency 128, a 300-request warm-up per client, and three rotated
+rounds of 30,000 measured requests per client. All 451,500 expected requests
+reached the server:
+
+| Client | Version | Median throughput | Median p99 |
+| --- | ---: | ---: | ---: |
+| ofetch | 1.5.1 | 22,653 req/s | 10.146 ms |
+| Npora Request | pending 1.15.0 workspace | 22,390 req/s | 10.445 ms |
+| Ky | 2.0.2 | 18,048 req/s | 16.393 ms |
+| Axios | 1.19.0 npm release | 14,638 req/s | 12.541 ms |
+| Got | 15.1.0 | 13,672 req/s | 17.203 ms |
+
+Npora Request was within 1.2% of ofetch and ahead of Ky, Axios, and Got in this
+specific run. This is not a universal ranking: Axios and Got use their Node
+HTTP transports while the other three use Node Fetch, and results change with
+payloads, TLS, agents, proxies, retries, hooks, and remote latency. The script
+keeps full per-round samples and verifies the server-side request count.
 
 ## Scenarios
 

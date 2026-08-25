@@ -123,7 +123,30 @@ export interface CacheOptions {
    */
   ttl?: number
 
+  /**
+   * Maximum time in milliseconds that an expired entry may be used after an
+   * eligible network or 5xx failure. Response `stale-if-error` may shorten it.
+   *
+   * @default response stale-if-error, otherwise disabled
+   */
+  staleIfError?: number
+
+  /**
+   * Maximum time in milliseconds that an expired entry may be returned while
+   * one deduplicated background refresh runs. The response directive may
+   * shorten this window.
+   *
+   * @default response stale-while-revalidate, otherwise disabled
+   */
+  staleWhileRevalidate?: number
+
   key?: string
+
+  /** Tags used for grouped cache invalidation. */
+  tags?: readonly string[]
+
+  /** Tags invalidated after this request settles successfully. */
+  invalidateTags?: readonly string[]
 
   /**
    * Share one network operation between concurrent equivalent requests.

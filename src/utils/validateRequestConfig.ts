@@ -3,6 +3,7 @@ import type { RequestConfig } from '../types'
 import { isURLSearchParams } from './isURLSearchParams'
 import { MAX_TIMER_DELAY } from './maxTimerDelay'
 import { hasOwnProperty } from './hasOwnProperty'
+import { isAbsoluteURL } from './buildRequest'
 
 const BODY_FIELDS = [
   'body',
@@ -156,6 +157,11 @@ function validateSchema(config: RequestConfig): void {
 
 function validateLimits(config: RequestConfig): void {
   validateLimit(
+    config.maxRequestSize,
+    'Request maxRequestSize',
+    config
+  )
+  validateLimit(
     config.maxResponseSize,
     'Request maxResponseSize',
     config
@@ -197,6 +203,16 @@ function validateURL(config: RequestConfig): void {
   }
 
   if (
+    config.allowAbsoluteUrls !== undefined &&
+    typeof config.allowAbsoluteUrls !== 'boolean'
+  ) {
+    throw configError(
+      'Request allowAbsoluteUrls must be a boolean',
+      config
+    )
+  }
+
+  if (
     isMalformedHttpURL(config.url) ||
     (
       config.baseURL !== undefined &&
@@ -205,6 +221,17 @@ function validateURL(config: RequestConfig): void {
   ) {
     throw configError(
       'Request URL is malformed',
+      config
+    )
+  }
+
+  if (
+    config.baseURL &&
+    config.allowAbsoluteUrls === false &&
+    isAbsoluteURL(config.url)
+  ) {
+    throw configError(
+      'Absolute request URLs are not allowed with this baseURL',
       config
     )
   }

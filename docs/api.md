@@ -5,6 +5,23 @@
 For option types, defaults, merge behavior, runtime support, and plugin-owned
 request fields, see the [configuration reference](configuration.md).
 
+## Package entrypoints
+
+The root entrypoint remains backward compatible and exports the complete API.
+Applications may use subpaths to load a smaller runtime surface:
+
+```ts
+import { createClient } from '@npora/request/core'
+import { cachePlugin } from '@npora/request/plugins/cache'
+import { retryPlugin } from '@npora/request/plugins/retry'
+```
+
+Official plugin entrypoints are `auth`, `cache`, `circuit-breaker`,
+`concurrency`, `download`, `logger`, `retry`, and `upload` under
+`@npora/request/plugins/`. The aggregate plugin entrypoint remains available
+at `@npora/request/plugins`. Import `MockAdapter` from
+`@npora/request/testing` or its alias `@npora/request/adapters/mock`.
+
 ---
 
 # Client
@@ -129,6 +146,7 @@ response body. Use `headResponse()` to inspect status and headers.
 ```ts
 {
   baseURL?: string
+  allowAbsoluteUrls?: boolean
   url: string
   method?: HttpMethod
   fetchOptions?: FetchOptions
@@ -146,6 +164,10 @@ Object `query` parameters are shallow merged with client defaults. Native
 `searchParams` replace inherited query defaults and preserve repeated keys,
 entry order and native `URLSearchParams` encoding semantics. `query` and
 `searchParams` are mutually exclusive.
+
+Absolute request URLs bypass `baseURL` by default. Set
+`allowAbsoluteUrls: false` to reject absolute and protocol-relative request
+URLs whenever `baseURL` is configured.
 
 ```ts
 await request.get('/account', {
@@ -184,15 +206,19 @@ when the FormData structure is fully trusted.
 {
   timeout?: number
   signal?: AbortSignal
+  maxRequestSize?: number
   maxResponseSize?: number
 }
 ```
 
 Timeout timers and composed abort listeners are released when a request
-settles, times out or is externally aborted. `maxResponseSize` limits parsed
-and streamed response bytes and defaults to `Infinity`. A response that
-exceeds the limit fails with `RESPONSE_TOO_LARGE`; a trustworthy
-`Content-Length` can reject it before the body is consumed.
+settles, times out or is externally aborted. `maxRequestSize` preflights
+deterministically sized bodies and fails with `REQUEST_TOO_LARGE`; FormData,
+ReadableStream, and custom-adapter bodies require transport-specific limits.
+`maxResponseSize` limits parsed and streamed response bytes and defaults to
+`Infinity`. A response that exceeds the limit fails with
+`RESPONSE_TOO_LARGE`; a trustworthy `Content-Length` can reject it before the
+body is consumed.
 
 ---
 
@@ -879,17 +905,139 @@ await request.get('/user', {
 cache.clear()
 ```
 
+Inspect aggregate behavior or forward privacy-safe lifecycle events to an
+application metrics system:
+
+```ts
+const cache = cachePlugin({
+  onEvent(event) {
+    metrics.increment(`request.cache.${event.type}`)
+  }
+})
+
+const snapshot = cache.getStats()
+
+console.log(snapshot.hits, snapshot.misses)
+cache.resetStats()
+```
+
+Statistics cover hits, misses, bypasses, targeted invalidations, in-flight
+deduplication, conditional revalidation, stale-if-error recovery,
+stale-while-revalidate responses, and background refresh starts, successes,
+and failures. Failed invalidations increment `invalidationErrors` and emit a
+privacy-safe `invalidation-error` event. Each snapshot is a copy.
+Resetting statistics does not clear cached data. Events contain only `type` and
+`timestamp`; callback exceptions and rejected promises are ignored so
+telemetry cannot change request results.
+
+Seed parsed data or update an existing entry by effective request
+configuration:
+
+```ts
+await cache.set({ url: '/user', baseURL: '/api' }, user, {
+  ttl: 30000,
+  status: 200,
+  headers: { 'content-type': 'application/json' },
+  tags: ['user:1']
+})
+
+const found = await cache.update<User>(
+  { url: '/user', baseURL: '/api' },
+  current => ({ ...current, name: 'Local value' })
+)
+```
+
+`set` defaults to status 200 and the request cache TTL (30 seconds by default).
+`update` preserves metadata and freshness, returns `false` if the entry is
+missing, and deletes it when the updater returns `undefined`. Updating parsed
+data discards any stored raw response, so a later `getResponse()` refetches
+instead of returning mismatched raw bytes. Both methods serialize with
+same-key asynchronous operations and isolate their values from older in-flight
+responses. Custom-store errors are returned to the caller.
+
+Delete one entry by supplying the effective configuration that generated its
+key:
+
+```ts
+await cache.delete({
+  url: '/user',
+  baseURL: '/api',
+  responseType: 'json',
+  headers: {
+    accept: 'application/json'
+  },
+  extensions: {
+    cache: { enabled: true }
+  }
+})
+```
+
+The effective configuration must include relevant client defaults and request
+interceptor changes because `baseURL`, query values, response type, and
+representation headers are key dimensions. When a request uses a custom
+`extensions.cache.key`, only that key must match. Targeted deletion prevents
+older same-key requests from repopulating the entry, detaches future callers
+from old in-flight work, aborts the matching background refresh, and leaves
+unrelated keys untouched. Await asynchronous-store deletion before depending
+on completion; requests started meanwhile wait for it.
+
+Associate related entries with tags and invalidate any entry matching at least
+one tag:
+
+```ts
+await request.get('/users/1', {
+  extensions: {
+    cache: {
+      enabled: true,
+      tags: ['user:1', 'users']
+    }
+  }
+})
+
+const removed = await cache.invalidateTags(['user:1'])
+```
+
+Each entry accepts at most 32 unique tags of 1–128 characters. Tag validation
+runs before cache reads and network I/O. The default `MemoryCacheStore` scans
+its bounded entries and returns the number removed. A custom store must expose
+`invalidateTags(tags): number | Promise<number>` or the plugin reports
+`CONFIG_ERROR`. Matching in-flight requests are detached immediately, their
+background refreshes are aborted, and older responses cannot repopulate the
+invalidated entries. Requests with matching tags wait for an asynchronous
+invalidation; unrelated tags continue normally.
+
+Invalidate related reads automatically after a successful mutation:
+
+```ts
+await request.patch('/users/1', {
+  json: update,
+  extensions: {
+    cache: {
+      invalidateTags: ['user:1', 'users']
+    }
+  }
+})
+```
+
+Response caching does not need to be enabled on the mutation. Automatic
+invalidation runs once after the complete request pipeline succeeds, so a
+successful final retry invalidates once while HTTP, Schema, response
+interceptor, cancellation, and exhausted-retry failures do not invalidate.
+Asynchronous custom-store invalidation is awaited before the successful result
+is delivered. Missing custom-store tag support and invalid tag configuration
+fail before network I/O.
+
 Cache entries expire after 30 seconds by default. Set `ttl` in milliseconds,
 use `0` to disable persistent storage for a request, or use `Infinity` to retain
 the entry indefinitely. Negative and non-numeric TTL values fail with
 `CONFIG_ERROR` before a network request is sent.
 
 Each cache plugin instance owns an isolated `MemoryCacheStore` by default.
-It retains at most 1,000 entries with LRU eviction and removes expired entries
-when they are read. Configure the built-in store with `maxEntries`; `0` disables
-storage and `Infinity` explicitly removes the capacity bound. A custom `store`
-owns and enforces its own capacity, so `maxEntries` is ignored when one is
-provided.
+It retains at most 1,000 entries with LRU eviction, including stale entries that
+may still be conditionally revalidated. Configure the built-in store with
+`maxEntries`; `0` disables storage and `Infinity` explicitly removes the
+capacity bound. A custom `store` owns and enforces its own capacity, so
+`maxEntries` is ignored when one is provided.
 Only `GET` and `HEAD` are cached. The generated cache key includes every
 explicitly configured request header and guarantees variation by
 `authorization`, `cookie`, `accept` and `accept-language`. This conservatively
@@ -898,6 +1046,43 @@ normalized independently of object insertion order, and different response
 parsing types use separate cache entries. Responses marked with
 `Cache-Control: no-store` or `Vary: *` may still be shared by equivalent
 concurrent requests, but are never persisted in the cache store.
+The configured TTL is an application maximum: a valid response `max-age`
+shortens it, and an `Age` header is subtracted from that server freshness
+lifetime. Invalid or repeated `max-age` directives disable persistence.
+Expired and `no-cache` entries carrying `ETag` or `Last-Modified` are retained
+for conditional revalidation. A `304 Not Modified` response reuses the cached
+status and body, merges updated response headers, and recalculates freshness.
+Application-provided conditional headers and range requests are never
+overwritten by the plugin.
+
+Request `Cache-Control: no-cache` or `max-age=0` forces revalidation of an
+otherwise fresh entry. Legacy `Pragma: no-cache` has the same effect when
+`Cache-Control` is absent. Request `Cache-Control: no-store` bypasses cache
+reads, writes, and in-flight sharing without deleting an existing entry.
+`Cache-Control` and `Pragma` are control fields rather than representation key
+dimensions, so the generated key excludes them. Responses that declare
+`Vary: Cache-Control` or `Vary: Pragma` are therefore not persisted.
+
+Response `Cache-Control: stale-if-error=N` allows an expired entry to recover
+an eligible network, timeout, or 5xx failure for up to `N` seconds. Per-request
+`extensions.cache.staleIfError` is measured in milliseconds; it enables a
+local fallback window when the response omits the directive and caps the
+server window when both exist. Configured retries are exhausted before stale
+data is considered. Aborts, parsing, configuration, schema, and non-5xx HTTP
+failures remain visible. Waiting deduplicated requests do not automatically
+inherit a leader's stale fallback and continue through their own request
+lifecycle.
+
+Response `Cache-Control: stale-while-revalidate=N` permits an expired entry to
+be returned immediately for `N` seconds while one deduplicated background
+refresh runs. `extensions.cache.staleWhileRevalidate` is the application limit
+in milliseconds and follows the same enable-or-cap rule as `staleIfError`.
+Refreshes re-enter the owning client pipeline from the original request input,
+so request interceptors, plugins, retries, Schema validation, response
+interceptors, and custom adapters remain active exactly once. `cache.clear()`
+and plugin removal abort active refreshes. Forced validation, response
+`no-cache` or `must-revalidate`, application conditional headers, and range
+requests disable immediate stale reuse.
 
 Concurrent equivalent requests share one network operation by default. Waiting
 requests remain attached while the leader retries, receive independent copies
@@ -937,6 +1122,9 @@ const store: CacheStore = {
   async delete(key) {
     await database.delete(key)
   },
+  async invalidateTags(tags) {
+    return database.deleteEntriesWithAnyTag(tags)
+  },
   async clear() {
     await database.clear()
   }
@@ -952,12 +1140,246 @@ await cache.clear()
 Store methods may be synchronous or asynchronous. Read, write and expiration
 cleanup failures are treated as cache misses and do not change the network
 result. Explicit `cache.clear()` failures remain visible to the caller.
+Custom stores must return stale entries from `get()` if conditional
+revalidation is desired; stores that remove expired entries continue to behave
+as ordinary cache misses.
 Asynchronous request-scoped store operations observe the request signal, so a
 stalled external store cannot keep an aborted request pending. The underlying
 store operation is not forcibly cancelled and must implement its own I/O
 cancellation when that is required.
 `CacheEntry.raw` is optional so portable stores may persist parsed data and
 response metadata without serializing a native `Response`.
+`CacheEntry.tags` carries the bounded tag list used by grouped invalidation.
+
+For browser persistence, pass an explicit `localStorage` or `sessionStorage`
+instance to `WebStorageCacheStore`:
+
+```ts
+import {
+  cachePlugin,
+  WebStorageCacheStore
+} from '@npora/request/plugins/cache'
+
+const store = new WebStorageCacheStore(sessionStorage, {
+  namespace: 'admin-console-v2',
+  maxEntries: 500
+})
+
+const cache = cachePlugin({ store })
+```
+
+The namespace is 1–128 characters and scopes reads, deletion, tag invalidation,
+LRU eviction, and `clear()` without touching other applications in the same
+storage area. The default namespace is `default`; applications sharing an
+origin should set a stable application-and-schema-specific value. `maxEntries`
+defaults to 1,000, `0` disables reads and writes, and the least recently used
+entry is removed at capacity.
+
+Entries use JSON serialization. Parsed response data must therefore be
+JSON-compatible: circular structures and `BigInt` fail storage, while values
+such as `Date` follow normal JSON conversion. `Infinity` expiration is encoded
+losslessly. Native `Response` bodies are deliberately omitted, so
+`getResponse()` treats a restored raw-less entry as a miss and fetches a fresh
+response. Malformed or incompatible records are removed on access. Storage
+quota and access errors follow normal `CacheStore` behavior: background
+request caching remains best effort, while explicit `cache.set()` and
+`cache.update()` report the error.
+
+Use `IndexedDBCacheStore` when synchronous Web Storage or JSON-only values are
+not appropriate:
+
+```ts
+const store = new IndexedDBCacheStore(indexedDB, {
+  databaseName: 'admin-console-cache',
+  namespace: 'account:42',
+  schemaVersion: 2,
+  maxEntries: 1000,
+  maxBytes: 50 * 1024 * 1024,
+  quotaRecovery: true,
+  shouldPersist(entry, estimatedBytes) {
+    return entry.status === 200 && estimatedBytes < 2 * 1024 * 1024
+  },
+  onEvent(event) {
+    metrics.record('persistent-cache', event)
+  }
+})
+
+const cache = cachePlugin({ store })
+const usage = await store.getUsage()
+```
+
+The adapter is fully asynchronous and uses IndexedDB structured cloning, so it
+can retain `Blob`, `Date`, `Map`, `Set`, typed arrays, and `BigInt` values.
+Native `Response` objects remain intentionally excluded. `databaseName` and
+`namespace` each accept 1–128 characters. The defaults are
+`@npora/request-cache` and `default`; applications should provide a stable,
+application- and account-scoped namespace. LRU limits, scoped
+`clear()`, tag invalidation, malformed-record cleanup, and `maxEntries: 0` have
+the same semantics as the Web Storage adapter. Call `await store.close()` when
+the database connection is no longer needed or before deleting/upgrading its
+database.
+
+`schemaVersion` is a positive safe integer from 1 through 1,000,000,000 and
+defaults to `1`. Increase it monotonically whenever serialized cache values or
+response assumptions become incompatible. Each version has distinct storage
+keys. The first operation on a newer version removes malformed and
+lower-version records in the same namespace, while a lower-version client
+preserves higher-version records without validating or otherwise interpreting
+their envelope. Its reads, writes, tag invalidation, LRU accounting, `clear()`,
+`compact()`, and quota recovery do not touch higher versions. This prevents
+updated and older tabs using this version-aware store from serving or
+overwriting each other's cache during a rolling deployment, even when the
+newer record structure is incompatible.
+
+Records written before `schemaVersion` was introduced are treated as version
+`1` and keep their original keys, so adopting the option is backward
+compatible. This application schema version is independent from the internal
+IndexedDB database version and does not run application migration code:
+incompatible entries become misses and are fetched again. Keep `namespace`
+stable when using `schemaVersion` for upgrades; changing both isolates the old
+namespace but cannot prune it.
+
+`maxBytes` defaults to `Infinity` and accepts a non-negative safe integer or
+positive infinity. It applies an approximate stored-size budget to the current
+schema version alongside `maxEntries`. Strings use their UTF-16 size; blobs,
+array buffers, and typed arrays use their byte lengths; arrays, maps, sets,
+objects, primitives, keys, and record metadata are traversed with cycle
+protection. Browser storage engines may account for values differently, so the
+limit is a deterministic application budget rather than an exact quota
+measurement.
+
+An entry larger than `maxBytes` is not persisted, removes any older same-key
+value, and is treated as a cache miss on the next read. Otherwise, a write
+evicts least-recently-used current-version entries until both entry and byte
+limits are satisfied. Stored
+size metadata is added lazily to compatible legacy records.
+
+`quotaRecovery` defaults to `true`. When IndexedDB still rejects a write with
+`QuotaExceededError`—for example because other origin storage consumes the
+browser quota—the store removes malformed and lower-schema records plus the
+oldest half of its current-schema entries, then retries once. The final error
+is reported if no scoped data can be removed or the retry also fails. Set it to
+`false` when eviction on quota pressure is not desired. Higher schema versions
+and other namespaces are never removed by recovery.
+
+`getUsage()` returns `{ entries, estimatedBytes, maxEntries, maxBytes,
+schemaVersion }` for valid records in the current namespace and schema. It does
+not expose cache keys or scan other namespaces. `onEvent` receives aggregated
+events after committed cleanup, plus oversized-entry rejections. `type` is
+`eviction` or `rejection`; `reason` is `max-entries`, `max-bytes`,
+`quota-recovery`, `schema-version`, `malformed`, `oversized`,
+`admission-policy`, or `expired`. Events contain
+only the affected entry count, estimated bytes, and timestamp—never keys,
+namespaces, URLs, headers, or response data. Synchronous throws and rejected
+promises from observers are ignored so telemetry cannot break caching.
+
+`shouldPersist(entry, estimatedBytes)` runs after structured-clone size
+estimation for entries that fit `maxBytes`, and may return a boolean or a
+promise. It receives a portable `CacheEntry` without the internal storage key,
+namespace, access time, or schema metadata. Returning `false` removes any older
+same-key value and emits an aggregate `rejection` event with reason
+`admission-policy`. If the policy throws or rejects, `set()` reports that error
+and preserves the old record. Non-boolean results produce a `CONFIG_ERROR`.
+Because the callback can inspect parsed response data and headers, applications
+must avoid logging or forwarding sensitive values from it.
+
+Use `compact()` to reclaim current-schema entries that are no longer useful:
+
+```ts
+let result
+
+do {
+  result = await store.compact({
+    expiredBefore: Date.now() - 7 * 24 * 60 * 60 * 1000,
+    maxRemovals: 500
+  })
+} while (result.hasMore)
+```
+
+`expiredBefore` must be finite and defaults to `Date.now()`. An entry is
+removed when `expiresAt <= expiredBefore`; choose an older boundary when stale
+cache entries are retained for stale-while-revalidate or stale-if-error.
+`maxRemovals` accepts a positive safe integer or `Infinity` and defaults to
+`Infinity`. The result contains `scannedEntries`, `removedEntries`,
+`estimatedBytesFreed`, `expiredBefore`, and conservative `hasMore`. A bounded
+pass may report `hasMore: true` after removing the final eligible entry, so
+repeat until it returns `false`. Cleanup emits aggregate `expired` events and
+never exposes keys or values. Both `compact()` and `getUsage()` scan with an
+IndexedDB cursor, keeping peak JavaScript memory independent of namespace size.
+
+Compose a fast primary and durable secondary cache with `TieredCacheStore`:
+
+```ts
+const persistent = new IndexedDBCacheStore(indexedDB, {
+  namespace: 'account:42',
+  schemaVersion: 2
+})
+
+const store = new TieredCacheStore({
+  primary: new MemoryCacheStore({ maxEntries: 200 }),
+  secondary: persistent,
+  broadcast: {
+    channel: new BroadcastChannel('admin-cache:account:42:v2'),
+    maxTrackedKeys: 1000
+  },
+  coordination: {
+    locks: navigator.locks,
+    namespace: 'admin-cache:account:42:v2'
+  }
+})
+
+const cache = cachePlugin({ store })
+```
+
+Primary hits preserve the store's synchronous fast path. Primary misses read
+the secondary tier and promote successful results; promotion failures do not
+discard valid secondary data. Writes complete in the secondary tier before
+updating the primary, preventing failed persistence from creating a memory-only
+success. Delete and clear operations always attempt both tiers and report the
+first failure after both settle.
+
+Tag invalidation requires both stores to implement `invalidateTags()` and
+returns the larger removal count, representing the best logical count when the
+tiers mirror each other. External changes made directly to the secondary store
+cannot evict another process or tab's primary memory entry; route mutations
+through each active tiered store or use a cross-context invalidation channel.
+Keep a reference to a closeable secondary store when its connection lifecycle
+must be managed.
+
+When `broadcast.channel` is supplied, successful writes and targeted deletes
+send only a protocol version, random source identifier, action, and short
+non-cryptographic key fingerprint. URLs, headers, response data, tags, and full
+cache keys are never posted. Receiving contexts delete only the matching
+primary key; unknown fingerprints, tag invalidation, and clear operations
+conservatively clear the entire primary tier. The next read restores current
+data from the shared secondary store. Fingerprint collisions therefore cause
+only an extra miss, never reuse of the wrong response.
+
+`maxTrackedKeys` defaults to 1,000 and accepts 1–100,000. Old tracking records
+are bounded; a message for an untracked key falls back to clearing the primary.
+Channel delivery is eventually consistent, so a read already in progress may
+finish with its existing value. `store.dispose()` removes the listener but does
+not close the caller-owned channel. Use a channel name scoped by application,
+account, and cache schema version, and call both `dispose()` and
+`channel.close()` during teardown.
+
+When `coordination.locks` is supplied, cache misses and revalidations participate
+in an exclusive Web Lock derived from `coordination.namespace` and a short key
+fingerprint. A contender waits for the active request to settle, evicts its
+possibly stale primary entry, and rereads the shared secondary tier. It returns
+the newly cached response without another network request when possible; if the
+leader failed or produced no cacheable entry, the waiter becomes the next
+leader. This complements in-plugin request deduplication across independent
+clients, tabs, workers, and windows on the same origin. `dedupe: false` disables
+both forms of request sharing.
+
+The namespace defaults to `npora-cache`, accepts 1–128 characters, and should
+be scoped by application, account, and cache schema version. Lock names never
+contain the complete cache key, URL, headers, or response data. Waiting honors
+the request abort signal. Lock-manager failures fall back to an ordinary cache
+miss unless the request was aborted, and `store.dispose()` releases active
+leases. Configure this capability only where Web Locks are available, normally
+with `locks: navigator.locks`.
 
 Calling `cache.clear()` immediately starts a new cache and deduplication
 generation. Requests started afterward never join an older in-flight leader,
@@ -965,11 +1387,13 @@ and stale asynchronous reads or older responses cannot repopulate, overwrite or
 delete entries in the new generation. Requests already sharing an older leader
 still settle normally. Await `cache.clear()` when using an asynchronous store
 before relying on the underlying store having finished its own clear operation.
+Use `cache.delete(config)` when only one entry should be invalidated.
 
 The generated default key incorporates values from `varyHeaders`, including
-authorization and cookies. External stores must treat cache keys as sensitive
-or hash them before persistence and logging. They must also be isolated per
-application or tenant when browser-private responses can reach a shared store.
+authorization and cookies, except for the cache control fields described
+above. External stores must treat cache keys as sensitive or hash them before
+persistence and logging. They must also be isolated per application or tenant
+when browser-private responses can reach a shared store.
 
 Additional methods must be enabled explicitly:
 
@@ -1134,6 +1558,7 @@ TIMEOUT_ERROR
 ABORT_ERROR
 PARSER_ERROR
 SCHEMA_ERROR
+REQUEST_TOO_LARGE
 RESPONSE_TOO_LARGE
 CIRCUIT_OPEN
 CONCURRENCY_LIMIT

@@ -1,4 +1,5 @@
 import type { QueryParams, RequestConfig } from '../types'
+import { RequestError } from '../errors'
 import { createTimeoutSignal } from './createTimeoutSignal'
 import { hasOwnProperty } from './hasOwnProperty'
 import { isURLSearchParams } from './isURLSearchParams'
@@ -26,6 +27,7 @@ export function buildRequestWithHeaders(
   headers: Headers
 ): BuiltRequest {
   const body = buildBody(config, headers)
+  validateRequestBodySize(body, config)
   const url = buildURL(config)
   const init: RequestInit = {
     ...config.fetchOptions,
@@ -113,7 +115,7 @@ function joinURL(baseURL: string | undefined, url: string): string {
   return `${baseURL.slice(0, baseEnd)}/${url.slice(urlStart)}`
 }
 
-function isAbsoluteURL(url: string): boolean {
+export function isAbsoluteURL(url: string): boolean {
   if (url.startsWith('//')) {
     return true
   }
@@ -148,14 +150,19 @@ function appendQuery(
   key: string,
   value: QueryParams[string]
 ): void {
-  if (value === null || value === undefined) {
+  if (value === undefined) {
+    return
+  }
+
+  if (value === null) {
+    params.append(key, '')
     return
   }
 
   if (Array.isArray(value)) {
     for (const item of value) {
-      if (item !== null && item !== undefined) {
-        params.append(key, String(item))
+      if (item !== undefined) {
+        params.append(key, item === null ? '' : String(item))
       }
     }
 
@@ -310,6 +317,87 @@ function setContentType(headers: Headers, value: string): void {
   if (!headers.has('content-type')) {
     headers.set('content-type', value)
   }
+}
+
+function validateRequestBodySize(
+  body: BodyInit | undefined,
+  config: RequestConfig
+): void {
+  const maxSize = config.maxRequestSize
+
+  if (!Number.isFinite(maxSize) || body === undefined) {
+    return
+  }
+
+  const size = getRequestBodySize(body)
+
+  if (
+    size !== undefined &&
+    size > (maxSize ?? Number.POSITIVE_INFINITY)
+  ) {
+    throw new RequestError(
+      `Request body exceeds maxRequestSize ${maxSize}`,
+      {
+        code: 'REQUEST_TOO_LARGE',
+        config
+      }
+    )
+  }
+}
+
+function getRequestBodySize(body: BodyInit): number | undefined {
+  if (typeof body === 'string') {
+    return utf8ByteLength(body)
+  }
+
+  if (isURLSearchParams(body)) {
+    return utf8ByteLength(body.toString())
+  }
+
+  if (typeof Blob !== 'undefined' && body instanceof Blob) {
+    return body.size
+  }
+
+  if (body instanceof ArrayBuffer) {
+    return body.byteLength
+  }
+
+  if (ArrayBuffer.isView(body)) {
+    return body.byteLength
+  }
+
+  return undefined
+}
+
+function utf8ByteLength(value: string): number {
+  let bytes = 0
+
+  for (let index = 0; index < value.length; index += 1) {
+    const code = value.charCodeAt(index)
+
+    if (code < 0x80) {
+      bytes += 1
+    } else if (code < 0x800) {
+      bytes += 2
+    } else if (
+      code >= 0xd800 &&
+      code <= 0xdbff &&
+      index + 1 < value.length
+    ) {
+      const next = value.charCodeAt(index + 1)
+
+      if (next >= 0xdc00 && next <= 0xdfff) {
+        bytes += 4
+        index += 1
+      } else {
+        bytes += 3
+      }
+    } else {
+      bytes += 3
+    }
+  }
+
+  return bytes
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {

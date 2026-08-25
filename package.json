@@ -36,6 +36,66 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
       "require": "./dist/index.cjs"
+    },
+    "./core": {
+      "types": "./dist/core.d.ts",
+      "import": "./dist/core.js",
+      "require": "./dist/core.cjs"
+    },
+    "./plugins": {
+      "types": "./dist/plugins.d.ts",
+      "import": "./dist/plugins.js",
+      "require": "./dist/plugins.cjs"
+    },
+    "./plugins/auth": {
+      "types": "./dist/plugins/auth.d.ts",
+      "import": "./dist/plugins/auth.js",
+      "require": "./dist/plugins/auth.cjs"
+    },
+    "./plugins/cache": {
+      "types": "./dist/plugins/cache.d.ts",
+      "import": "./dist/plugins/cache.js",
+      "require": "./dist/plugins/cache.cjs"
+    },
+    "./plugins/circuit-breaker": {
+      "types": "./dist/plugins/circuit-breaker.d.ts",
+      "import": "./dist/plugins/circuit-breaker.js",
+      "require": "./dist/plugins/circuit-breaker.cjs"
+    },
+    "./plugins/concurrency": {
+      "types": "./dist/plugins/concurrency.d.ts",
+      "import": "./dist/plugins/concurrency.js",
+      "require": "./dist/plugins/concurrency.cjs"
+    },
+    "./plugins/download": {
+      "types": "./dist/plugins/download.d.ts",
+      "import": "./dist/plugins/download.js",
+      "require": "./dist/plugins/download.cjs"
+    },
+    "./plugins/logger": {
+      "types": "./dist/plugins/logger.d.ts",
+      "import": "./dist/plugins/logger.js",
+      "require": "./dist/plugins/logger.cjs"
+    },
+    "./plugins/retry": {
+      "types": "./dist/plugins/retry.d.ts",
+      "import": "./dist/plugins/retry.js",
+      "require": "./dist/plugins/retry.cjs"
+    },
+    "./plugins/upload": {
+      "types": "./dist/plugins/upload.d.ts",
+      "import": "./dist/plugins/upload.js",
+      "require": "./dist/plugins/upload.cjs"
+    },
+    "./testing": {
+      "types": "./dist/testing.d.ts",
+      "import": "./dist/testing.js",
+      "require": "./dist/testing.cjs"
+    },
+    "./adapters/mock": {
+      "types": "./dist/testing.d.ts",
+      "import": "./dist/testing.js",
+      "require": "./dist/testing.cjs"
     }
   },
   "files": [
@@ -67,7 +127,7 @@
     "test:release-workflow": "node test/release-workflow.mjs",
     "test:types": "pnpm build && tsc -p test/types/tsconfig.json",
     "test:examples": "tsc -p examples/tsconfig.json",
-    "test:package": "node test/package/esm.mjs && node test/package/cjs.cjs && node test/package/api-exports.mjs && node test/package/api-contract.mjs && node test/package/npm-pack-result.test.mjs && node test/package/manifest.mjs && pnpm test:size",
+    "test:package": "node test/package/esm.mjs && node test/package/cjs.cjs && node test/package/subpaths.mjs && node test/package/subpaths.cjs && node test/package/api-exports.mjs && node test/package/api-contract.mjs && node test/package/npm-pack-result.test.mjs && node test/package/manifest.mjs && pnpm test:size",
     "test:registry": "node test/package/registry-install.mjs",
     "test:size": "node test/package/size.mjs",
     "test:browser": "playwright test --config=browser/playwright.config.ts",
@@ -77,6 +137,9 @@
     "audit:malware": "node scripts/audit-malware.mjs",
     "audit:signatures": "pnpm audit signatures",
     "benchmark": "tsx benchmark/request.ts",
+    "benchmark:http": "tsx benchmark/http-concurrency.ts",
+    "benchmark:libraries": "npm --prefix benchmark/competitors run benchmark",
+    "benchmark:libraries:install": "npm install --prefix benchmark/competitors --ignore-scripts --no-audit --no-fund",
     "stress": "node --expose-gc --import tsx benchmark/stress.ts",
     "benchmark:types": "tsc -p benchmark/tsconfig.json"
   },

@@ -453,8 +453,8 @@ function normalizeQuery(query?: QueryParams): string {
     const values = Array.isArray(value) ? value : [value]
 
     for (const item of values) {
-      if (item !== null && item !== undefined) {
-        entries.push([key, String(item)])
+      if (item !== undefined) {
+        entries.push([key, item === null ? '' : String(item)])
       }
     }
   }

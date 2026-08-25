@@ -62,10 +62,14 @@ try {
       '--input-type=module',
       '--eval',
       [
-        `import { createClient, MockAdapter } from '${packageName}';`,
+        `import { createClient } from '${packageName}/core';`,
+        `import { retryPlugin } from '${packageName}/plugins/retry';`,
+        `import { MockAdapter } from '${packageName}/testing';`,
         'const adapter = new MockAdapter();',
-        "adapter.on('/smoke', () => ({ format: 'esm' }));",
-        'const data = await createClient({ adapter }).get("/smoke");',
+        "adapter.onGet('/smoke').networkErrorOnce();",
+        "adapter.onGet('/smoke').reply(200, { format: 'esm' });",
+        'const client = createClient({ adapter }).use(retryPlugin({ retries: 1 }));',
+        'const data = await client.get("/smoke");',
         "if (data.format !== 'esm') process.exit(1)"
       ].join('\n')
     ]
@@ -76,10 +80,13 @@ try {
     [
       '--eval',
       [
-        `const { createClient, MockAdapter } = require('${packageName}');`,
+        `const { createClient } = require('${packageName}/core');`,
+        `const { retryPlugin } = require('${packageName}/plugins/retry');`,
+        `const { MockAdapter } = require('${packageName}/adapters/mock');`,
         'const adapter = new MockAdapter();',
-        "adapter.on('/smoke', () => ({ format: 'cjs' }));",
-        'createClient({ adapter }).get("/smoke")',
+        "adapter.onGet('/smoke').networkErrorOnce();",
+        "adapter.onGet('/smoke').reply(200, { format: 'cjs' });",
+        'createClient({ adapter }).use(retryPlugin({ retries: 1 })).get("/smoke")',
         "  .then(data => { if (data.format !== 'cjs') process.exit(1) })",
         '  .catch(() => process.exit(1))'
       ].join('\n')
