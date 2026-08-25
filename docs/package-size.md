@@ -1,8 +1,8 @@
 # Package Size
 
 Package size is a release constraint, separate from runtime performance.
-The check covers both published JavaScript entrypoints, their gzip sizes,
-declaration files, and the npm tarball.
+The check covers the transitive file closures loaded by the root and selected
+subpath entrypoints, their gzip sizes, declaration files, and the npm tarball.
 
 Build and verify the current package:
 
@@ -83,6 +83,77 @@ Published JavaScript is optimized for machines rather than direct inspection.
 Use the tagged repository source when debugging internals; public error names,
 codes, metadata, export names, constructor names, and declarations remain
 verified package contracts.
+
+Version 1.15.0 split the root bundle into shared ESM and CommonJS chunks and
+added core, individual plugin, and testing subpath exports. Size checks follow
+each entry's static imports so moving code from an entry wrapper into a shared
+chunk cannot make the measured runtime cost appear smaller. The installed
+package grows modestly from the extra entry declarations, while applications
+can avoid loading unrelated plugins and MockAdapter code.
+
+The conditional cache revalidation change raises the cache subpath, root
+runtime, tarball, and unpacked-package budgets by the measured implementation
+cost plus narrow headroom. This covers validator retention, conditional request
+headers, request cache directives, `304` response restoration, and metadata
+merging without adding a runtime dependency; unrelated subpath and declaration
+budgets remain fixed.
+
+Bounded stale-if-error recovery adds a small core fallback handoff, the public
+request option, cache directive parsing, retry-aware recovery, and strict error
+classification. The root, core, cache, declaration, tarball, and unpacked
+budgets were raised by the measured cost plus narrow headroom; unrelated plugin
+and testing entry budgets remain fixed and no runtime dependency was added.
+
+Stale-while-revalidate adds an internal plugin dispatch channel, immutable
+request-input snapshots, deduplicated and abortable background refresh state,
+the public request option, and directive parsing. Runtime, declarations,
+tarball, and unpacked budgets track the measured implementation cost; no
+runtime dependency was added.
+
+Cache observability adds dependency-free aggregate counters and privacy-safe
+lifecycle events to the cache subpath. The implementation deliberately omits
+request identifiers and isolates observer failures; runtime, declaration, and
+package budgets include only the measured feature cost plus narrow headroom.
+
+Targeted cache deletion adds per-key generation isolation, asynchronous store
+coordination, in-flight detachment, and background-refresh cancellation. This
+keeps unrelated requests cacheable while ensuring older same-key work cannot
+repopulate an invalidated entry; budgets track the measured implementation and
+public type cost without adding a dependency.
+
+Bounded cache tags add grouped invalidation to the default memory store and an
+optional capability for custom stores. Per-key active tag state and per-tag
+asynchronous coordination prevent stale in-flight writes without introducing
+an unbounded plugin-side index; package budgets include the measured cost.
+
+Successful-mutation invalidation retains bounded request-scoped tag metadata
+through retries and performs final-outcome-aware cleanup from the settled
+lifecycle. Async stores are awaited and failures remain isolated from an
+otherwise successful response; the size budget tracks this orchestration.
+
+IndexedDB cache observability adds current-schema aggregate usage inspection
+and privacy-safe eviction, recovery, cleanup, and rejection summaries. The
+root, cache, declaration, tarball, and unpacked budgets were raised by the
+measured implementation and public type cost plus narrow headroom; no runtime
+dependency was added.
+
+IndexedDB admission policies add one synchronous-or-asynchronous decision hook,
+strict callback validation, same-key rejection cleanup, and an aggregate event
+reason. Runtime, declaration, tarball, and unpacked budgets track the measured
+cost plus narrow headroom without affecting unrelated subpaths.
+
+Bounded IndexedDB compaction adds cursor-based maintenance, aggregate cleanup
+results, stale-window controls, batch limits, and public option/result types.
+The same change makes usage inspection constant-memory. Root, cache,
+declaration, tarball, and unpacked budgets track the measured cost plus narrow
+headroom; core and unrelated plugin budgets remain fixed.
+
+The final IndexedDB forward-compatibility audit makes reads, deletes, writes,
+clearing, compaction, LRU accounting, and quota recovery preserve every higher
+schema version even if it occupies an older key or uses an incompatible record
+envelope. The root, cache, tarball, and unpacked budgets include only this
+measured guard and narrow headroom; declarations and unrelated subpaths remain
+fixed.
 
 `pnpm test:package` includes the size check, so release verification cannot
 publish a package that exceeds the checked-in budgets. CI also stores the JSON

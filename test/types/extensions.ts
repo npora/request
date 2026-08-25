@@ -1,5 +1,11 @@
 import type {
   Client,
+  CacheEvent,
+  CachePlugin,
+  CachePluginOptions,
+  CacheRefreshLease,
+  CacheSetOptions,
+  CacheStats,
   CacheStore,
   CircuitBreakerPlugin,
   CircuitBreakerPluginOptions,
@@ -10,22 +16,35 @@ import type {
   ConcurrencyState,
   DownloadOutput,
   DownloadPluginOptions,
+  IndexedDBCacheCompactionOptions,
+  IndexedDBCacheCompactionResult,
+  IndexedDBCacheStoreEvent,
+  IndexedDBCacheStoreOptions,
+  IndexedDBCacheUsage,
   LoggerEntry,
   MemoryCacheStoreOptions,
   Plugin,
   RequestLogger,
   RequestConfig,
   ServerSentEvent,
+  TieredCacheBroadcastOptions,
+  TieredCacheCoordinationOptions,
+  TieredCacheStoreOptions,
   TransferProgress,
   RetryEvent,
   RetryOptions,
-  UploadProgress
+  UploadProgress,
+  WebStorageCacheStoreOptions
 } from '@npora/request'
 import {
+  cachePlugin,
   circuitBreakerPlugin,
   concurrencyPlugin,
   downloadPlugin,
-  MemoryCacheStore
+  IndexedDBCacheStore,
+  MemoryCacheStore,
+  TieredCacheStore,
+  WebStorageCacheStore
 } from '@npora/request'
 
 interface MetricsOptions {
@@ -56,6 +75,8 @@ const retry: RetryOptions = {
 
 const config: RequestConfig = {
   url: '/user',
+  allowAbsoluteUrls: false,
+  maxRequestSize: 1024,
   searchParams: new URLSearchParams([
     ['tag', 'first'],
     ['tag', 'second']
@@ -120,6 +141,7 @@ client.unuse(plugin.name)
 const installed: boolean = client.hasPlugin(plugin.name)
 const extended: Client = client.extend({
   baseURL: '/v2',
+  allowAbsoluteUrls: false,
   headers: {
     'x-client': 'extended'
   }
@@ -218,14 +240,138 @@ const cacheStore: CacheStore = {
   async clear() {}
 }
 
+const staleCacheConfig: RequestConfig = {
+  url: '/stale',
+  extensions: {
+    cache: {
+      enabled: true,
+      staleIfError: 5000,
+      staleWhileRevalidate: 10000,
+      tags: ['user:1', 'users'],
+      invalidateTags: ['user-lists']
+    }
+  }
+}
+
 void cacheStore
+void staleCacheConfig
 
 const memoryCacheOptions: MemoryCacheStoreOptions = {
   maxEntries: 100
 }
 const memoryCacheStore: CacheStore = new MemoryCacheStore(memoryCacheOptions)
+const webStorageOptions: WebStorageCacheStoreOptions = {
+  namespace: 'type-test',
+  maxEntries: 100
+}
+const webStorageCacheStore: CacheStore = new WebStorageCacheStore(
+  localStorage,
+  webStorageOptions
+)
+const indexedDBOptions: IndexedDBCacheStoreOptions = {
+  databaseName: 'type-test',
+  namespace: 'type-test',
+  maxEntries: 100,
+  maxBytes: 1024 * 1024,
+  quotaRecovery: true,
+  onEvent(event) {
+    const cacheEvent: IndexedDBCacheStoreEvent = event
+
+    void cacheEvent.estimatedBytes
+  },
+  shouldPersist(entry, estimatedBytes) {
+    return entry.status === 200 && estimatedBytes < 512 * 1024
+  },
+  schemaVersion: 2
+}
+const indexedDBStore = new IndexedDBCacheStore(
+  indexedDB,
+  indexedDBOptions
+)
+const indexedDBCacheStore: CacheStore = indexedDBStore
+const indexedDBUsage: Promise<IndexedDBCacheUsage> = indexedDBStore.getUsage()
+const compactionOptions: IndexedDBCacheCompactionOptions = {
+  expiredBefore: Date.now(),
+  maxRemovals: 100
+}
+const compaction: Promise<IndexedDBCacheCompactionResult> =
+  indexedDBStore.compact(compactionOptions)
+const tieredCacheOptions: TieredCacheStoreOptions = {
+  primary: memoryCacheStore,
+  secondary: indexedDBCacheStore,
+  broadcast: {
+    channel: new BroadcastChannel('type-test'),
+    maxTrackedKeys: 100
+  },
+  coordination: {
+    locks: navigator.locks,
+    namespace: 'type-test'
+  }
+}
+const tieredBroadcastOptions: TieredCacheBroadcastOptions =
+  tieredCacheOptions.broadcast!
+const tieredCoordinationOptions: TieredCacheCoordinationOptions =
+  tieredCacheOptions.coordination!
+const cacheRefreshLease: Promise<CacheRefreshLease> =
+  new TieredCacheStore(tieredCacheOptions)
+    .acquireRefreshLease!('type-test')
+const tieredCacheStore: CacheStore = new TieredCacheStore(tieredCacheOptions)
 
 void memoryCacheStore
+void webStorageCacheStore
+void indexedDBCacheStore
+void indexedDBUsage
+void compaction
+void tieredCacheStore
+void tieredBroadcastOptions
+void tieredCoordinationOptions
+void cacheRefreshLease
+
+const cacheOptions: CachePluginOptions = {
+  onEvent(event) {
+    const cacheEvent: CacheEvent = event
+
+    void cacheEvent.type
+    void cacheEvent.timestamp
+  }
+}
+const observedCache: CachePlugin = cachePlugin(cacheOptions)
+const cacheStats: Readonly<CacheStats> = observedCache.getStats()
+const cacheSetOptions: CacheSetOptions = {
+  ttl: Infinity,
+  status: 200,
+  statusText: 'OK',
+  headers: { 'x-cache-source': 'seed' },
+  tags: ['user:1']
+}
+
+observedCache.resetStats()
+void observedCache.delete({
+  url: '/observed-cache-entry',
+  extensions: {
+    cache: {
+      key: 'observed-cache-entry'
+    }
+  }
+})
+const cacheWrite: void | Promise<void> = observedCache.set(
+  { url: '/observed-cache-entry' },
+  { id: 1 },
+  cacheSetOptions
+)
+const cacheUpdate: boolean | Promise<boolean> = observedCache.update<{
+  id: number
+}>({ url: '/observed-cache-entry' }, value => ({
+  id: value.id + 1
+}))
+const invalidatedTags: number | Promise<number> =
+  observedCache.invalidateTags(['user:1', 'users'])
+
+void invalidatedTags
+void cacheWrite
+void cacheUpdate
+void cacheStats.backgroundRefreshErrors
+void cacheStats.invalidations
 
 const circuitOptions: CircuitBreakerPluginOptions = {
   failureThreshold: 3,

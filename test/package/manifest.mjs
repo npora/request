@@ -43,15 +43,38 @@ try {
     .map(file => file.path)
     .sort()
 
-  assert.deepEqual(paths, [
+  const requiredPaths = [
     'LICENSE',
     'README.md',
-    'dist/index.cjs',
-    'dist/index.d.cts',
-    'dist/index.d.ts',
+    'package.json',
     'dist/index.js',
-    'package.json'
-  ])
+    'dist/index.cjs',
+    'dist/index.d.ts',
+    'dist/index.d.cts',
+    'dist/core.js',
+    'dist/core.cjs',
+    'dist/plugins/retry.js',
+    'dist/plugins/retry.cjs',
+    'dist/testing.js',
+    'dist/testing.cjs'
+  ]
+
+  for (const path of requiredPaths) {
+    assert.ok(paths.includes(path), `Missing packed file ${path}`)
+  }
+
+  assert.ok(
+    paths.every(path => (
+      path === 'LICENSE' ||
+      path === 'README.md' ||
+      path === 'package.json' ||
+      (
+        path.startsWith('dist/') &&
+        /\.(?:js|cjs|d\.ts|d\.cts)$/.test(path)
+      )
+    )),
+    'Tarball contains a file outside the compiled package allowlist'
+  )
 } finally {
   rmSync(temporaryDirectory, {
     recursive: true,

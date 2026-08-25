@@ -11,6 +11,7 @@ export type RequestErrorCode =
   | 'ABORT_ERROR'
   | 'PARSER_ERROR'
   | 'SCHEMA_ERROR'
+  | 'REQUEST_TOO_LARGE'
   | 'RESPONSE_TOO_LARGE'
   | 'CIRCUIT_OPEN'
   | 'CONCURRENCY_LIMIT'

@@ -36,6 +36,7 @@ export interface PluginScope {
 export function createPluginScope(
   interceptors: PluginInterceptors,
   hooks: PluginHooks,
+  dispatch: PluginContext['dispatch'],
   priority = 0
 ): PluginScope {
   const cleanups: PluginCleanup[] = []
@@ -58,7 +59,8 @@ export function createPluginScope(
         cleanups
       )
     },
-    hooks: createScopedHooks(hooks, priority, cleanups)
+    hooks: createScopedHooks(hooks, priority, cleanups),
+    dispatch
   }
 
   return {

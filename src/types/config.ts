@@ -65,6 +65,15 @@ export interface RequestConfig {
 
   baseURL?: string
 
+  /**
+   * Allow an absolute request URL to bypass `baseURL`.
+   *
+   * Disable this when `baseURL` defines the trusted request boundary.
+   *
+   * @default true
+   */
+  allowAbsoluteUrls?: boolean
+
   fetchOptions?: FetchOptions
 
   headers?: HeadersInit
@@ -84,6 +93,17 @@ export interface RequestConfig {
   timeout?: number
 
   signal?: AbortSignal
+
+  /**
+   * Maximum request body size in bytes when the serialized size can be
+   * determined before dispatch.
+   *
+   * FormData and ReadableStream bodies cannot be preflighted without
+   * buffering and are therefore not covered.
+   *
+   * @default unlimited
+   */
+  maxRequestSize?: number
 
   /**
    * Maximum parsed response body size in bytes.
