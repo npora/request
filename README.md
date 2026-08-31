@@ -27,6 +27,12 @@ authentication, and upload/download progress.
   composable plugins over the standard Fetch API.
 - **Use one predictable contract everywhere.** Browsers, Web Workers, Node.js,
   ESM, and CommonJS share the same typed lifecycle and stable error codes.
+- **Keep native platform values native.** `URL`, `Request`, `Headers`,
+  `FormData`, `Blob`, `ArrayBuffer`, and `ReadableStream` retain their Fetch
+  semantics, including supported cross-realm inputs.
+- **Bound untrusted traffic.** Separate request, successful response, and error
+  response limits prevent accidental buffering while preserving meaningful
+  error codes and cancellation.
 - **Ship less supply-chain risk.** The package has no runtime dependencies and
   verifies public exports, browser behavior, security regressions, and size
   budgets before release.
@@ -48,8 +54,10 @@ claims about every remote workload; commands and limitations are in the
 ## Features
 
 - Data-first and complete-response APIs with TypeScript inference.
-- Native `URL` inputs, including cross-realm values, with stable lifecycle
-  snapshots.
+- Native `URL` and `Request` inputs with explicit per-call overrides and stable
+  lifecycle snapshots.
+- First-class RFC 10008 `QUERY` helpers with JSON bodies and safe retries for
+  replayable content.
 - Query- and fragment-safe `baseURL` prefix composition.
 - Object query merging plus native ordered `URLSearchParams` through
   `searchParams`.
@@ -130,6 +138,44 @@ console.log(response.status)
 console.log(response.headers)
 console.log(response.raw)
 ```
+
+## Native Fetch inputs
+
+Use a native `Request` directly when another platform layer already owns the
+request construction. Client defaults and explicit overrides still participate
+in the normal lifecycle, while an unchanged body is not cloned or buffered:
+
+```ts
+const input = new Request('https://api.example.com/users/1', {
+  headers: {
+    authorization: `Bearer ${accessToken}`
+  }
+})
+
+const user = await api.request<User>(input, {
+  timeout: 3000
+})
+```
+
+Native `URL`, `Headers`, body values, cancellation signals, and Fetch options
+remain available throughout interceptors, plugins, responses, and errors.
+
+## Content-bearing queries
+
+Use the standardized `QUERY` method for safe, idempotent queries whose input
+belongs in a typed request body instead of a long URL:
+
+```ts
+const users = await api.query<User[]>('/users/search', {
+  json: {
+    status: 'active',
+    teams: ['platform', 'web']
+  }
+})
+```
+
+JSON supplies the required media type automatically. Replayable QUERY bodies
+participate in safe retries when the retry plugin is installed.
 
 ## Response validation
 
@@ -698,7 +744,6 @@ allowlist, and size budgets.
 - [API reference](https://github.com/npora/request/blob/main/docs/api.md)
 - [Architecture](https://github.com/npora/request/blob/main/docs/architecture.md)
 - [Migration from 0.x](https://github.com/npora/request/blob/main/docs/migration.md)
-- [Migration from Axios or Ky](https://github.com/npora/request/blob/main/docs/migration-from-axios-and-ky.md)
 - [Security model](https://github.com/npora/request/blob/main/docs/security.md)
 - [Testing and release gates](https://github.com/npora/request/blob/main/docs/testing.md)
 - [Performance benchmarks](https://github.com/npora/request/blob/main/docs/benchmark.md)

@@ -5,6 +5,27 @@
 For option types, defaults, merge behavior, runtime support, and plugin-owned
 request fields, see the [configuration reference](configuration.md).
 
+## Core guarantees
+
+- **Native transport model:** Fetch-compatible inputs, responses, cancellation,
+  streams, and transport overrides remain visible instead of being hidden by a
+  private request abstraction.
+- **Two deliberate response APIs:** data-first methods return parsed values;
+  complete-response methods add status, headers, effective configuration, and
+  the native response without changing request configuration.
+- **Bounded body handling:** request streams, successful responses, thrown HTTP
+  error data, SSE, NDJSON, and progress streams honor explicit limits without
+  forcing full-body buffering.
+- **Stable failures:** transport, timeout, abort, HTTP, parser, schema, size,
+  plugin, and configuration failures use typed errors with stable codes and
+  preserve their causal metadata.
+- **Deterministic extensibility:** interceptors and official plugins share an
+  ordered lifecycle with isolated client state, cancellation, cleanup, and
+  retry rules.
+- **Portable delivery:** the same public contract is tested in Node.js,
+  Chromium, Firefox, WebKit, Web Workers, ESM, and CommonJS, with zero runtime
+  dependencies.
+
 ## Package entrypoints
 
 The root entrypoint remains backward compatible and exports the complete API.
@@ -246,11 +267,11 @@ Absolute request URLs bypass `baseURL` by default. Set
 `allowAbsoluteUrls: false` to reject absolute and protocol-relative request
 URLs whenever `baseURL` is configured.
 
-`baseURL` is a path prefix, matching the established Axios/ofetch-style model,
-not WHATWG `new URL(input, base)` resolution. Base query parameters are merged
-before request URL and configured query values, while fragments remain last
-and a request fragment takes precedence. This prevents a base query or hash
-from splitting the combined path into a malformed URL.
+`baseURL` uses predictable path-prefix composition rather than WHATWG
+`new URL(input, base)` resolution. Base query parameters are merged before the
+request URL and configured query values, while fragments remain last and a
+request fragment takes precedence. This prevents a base query or hash from
+splitting the combined path into a malformed URL.
 
 ```ts
 await request.get('/account', {

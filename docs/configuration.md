@@ -49,13 +49,13 @@ keys, retries, logging, and adapters observe it; later mutation of the original
 object cannot redirect an in-flight request. URL objects are absolute, ignore
 `baseURL`, and remain subject to `allowAbsoluteUrls: false`.
 
-`baseURL` keeps path-prefix semantics for Axios/ofetch compatibility: leading
-and trailing slashes are normalized and `/users` remains below a `/v1` prefix.
-If the base contains query parameters, they are placed after the combined path
-and before request/query options. Base and request query strings retain their
-order. A request fragment overrides a base fragment; otherwise the base
-fragment is preserved at the end of the final URL. Query-only and fragment-only
-request references do not insert an extra path slash.
+`baseURL` uses path-prefix semantics: leading and trailing slashes are
+normalized and `/users` remains below a `/v1` prefix. If the base contains
+query parameters, they are placed after the combined path and before
+request/query options. Base and request query strings retain their order. A
+request fragment overrides a base fragment; otherwise the base fragment is
+preserved at the end of the final URL. Query-only and fragment-only request
+references do not insert an extra path slash.
 
 The `json` shortcut accepts objects, arrays, strings, numbers, booleans, and
 `null`. An explicit `json: null` is a real body containing `null`, participates
