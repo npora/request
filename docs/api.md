@@ -80,6 +80,8 @@ the child client.
 ```ts
 request.request<T>(config): Promise<T>
 request.requestResponse<T>(config): Promise<NporaResponse<T>>
+request.request<T>(nativeRequest, config?): Promise<T>
+request.requestResponse<T>(nativeRequest, config?): Promise<NporaResponse<T>>
 ```
 
 `request()` returns parsed response data. `requestResponse()` returns the
@@ -98,6 +100,16 @@ const response = await request.requestResponse<User>({
 
 console.log(response.status)
 ```
+
+A native `Request`, including one created by another same-origin realm, can be
+passed directly. Client defaults are applied first, then the Request URL,
+method, headers, body, signal, and Fetch properties, followed by explicit
+per-call overrides. Bodies are not cloned or buffered, and the original native
+Request remains the Fetch input while URL, method, and body are unchanged.
+Bodyless cross-realm Requests are supported. For a portable body-bearing
+cross-realm call, provide an explicit replacement `body`, `json`, `form`, or
+`formData`, because browsers do not transfer the original consistently. Callers
+must not consume a Request body elsewhere after dispatch.
 
 ---
 

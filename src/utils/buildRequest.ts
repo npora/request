@@ -6,6 +6,7 @@ import { isURLSearchParams } from './isURLSearchParams'
 import { isArrayBuffer, isBlob } from './isBinaryBody'
 import { isFormData } from './isFormData'
 import { isReadableStream } from './isReadableStream'
+import { getRequestForBody } from './isRequest'
 
 const RESPONSE_ACCEPT = {
   json: 'application/json',
@@ -26,6 +27,8 @@ const URL_REFERENCE = /^([^?#]*)(?:\?([^#]*))?(#.*)?$/
 
 export interface BuiltRequest {
   url: string
+  input?: Request
+  useNativeInput?: boolean
   init: RequestInit
   clear: () => void
   bodyError?: { current?: RequestError }
@@ -54,19 +57,25 @@ export function buildRequestWithHeaders(
   const originalBody = body
   body = limitStreamingRequestBody(body, config, bodyError)
   const url = buildURL(config)
+  const input = resolveNativeRequestInput(
+    config,
+    body,
+    url,
+    config.method
+  )
   const init: RequestInit = {
     ...config.fetchOptions,
     method: config.method ?? 'GET',
     headers,
-    body,
     signal: config.signal
   }
 
-  if (
-    body &&
-    isReadableStream(body)
-  ) {
-    (init as RequestInit & { duplex: 'half' }).duplex = 'half'
+  if (!input) {
+    init.body = body
+
+    if (body && isReadableStream(body)) {
+      (init as RequestInit & { duplex: 'half' }).duplex = 'half'
+    }
   }
 
   const timeoutEnabled = Boolean(
@@ -80,12 +89,76 @@ export function buildRequestWithHeaders(
     init.signal = timeoutSignal.signal
   }
 
+  const useNativeInput = input
+    ? canUseNativeInput(input, init, config.fetchOptions)
+    : false
+
   return {
     url,
+    input,
+    useNativeInput,
     init,
     clear: timeoutSignal?.clear ?? noop,
     bodyError: body === originalBody ? undefined : bodyError
   }
+}
+
+function canUseNativeInput(
+  input: Request,
+  init: RequestInit,
+  fetchOptions: RequestConfig['fetchOptions']
+): boolean {
+  if (
+    init.method !== input.method ||
+    init.signal !== input.signal ||
+    !headersEqual(input.headers, init.headers)
+  ) {
+    return false
+  }
+
+  return fetchOptions === undefined || (
+    fetchOptions.cache === input.cache &&
+    fetchOptions.credentials === input.credentials &&
+    fetchOptions.integrity === input.integrity &&
+    fetchOptions.keepalive === input.keepalive &&
+    fetchOptions.mode === input.mode &&
+    fetchOptions.redirect === input.redirect &&
+    fetchOptions.referrer === input.referrer &&
+    fetchOptions.referrerPolicy === input.referrerPolicy &&
+    Reflect.ownKeys(fetchOptions).length === 8
+  )
+}
+
+function headersEqual(
+  left: Headers,
+  right: HeadersInit | undefined
+): boolean {
+  const expected = new Headers(right)
+
+  if ([...left].length !== [...expected].length) {
+    return false
+  }
+
+  for (const [key, value] of left) {
+    if (expected.get(key) !== value) {
+      return false
+    }
+  }
+
+  return true
+}
+
+function resolveNativeRequestInput(
+  config: RequestConfig,
+  body: BodyInit | undefined,
+  url: string,
+  method: RequestConfig['method']
+): Request | undefined {
+  const input = getRequestForBody(config, body)
+
+  return input?.url === url && input.method === (method ?? 'GET')
+    ? input
+    : undefined
 }
 
 function setAccept(

@@ -81,6 +81,7 @@ const publicExports = [
   'RequestErrorCode',
   'RequestErrorOptions',
   'RequestExtensions',
+  'RequestInputConfig',
   'RequestLogEntry',
   'RequestLogger',
   'RequestURL',

@@ -254,6 +254,8 @@ isolated to each client.
 ```ts
 api.request(config)
 api.requestResponse(config)
+api.request(nativeRequest, config)
+api.requestResponse(nativeRequest, config)
 
 api.get(url, config)
 api.post(url, config)

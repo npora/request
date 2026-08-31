@@ -11,6 +11,11 @@ interface User {
 interface BrowserRequestClient {
   extend(options?: BrowserClientOptions): BrowserRequestClient
 
+  request<T>(
+    input: Request,
+    config?: BrowserRequestConfig
+  ): Promise<T>
+
   get<T>(
     url: string | URL,
     config?: BrowserRequestConfig
@@ -203,6 +208,62 @@ test(
       id: 1,
       name: 'Npora'
     })
+  }
+)
+
+test(
+  'should accept a native Request created by another realm',
+  async ({ page }) => {
+    await openFixture(page)
+
+    const result = await page.evaluate(async () => {
+      const request = (window as BrowserWindow).nporaRequest
+      const frame = document.createElement('iframe')
+      document.body.append(frame)
+
+      try {
+        const foreign = frame.contentWindow
+
+        if (!request || !foreign) {
+          throw new Error('Request fixture is unavailable')
+        }
+
+        const input = new foreign.Request(
+          new foreign.URL('/api/echo?native=true', location.href),
+          {
+            headers: {
+              'x-native': 'yes'
+            }
+          }
+        )
+        const foreignResult = await request.request<{
+          method: string
+          query: Record<string, string>
+          headers: Record<string, string>
+        }>(input, {
+          headers: { 'x-override': 'yes' }
+        })
+        const sameRealmResult = await request.request<{
+          method: string
+          body: { source: string }
+        }>(new Request(new URL('/api/echo', location.href), {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ source: 'request' })
+        }))
+
+        return { foreignResult, sameRealmResult }
+      } finally {
+        frame.remove()
+      }
+    })
+
+    expect(result.foreignResult.method).toBe('GET')
+    expect(result.foreignResult.query).toEqual({ native: 'true' })
+    expect(result.foreignResult.headers['x-native']).toBe('yes')
+    expect(result.foreignResult.headers['x-override']).toBe('yes')
+    expect(result.sameRealmResult.method).toBe('POST')
+    expect(result.sameRealmResult.body).toEqual({ source: 'request' })
   }
 )
 

@@ -59,7 +59,10 @@ export class FetchAdapter implements Adapter {
 
       request = buildRequestWithHeaders(config, headers)
       const fetchImplementation = config.fetch ?? globalThis.fetch
-      let response = await fetchImplementation(request.url, request.init)
+      let response = await fetchImplementation(
+        request.input ?? request.url,
+        request.useNativeInput ? undefined : request.init
+      )
       const filteredResponse =
         response.type === 'opaque' ||
         response.type === 'opaqueredirect'

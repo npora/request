@@ -212,3 +212,6 @@ export interface RequestConfig {
 
   extensions?: RequestExtensions
 }
+
+/** Per-call overrides accepted with a native Request input. */
+export type RequestInputConfig = Omit<RequestConfig, 'url'>

@@ -16,6 +16,97 @@ afterEach(() => {
 })
 
 describe('request config', () => {
+  it('should preserve an unchanged native Request as the fetch input', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response('ok', {
+        headers: { 'content-type': 'text/plain' }
+      })
+    )
+    const input = new Request('https://api.example.com/native', {
+      method: 'POST',
+      body: 'native body'
+    })
+
+    await createClient({ fetch: fetchMock }).request(input)
+
+    expect(fetchMock).toHaveBeenCalledWith(input, undefined)
+    expect(input.bodyUsed).toBe(false)
+  })
+
+  it('should accept a native Request with per-call overrides', async () => {
+    let sentBody = ''
+    const fetchMock = vi.fn(async (_url: string, init?: RequestInit) => {
+      sentBody = await new Response(init?.body).text()
+      return new Response('ok')
+    })
+    const controller = new AbortController()
+    const input = new Request('https://api.example.com/native?first=1', {
+      method: 'POST',
+      headers: {
+        'content-type': 'text/plain',
+        'x-input': 'yes'
+      },
+      body: 'native body',
+      cache: 'no-store',
+      credentials: 'omit',
+      signal: controller.signal
+    })
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    await createClient({
+      headers: { 'x-default': 'yes' }
+    }).request(input, {
+      headers: { 'x-override': 'yes' },
+      query: { second: 2 },
+      responseType: 'text',
+      fetchOptions: { cache: 'reload' }
+    })
+
+    const [url, init] = fetchMock.mock.calls[0]!
+
+    expect(url).toBe(
+      'https://api.example.com/native?first=1&second=2'
+    )
+    expect(init.method).toBe('POST')
+    expect(init.signal).toBe(input.signal)
+    expect(init.cache).toBe('reload')
+    expect(init.credentials).toBe('omit')
+    expect(init.duplex).toBe('half')
+    expect(new Headers(init.headers).get('x-input')).toBe('yes')
+    expect(new Headers(init.headers).get('x-default')).toBe('yes')
+    expect(new Headers(init.headers).get('x-override')).toBe('yes')
+    expect(sentBody).toBe('native body')
+    controller.abort('stop')
+    expect(input.signal.aborted).toBe(true)
+    expect(input.signal.reason).toBe('stop')
+  })
+
+  it('should allow native Request body and method replacement', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response('ok'))
+    const input = new Request('https://api.example.com/native', {
+      method: 'POST',
+      body: 'original'
+    })
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    await createClient().requestResponse(input, {
+      method: 'PUT',
+      body: 'replacement',
+      responseType: 'text'
+    })
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://api.example.com/native',
+      expect.objectContaining({
+        method: 'PUT',
+        body: 'replacement'
+      })
+    )
+    expect(input.bodyUsed).toBe(false)
+  })
+
   it('should accept and snapshot a native URL input', async () => {
     let releaseInterceptor: (() => void) | undefined
     const interceptorReady = new Promise<void>(resolve => {
