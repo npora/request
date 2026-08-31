@@ -35,6 +35,11 @@ interface BrowserRequestClient {
     config?: BrowserRequestConfig
   ): Promise<T>
 
+  query<T>(
+    url: string,
+    config?: BrowserRequestConfig
+  ): Promise<T>
+
   headResponse(
     url: string,
     config?: BrowserRequestConfig
@@ -2748,7 +2753,7 @@ test(
 )
 
 test(
-  'should send HEAD and OPTIONS requests in the browser',
+  'should send HEAD, OPTIONS, and QUERY requests in the browser',
   async ({ page }) => {
     await openFixture(page)
 
@@ -2764,22 +2769,37 @@ test(
 
       const head = await request.headResponse('/user')
       const options = await request.options('/user')
+      const query = await request.query<{
+        method: string
+        body: { filter: string }
+        headers: Record<string, string>
+      }>('/echo', {
+        json: { filter: 'active' }
+      })
 
       return {
         head: {
           data: head.data,
           status: head.status
         },
-        options
+        options,
+        query
       }
     })
 
-    expect(result).toEqual({
+    expect(result).toMatchObject({
       head: {
         data: undefined,
         status: 200
       },
-      options: undefined
+      options: undefined,
+      query: {
+        method: 'QUERY',
+        body: { filter: 'active' },
+        headers: expect.objectContaining({
+          'content-type': 'application/json'
+        })
+      }
     })
   }
 )

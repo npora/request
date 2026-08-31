@@ -339,7 +339,7 @@ Type: `number | RetryOptions`. Requires `retryPlugin()`.
 | Field | Default | Purpose |
 | --- | --- | --- |
 | `retries` | `0` | Maximum retry count after the initial attempt. |
-| `methods` | `GET`, `HEAD`, `OPTIONS`, `PUT`, `DELETE` | Replayable methods allowed to retry. |
+| `methods` | `GET`, `HEAD`, `OPTIONS`, `QUERY`, `PUT`, `DELETE` | Replayable methods allowed to retry. |
 | `statusCodes` | HTTP 408/425/429/5xx and timed 413 | Exact HTTP status codes allowed to retry. |
 | `retryOnTimeout` | `true` | Retry per-attempt timeout failures. |
 | `delay` | exponential 100–1000 ms | Milliseconds or a callback producing the delay. |

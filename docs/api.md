@@ -120,6 +120,7 @@ request.get<T>(url, config?)
 request.post<T>(url, config?)
 request.put<T>(url, config?)
 request.patch<T>(url, config?)
+request.query<T>(url, config?)
 request.delete<T>(url, config?)
 request.head(url, config?)
 request.options<T>(url, config?)
@@ -130,6 +131,7 @@ request.getResponse<T>(url, config?)
 request.postResponse<T>(url, config?)
 request.putResponse<T>(url, config?)
 request.patchResponse<T>(url, config?)
+request.queryResponse<T>(url, config?)
 request.deleteResponse<T>(url, config?)
 request.headResponse(url, config?)
 request.optionsResponse<T>(url, config?)
@@ -148,6 +150,13 @@ console.log(response.headers)
 
 `head()` resolves to `undefined` because HEAD responses do not contain a
 response body. Use `headResponse()` to inspect status and headers.
+
+`query()` implements the safe, idempotent, content-bearing HTTP QUERY method
+defined by RFC 10008. Include a media type by using `json`, `form`, `formData`,
+or an explicit `content-type` header with `body`. QUERY is retryable by default
+when the body is replayable. The built-in cache excludes QUERY because its
+current cache keys intentionally do not inspect request content; do not add it
+to `cachePlugin({ methods })`.
 
 ---
 
@@ -879,7 +888,7 @@ const request = createClient().use(
   retryPlugin({
     retries: 2,
     delay: 200,
-    methods: ['GET', 'HEAD', 'OPTIONS', 'PUT', 'DELETE'],
+    methods: ['GET', 'HEAD', 'OPTIONS', 'QUERY', 'PUT', 'DELETE'],
     statusCodes: [408, 425, 429, 500, 502, 503, 504],
     retryOnTimeout: false,
     respectRetryAfter: true,

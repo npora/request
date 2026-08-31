@@ -16,6 +16,7 @@ const DEFAULT_RETRY_METHODS: readonly HttpMethod[] = [
   'GET',
   'HEAD',
   'OPTIONS',
+  'QUERY',
   'PUT',
   'DELETE'
 ]

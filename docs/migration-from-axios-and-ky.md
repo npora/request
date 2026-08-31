@@ -43,6 +43,28 @@ await api.post('/users', {
 Use `searchParams` when repeated keys, insertion order, or native URL encoding
 must be preserved exactly.
 
+### Send content-bearing queries
+
+Axios 1.19 and Ky expose the standardized HTTP `QUERY` method. Npora Request
+provides the same shortcut while preserving schema inference and its data-first
+and response-first APIs:
+
+```ts
+const users = await api.query<User[]>('/users/search', {
+  json: { status: 'active', team: ['platform', 'web'] }
+})
+
+const response = await api.queryResponse<User[]>('/users/search', {
+  json: { status: 'active' }
+})
+```
+
+RFC 10008 defines QUERY as safe and idempotent, so replayable QUERY bodies are
+retried by default. The request content requires a media type; `json`, `form`,
+and `formData` set one automatically. The built-in cache deliberately excludes
+QUERY because its current keys do not inspect request content; do not add QUERY
+to `cachePlugin({ methods })`.
+
 ### Read complete responses
 
 Axios always resolves with a response wrapper. Npora Request data methods

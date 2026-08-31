@@ -344,6 +344,38 @@ describe('retryPlugin', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2)
   })
 
+  it('should retry replayable QUERY requests by default', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(new Response('busy', { status: 503 }))
+      .mockResolvedValueOnce(new Response('{"ok":true}', {
+        headers: { 'content-type': 'application/json' }
+      }))
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient().use(retryPlugin({
+      retries: 1,
+      delay: 0
+    }))
+
+    await expect(request.query<{ ok: boolean }>('/search', {
+      json: { filter: 'active' }
+    })).resolves.toEqual({ ok: true })
+
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+
+    for (const [, init] of fetchMock.mock.calls) {
+      expect(init).toMatchObject({
+        method: 'QUERY',
+        body: '{"filter":"active"}'
+      })
+      expect(new Headers(init?.headers).get('content-type')).toBe(
+        'application/json'
+      )
+    }
+  })
+
   it('should not retry non-idempotent methods by default', async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       new Response(JSON.stringify({ message: 'Server Error' }), {

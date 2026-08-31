@@ -356,6 +356,40 @@ export class Client {
     return this.requestMethodResponse<T>(url, 'PATCH', config)
   }
 
+  query<Schema extends StandardSchemaV1>(
+    url: RequestURL,
+    config: SchemaMethodConfig<Schema>
+  ): Promise<StandardSchemaV1.InferOutput<Schema>>
+
+  query<T = unknown>(
+    url: RequestURL,
+    config?: MethodConfig
+  ): Promise<T>
+
+  query<T = unknown>(
+    url: RequestURL,
+    config: MethodConfig = EMPTY_METHOD_CONFIG
+  ): Promise<T> {
+    return this.requestMethod<T>(url, 'QUERY', config)
+  }
+
+  queryResponse<Schema extends StandardSchemaV1>(
+    url: RequestURL,
+    config: SchemaMethodConfig<Schema>
+  ): Promise<NporaResponse<StandardSchemaV1.InferOutput<Schema>>>
+
+  queryResponse<T = unknown>(
+    url: RequestURL,
+    config?: MethodConfig
+  ): Promise<NporaResponse<T>>
+
+  queryResponse<T = unknown>(
+    url: RequestURL,
+    config: MethodConfig = EMPTY_METHOD_CONFIG
+  ): Promise<NporaResponse<T>> {
+    return this.requestMethodResponse<T>(url, 'QUERY', config)
+  }
+
   delete<Schema extends StandardSchemaV1>(
     url: RequestURL,
     config: SchemaMethodConfig<Schema>

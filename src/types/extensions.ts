@@ -37,7 +37,7 @@ export interface RetryOptions {
   /**
    * HTTP methods that may be retried.
    *
-   * @default GET, HEAD, OPTIONS, PUT and DELETE
+   * @default GET, HEAD, OPTIONS, QUERY, PUT and DELETE
    */
   methods?: readonly HttpMethod[]
 

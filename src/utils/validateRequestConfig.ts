@@ -117,6 +117,7 @@ function validateMethod(config: RequestConfig): void {
     case 'POST':
     case 'PUT':
     case 'PATCH':
+    case 'QUERY':
     case 'DELETE':
     case 'HEAD':
     case 'OPTIONS':
