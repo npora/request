@@ -1,4 +1,4 @@
-import { isRequestError, RequestError } from '../errors'
+import { isRequestError } from '../errors'
 import type {
   HttpMethod,
   RequestConfig,

@@ -1,4 +1,4 @@
-import { isRequestError, RequestError } from '../errors'
+import { isRequestError } from '../errors'
 import type { RequestContext } from '../core/RequestContext'
 import type { RequestConfig } from '../types'
 import type { Plugin } from './Plugin'

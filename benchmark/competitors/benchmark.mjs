@@ -55,9 +55,9 @@ const server = createServer(async (request, response) => {
       'content-length': Buffer.byteLength(responseBody)
     })
     response.end(responseBody)
-  } catch (error) {
+  } catch {
     response.writeHead(500, { 'content-type': 'text/plain' })
-    response.end(error instanceof Error ? error.message : String(error))
+    response.end('Benchmark request validation failed')
   }
 })
 
