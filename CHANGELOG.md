@@ -1,5 +1,22 @@
 # @npora/request
 
+## 1.17.0
+
+### Minor Changes
+
+- 55f1eb3: Accept native and cross-realm `Request` inputs in `request()` and
+  `requestResponse()`, with client defaults and explicit per-call overrides.
+- e23e6cc: Support the RFC 10008 QUERY method with typed data and response shortcuts,
+  content-bearing requests, and safe default retries for replayable bodies.
+- b435a41: Enforce `maxRequestSize` incrementally for Fetch `ReadableStream` uploads,
+  preserving backpressure and cancelling the source when the limit is exceeded.
+
+### Patch Changes
+
+- 4d37de0: Consume Fetch HTTP error bodies once while populating bounded error data instead
+  of retaining a separately readable cloned stream, preventing ignored errors
+  from buffering an unread response branch while preserving native metadata.
+
 ## 1.16.0
 
 ### Minor Changes
