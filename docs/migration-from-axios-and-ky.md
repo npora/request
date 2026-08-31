@@ -45,9 +45,10 @@ must be preserved exactly.
 
 ### Send content-bearing queries
 
-Axios 1.19 and Ky expose the standardized HTTP `QUERY` method. Npora Request
-provides the same shortcut while preserving schema inference and its data-first
-and response-first APIs:
+Axios 1.19 exposes a `query()` shortcut. Ky 2.0.2 accepts `method: 'QUERY'`,
+while its next-version documentation adds a shortcut. Npora Request provides a
+published shortcut while preserving schema inference and its data-first and
+response-first APIs:
 
 ```ts
 const users = await api.query<User[]>('/users/search', {
@@ -64,6 +65,11 @@ retried by default. The request content requires a media type; `json`, `form`,
 and `formData` set one automatically. The built-in cache deliberately excludes
 QUERY because its current keys do not inspect request content; do not add QUERY
 to `cachePlugin({ methods })`.
+
+ofetch 1.5.1 accepts the custom method but does not apply its usual automatic
+JSON-body handling to QUERY; serialize the body and set `content-type`
+explicitly when migrating that call. Npora Request's `json` option handles
+QUERY the same way as POST, PUT, and PATCH.
 
 ### Read complete responses
 

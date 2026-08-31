@@ -1,6 +1,7 @@
 import { strict as assert } from 'node:assert'
-import { writeFile } from 'node:fs/promises'
+import { readFile, writeFile } from 'node:fs/promises'
 import { createServer } from 'node:http'
+import { resolve } from 'node:path'
 import { performance } from 'node:perf_hooks'
 
 import axios from 'axios'
@@ -9,79 +10,125 @@ import ky from 'ky'
 import { ofetch } from 'ofetch'
 import { createClient } from '../../dist/index.js'
 
-const configuration = {
-  operations: 30_000,
-  concurrency: 128,
-  warmup: 300,
-  rounds: 3
-}
-const body = JSON.stringify({ ok: true })
-let received = 0
-const server = createServer((_request, response) => {
-  received += 1
-  response.writeHead(200, {
-    'content-type': 'application/json',
-    'content-length': Buffer.byteLength(body)
-  })
-  response.end(body)
+const ALL_SCENARIOS = ['get-json', 'post-json', 'query-json']
+const configuration = parseOptions(process.argv.slice(2))
+const responseBody = JSON.stringify({ ok: true })
+const requestPayload = { filter: 'active', limit: 20 }
+const expectedRequestBody = JSON.stringify(requestPayload)
+const received = new Map(ALL_SCENARIOS.map(name => [name, 0]))
+
+const server = createServer(async (request, response) => {
+  try {
+    const scenario = new URL(
+      request.url ?? '/',
+      'http://127.0.0.1'
+    ).pathname.slice(1)
+
+    assert.ok(
+      configuration.scenarios.includes(scenario),
+      `Unexpected benchmark route: ${scenario}`
+    )
+
+    const expectedMethod = scenario === 'get-json'
+      ? 'GET'
+      : scenario === 'post-json'
+        ? 'POST'
+        : 'QUERY'
+    const body = await readBody(request)
+
+    assert.equal(request.method, expectedMethod)
+    assert.equal(
+      body,
+      expectedMethod === 'GET' ? '' : expectedRequestBody
+    )
+
+    if (expectedMethod !== 'GET') {
+      assert.match(
+        request.headers['content-type'] ?? '',
+        /^application\/json(?:;|$)/i
+      )
+    }
+
+    received.set(scenario, (received.get(scenario) ?? 0) + 1)
+    response.writeHead(200, {
+      'content-type': 'application/json',
+      'content-length': Buffer.byteLength(responseBody)
+    })
+    response.end(responseBody)
+  } catch (error) {
+    response.writeHead(500, { 'content-type': 'text/plain' })
+    response.end(error instanceof Error ? error.message : String(error))
+  }
 })
 
-await new Promise((resolve, reject) => {
+await new Promise((resolvePromise, reject) => {
   server.once('error', reject)
-  server.listen(0, '127.0.0.1', resolve)
+  server.listen(0, '127.0.0.1', resolvePromise)
 })
 
 try {
-  const { port } = server.address()
-  const baseURL = `http://127.0.0.1:${port}`
-  const npora = createClient({ baseURL })
-  const axiosClient = axios.create({ baseURL })
-  const kyClient = ky.create({ prefix: baseURL })
-  const gotClient = got.extend({ prefixUrl: baseURL })
-  const clients = new Map([
-    ['@npora/request', () => npora.get('/load')],
-    ['axios', () => axiosClient.get('/load').then(result => result.data)],
-    ['ky', () => kyClient.get('load').json()],
-    ['got', () => gotClient.get('load').json()],
-    ['ofetch', () => ofetch(`${baseURL}/load`)]
-  ])
-  const samples = Object.fromEntries(
-    [...clients.keys()].map(name => [name, []])
-  )
+  const address = server.address()
 
-  for (const request of clients.values()) {
-    for (let index = 0; index < configuration.warmup; index += 1) {
-      assert.equal((await request()).ok, true)
+  assert.ok(address && typeof address === 'object')
+
+  const baseURL = `http://127.0.0.1:${address.port}`
+  const clients = createClients(baseURL)
+  const results = {}
+  const samples = {}
+
+  for (const scenario of configuration.scenarios) {
+    const scenarioSamples = Object.fromEntries(
+      [...clients.keys()].map(name => [name, []])
+    )
+
+    for (const operations of clients.values()) {
+      const operation = operations[scenario]
+
+      for (let index = 0; index < configuration.warmup; index += 1) {
+        assert.equal((await operation()).ok, true)
+      }
     }
+
+    const names = [...clients.keys()]
+
+    for (let round = 0; round < configuration.rounds; round += 1) {
+      const order = names.slice(round).concat(names.slice(0, round))
+
+      for (const name of order) {
+        const sample = await runConcurrent(
+          configuration.operations,
+          configuration.concurrency,
+          clients.get(name)[scenario]
+        )
+
+        scenarioSamples[name].push(sample)
+        process.stdout.write(
+          `${scenario} · ${name} · round ${round + 1}: ` +
+          `${sample.requestsPerSecond.toFixed(0)} req/s, ` +
+          `p99 ${sample.p99Milliseconds.toFixed(3)} ms\n`
+        )
+      }
+    }
+
+    samples[scenario] = scenarioSamples
+    results[scenario] = Object.fromEntries(
+      Object.entries(scenarioSamples).map(
+        ([name, values]) => [name, summarize(values)]
+      )
+    )
   }
 
-  const names = [...clients.keys()]
-
-  for (let round = 0; round < configuration.rounds; round += 1) {
-    const order = names.slice(round).concat(names.slice(0, round))
-
-    for (const name of order) {
-      const sample = await runConcurrent(
-        configuration.operations,
-        configuration.concurrency,
-        clients.get(name)
-      )
-
-      samples[name].push(sample)
-      process.stdout.write(
-        `${name} round ${round + 1}: ` +
-        `${sample.requestsPerSecond.toFixed(0)} req/s, ` +
-        `p99 ${sample.p99Milliseconds.toFixed(3)} ms\n`
-      )
-    }
-  }
-
-  const expectedRequests = clients.size * (
+  const requestsPerScenario = clients.size * (
     configuration.warmup +
     configuration.operations * configuration.rounds
   )
+
+  for (const scenario of configuration.scenarios) {
+    assert.equal(received.get(scenario), requestsPerScenario)
+  }
+
   const report = {
-    schemaVersion: 1,
+    schemaVersion: 2,
     generatedAt: new Date().toISOString(),
     runtime: {
       node: process.version,
@@ -89,31 +136,213 @@ try {
       architecture: process.arch
     },
     configuration,
-    versions: {
-      '@npora/request': 'workspace build',
-      axios: '1.19.0',
-      ky: '2.0.2',
-      got: '15.1.0',
-      ofetch: '1.5.1'
-    },
-    requestsReceived: received,
-    expectedRequests,
-    results: Object.fromEntries(Object.entries(samples).map(
-      ([name, values]) => [name, summarize(values)]
-    )),
+    versions: await readVersions(),
+    requestsReceived: Object.fromEntries(received),
+    expectedRequestsPerScenario: requestsPerScenario,
+    results,
     samples
   }
 
-  assert.equal(received, expectedRequests)
-  await writeFile(
-    new URL('library-comparison-result.json', import.meta.url),
-    `${JSON.stringify(report, null, 2)}\n`
-  )
-  process.stdout.write(`${JSON.stringify(report.results, null, 2)}\n`)
+  const output = configuration.output
+    ? resolve(configuration.output)
+    : new URL('library-comparison-result.json', import.meta.url)
+
+  await writeFile(output, `${JSON.stringify(report, null, 2)}\n`)
+  process.stdout.write(`${JSON.stringify(results, null, 2)}\n`)
 } finally {
-  await new Promise((resolve, reject) => {
-    server.close(error => error ? reject(error) : resolve())
+  await new Promise((resolvePromise, reject) => {
+    server.close(error => error ? reject(error) : resolvePromise())
+    server.closeAllConnections()
   })
+}
+
+function createClients(baseURL) {
+  const npora = createClient({ baseURL })
+  const axiosClient = axios.create({ baseURL })
+  const kyClient = ky.create({ prefix: baseURL })
+  const gotClient = got.extend({ prefixUrl: baseURL })
+  const ofetchClient = ofetch.create({ baseURL })
+
+  return new Map([
+    ['@npora/request', {
+      'get-json': () => npora.get('/get-json'),
+      'post-json': () => npora.post('/post-json', {
+        json: requestPayload
+      }),
+      'query-json': () => npora.query('/query-json', {
+        json: requestPayload
+      })
+    }],
+    ['axios', {
+      'get-json': () => axiosClient.get('/get-json').then(readAxiosData),
+      'post-json': () => axiosClient.post(
+        '/post-json',
+        requestPayload
+      ).then(readAxiosData),
+      'query-json': () => axiosClient.query(
+        '/query-json',
+        requestPayload
+      ).then(readAxiosData)
+    }],
+    ['ky', {
+      'get-json': () => kyClient.get('get-json').json(),
+      'post-json': () => kyClient.post('post-json', {
+        json: requestPayload
+      }).json(),
+      'query-json': () => kyClient('query-json', {
+        method: 'QUERY',
+        json: requestPayload
+      }).json()
+    }],
+    ['got', {
+      'get-json': () => gotClient.get('get-json').json(),
+      'post-json': () => gotClient.post('post-json', {
+        json: requestPayload
+      }).json(),
+      'query-json': () => gotClient('query-json', {
+        method: 'QUERY',
+        json: requestPayload
+      }).json()
+    }],
+    ['ofetch', {
+      'get-json': () => ofetchClient('/get-json'),
+      'post-json': () => ofetchClient('/post-json', {
+        method: 'POST',
+        body: requestPayload
+      }),
+      'query-json': () => ofetchClient('/query-json', {
+        method: 'QUERY',
+        body: expectedRequestBody,
+        headers: { 'content-type': 'application/json' }
+      })
+    }]
+  ])
+}
+
+function readAxiosData(response) {
+  return response.data
+}
+
+function parseOptions(args) {
+  const values = new Map()
+  const allowedOptions = new Set([
+    '--operations',
+    '--concurrency',
+    '--warmup',
+    '--rounds',
+    '--scenarios',
+    '--output'
+  ])
+
+  for (let index = 0; index < args.length; index += 1) {
+    const argument = args[index]
+
+    if (!argument?.startsWith('--')) {
+      continue
+    }
+
+    const [name, inlineValue] = argument.split('=', 2)
+    const value = inlineValue ?? args[index + 1]
+
+    assert.ok(allowedOptions.has(name), `Unknown option: ${name}`)
+
+    if (inlineValue === undefined) {
+      index += 1
+    }
+
+    assert.ok(value, `Missing value for ${name}`)
+    values.set(name, value)
+  }
+
+  const scenarios = (values.get('--scenarios') ?? ALL_SCENARIOS.join(','))
+    .split(',')
+    .filter(Boolean)
+
+  assert.ok(scenarios.length > 0, 'At least one scenario is required')
+  assert.equal(
+    new Set(scenarios).size,
+    scenarios.length,
+    'Scenarios must not be duplicated'
+  )
+
+  for (const scenario of scenarios) {
+    assert.ok(
+      ALL_SCENARIOS.includes(scenario),
+      `Unknown scenario: ${scenario}`
+    )
+  }
+
+  return {
+    operations: positiveInteger(
+      values.get('--operations') ?? '10000',
+      'operations'
+    ),
+    concurrency: positiveInteger(
+      values.get('--concurrency') ?? '128',
+      'concurrency'
+    ),
+    warmup: nonNegativeInteger(
+      values.get('--warmup') ?? '100',
+      'warmup'
+    ),
+    rounds: positiveInteger(
+      values.get('--rounds') ?? '3',
+      'rounds'
+    ),
+    scenarios,
+    output: values.get('--output')
+  }
+}
+
+function positiveInteger(value, name) {
+  const number = Number(value)
+
+  assert.ok(
+    Number.isSafeInteger(number) && number > 0,
+    `${name} must be a positive integer`
+  )
+
+  return number
+}
+
+function nonNegativeInteger(value, name) {
+  const number = Number(value)
+
+  assert.ok(
+    Number.isSafeInteger(number) && number >= 0,
+    `${name} must be a non-negative integer`
+  )
+
+  return number
+}
+
+async function readVersions() {
+  return {
+    '@npora/request': await readVersion('../../package.json'),
+    axios: await readVersion('node_modules/axios/package.json'),
+    ky: await readVersion('node_modules/ky/package.json'),
+    got: await readVersion('node_modules/got/package.json'),
+    ofetch: await readVersion('node_modules/ofetch/package.json')
+  }
+}
+
+async function readVersion(relativePath) {
+  const contents = await readFile(
+    new URL(relativePath, import.meta.url),
+    'utf8'
+  )
+
+  return JSON.parse(contents).version
+}
+
+async function readBody(request) {
+  const chunks = []
+
+  for await (const chunk of request) {
+    chunks.push(chunk)
+  }
+
+  return Buffer.concat(chunks).toString('utf8')
 }
 
 async function runConcurrent(count, limit, operation) {

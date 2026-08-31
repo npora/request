@@ -1,10 +1,11 @@
 # Performance Benchmarks
 
-The benchmark suite measures request-library overhead without network latency.
+The core benchmark measures request-library overhead without network latency.
 It uses a minimal stateless adapter, a warm-up phase and the same workload for
-every scenario. The adapter intentionally omits request history so test-only
-observability storage is not mistaken for production request overhead during
-long stress runs.
+every scenario. Separate HTTP and competitor benchmarks use a localhost server.
+The core adapter intentionally omits request history so test-only observability
+storage is not mistaken for production request overhead during long stress
+runs.
 
 Run the default benchmark:
 
@@ -42,6 +43,28 @@ pnpm benchmark:http -- \
   --concurrency 256 \
   --output benchmark-results/http.json
 ```
+
+Run the isolated request-library comparison after installing its locked
+dependencies:
+
+```sh
+pnpm benchmark:libraries:install
+pnpm build
+pnpm benchmark:libraries -- \
+  --operations 10000 \
+  --concurrency 128 \
+  --warmup 100 \
+  --rounds 3 \
+  --scenarios get-json,post-json,query-json
+```
+
+The comparison reads installed library versions instead of embedding version
+labels. Its local server verifies every method, serialized request body, and
+content type before counting a request, so a fast but semantically different
+request fails the run. Scenario order rotates between rounds, and the JSON
+report records raw samples plus median throughput and latency. Use smaller
+operation and round counts for smoke tests; compare full reports only on the
+same runtime and machine.
 
 The stress runner distributes an exact total across core dispatch,
 serialization, interceptors, cache hits, deduplication and clear races, immediate and
