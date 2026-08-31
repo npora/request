@@ -28,6 +28,7 @@ export interface BuiltRequest {
   url: string
   init: RequestInit
   clear: () => void
+  bodyError?: { current?: RequestError }
 }
 
 /**
@@ -47,8 +48,11 @@ export function buildRequestWithHeaders(
   headers: Headers
 ): BuiltRequest {
   setAccept(headers, config.responseType)
-  const body = buildBody(config, headers)
+  let body = buildBody(config, headers)
   validateRequestBodySize(body, config)
+  const bodyError: { current?: RequestError } = {}
+  const originalBody = body
+  body = limitStreamingRequestBody(body, config, bodyError)
   const url = buildURL(config)
   const init: RequestInit = {
     ...config.fetchOptions,
@@ -79,7 +83,8 @@ export function buildRequestWithHeaders(
   return {
     url,
     init,
-    clear: timeoutSignal?.clear ?? noop
+    clear: timeoutSignal?.clear ?? noop,
+    bodyError: body === originalBody ? undefined : bodyError
   }
 }
 
@@ -478,6 +483,83 @@ function getRequestBodySize(body: BodyInit): number | undefined {
   }
 
   return undefined
+}
+
+function limitStreamingRequestBody(
+  body: BodyInit | undefined,
+  config: RequestConfig,
+  bodyError: { current?: RequestError }
+): BodyInit | undefined {
+  const maxSize = config.maxRequestSize
+
+  if (!isReadableStream(body) || !Number.isFinite(maxSize)) {
+    return body
+  }
+
+  const source = body as ReadableStream<Uint8Array<ArrayBufferLike>>
+  let reader: ReadableStreamDefaultReader<
+    Uint8Array<ArrayBufferLike>
+  > | undefined
+  let size = 0
+
+  return new ReadableStream<Uint8Array<ArrayBufferLike>>({
+    async pull(controller) {
+      reader ??= source.getReader()
+
+      try {
+        const result = await reader.read()
+
+        if (result.done) {
+          reader.releaseLock()
+          reader = undefined
+          controller.close()
+          return
+        }
+
+        size += result.value.byteLength
+
+        if (size > (maxSize ?? Number.POSITIVE_INFINITY)) {
+          const error = new RequestError(
+            `Request body exceeds maxRequestSize ${maxSize}`,
+            {
+              code: 'REQUEST_TOO_LARGE',
+              config
+            }
+          )
+          bodyError.current = error
+
+          void reader.cancel(error).catch(() => {
+            // The size error remains authoritative.
+          })
+          reader.releaseLock()
+          reader = undefined
+
+          throw error
+        }
+
+        controller.enqueue(result.value)
+      } catch (error) {
+        if (reader) {
+          reader.releaseLock()
+          reader = undefined
+        }
+
+        throw error
+      }
+    },
+    async cancel(reason) {
+      if (reader) {
+        try {
+          await reader.cancel(reason)
+        } finally {
+          reader.releaseLock()
+          reader = undefined
+        }
+      } else if (!source.locked) {
+        await source.cancel(reason)
+      }
+    }
+  })
 }
 
 function utf8ByteLength(value: string): number {

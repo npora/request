@@ -157,11 +157,11 @@ export interface RequestConfig {
   signal?: AbortSignal
 
   /**
-   * Maximum request body size in bytes when the serialized size can be
-   * determined before dispatch.
+   * Maximum request body size in bytes. Deterministically sized bodies are
+   * rejected before dispatch; ReadableStream bodies are limited as consumed.
    *
-   * FormData and ReadableStream bodies cannot be preflighted without
-   * buffering and are therefore not covered.
+   * Native FormData cannot be measured without changing its encoding and is
+   * therefore not covered.
    *
    * @default unlimited
    */

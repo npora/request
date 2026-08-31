@@ -188,6 +188,8 @@ once; it does not validate individual SSE events or NDJSON records.
 Native `FormData`, `Blob`, `ArrayBuffer`, and `ReadableStream` request bodies
 also work when created by another same-origin window or iframe. Detection does
 not lock streams, and retry safety and request-size limits remain active.
+With Fetch, `maxRequestSize` counts stream chunks without buffering and
+cancels the source once the limit is exceeded.
 
 Buffered bodies attached to thrown HTTP errors are capped at 10 MiB by
 default. Override `maxErrorResponseSize`, or set it to `Infinity` for trusted

@@ -288,8 +288,10 @@ caller's `signal`.
 
 Timeout timers and composed abort listeners are released when a request
 settles, times out or is externally aborted. `maxRequestSize` preflights
-deterministically sized bodies and fails with `REQUEST_TOO_LARGE`; FormData,
-ReadableStream, and custom-adapter bodies require transport-specific limits.
+deterministically sized bodies and fails with `REQUEST_TOO_LARGE`. The Fetch
+adapter also counts ReadableStream chunks during upload without buffering and
+cancels the source on overflow; an allowed prefix may already be on the wire.
+Native FormData and custom-adapter bodies require transport-specific limits.
 `maxResponseSize` limits parsed and streamed response bytes and defaults to
 `Infinity`. A response that exceeds the limit fails with
 `RESPONSE_TOO_LARGE`; a trustworthy `Content-Length` can reject it before the

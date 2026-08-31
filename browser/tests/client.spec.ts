@@ -765,6 +765,49 @@ test(
           // The 503 is expected; the one-shot stream must not be retried.
         }
 
+        let streamPulls = 0
+        let streamCancelled = false
+        const limitedStream = new foreign.ReadableStream({
+          pull(controller) {
+            controller.enqueue(
+              new foreign.Uint8Array(streamPulls++ === 0 ? 2 : 3)
+            )
+          },
+          cancel() {
+            streamCancelled = true
+          }
+        })
+        const limiting = module.createClient({
+          fetch: async (_url: string, init: RequestInit) => {
+            const reader = (
+              init.body as ReadableStream<Uint8Array>
+            ).getReader()
+
+            try {
+              while (!(await reader.read()).done) {
+                // Consume incrementally to preserve stream backpressure.
+              }
+            } catch {
+              // Simulate runtimes that discard a request-stream error.
+              throw new TypeError('fetch failed')
+            }
+
+            return new Response('{}', {
+              headers: { 'content-type': 'application/json' }
+            })
+          }
+        })
+        let streamLimit: string | undefined
+
+        try {
+          await limiting.post('/stream-limit', {
+            body: limitedStream,
+            maxRequestSize: 4
+          })
+        } catch (error) {
+          streamLimit = (error as { code?: string }).code
+        }
+
         return {
           nativeForm,
           recordForm,
@@ -774,6 +817,8 @@ test(
           bufferLimit: await captureSizeError(
             new foreign.ArrayBuffer(5)
           ),
+          streamLimit,
+          streamCancelled,
           attempts,
           duplex
         }
@@ -788,6 +833,8 @@ test(
     expect(result.recordForm.contentType).toContain('multipart/form-data')
     expect(result.blobLimit).toBe('REQUEST_TOO_LARGE')
     expect(result.bufferLimit).toBe('REQUEST_TOO_LARGE')
+    expect(result.streamLimit).toBe('REQUEST_TOO_LARGE')
+    expect(result.streamCancelled).toBe(true)
     expect(result.attempts).toBe(1)
     expect(result.duplex).toBe('half')
   }

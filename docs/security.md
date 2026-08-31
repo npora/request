@@ -94,8 +94,8 @@ application.
 - Parsed and streamed responses can be bounded with `maxResponseSize`.
 - Buffered bodies attached to thrown HTTP errors are limited to 10 MiB by
   default with `maxErrorResponseSize`, independently of successful responses.
-- Deterministically sized request bodies can be bounded with
-  `maxRequestSize` before built-in transports dispatch them.
+- `maxRequestSize` bounds deterministically sized request bodies before
+  dispatch and Fetch ReadableStream uploads during consumption.
 - Successful parsed responses can be validated and transformed with a
   Standard Schema v1 compatible validator before application response
   interceptors run.

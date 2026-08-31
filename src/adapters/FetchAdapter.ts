@@ -192,6 +192,12 @@ export class FetchAdapter implements Adapter {
         throw error
       }
 
+      const requestSizeError = request?.bodyError?.current
+
+      if (requestSizeError) {
+        throw requestSizeError
+      }
+
       if (!request) {
         throw new RequestError('Failed to build request', {
           code: 'CONFIG_ERROR',

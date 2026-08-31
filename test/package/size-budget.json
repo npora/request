@@ -1,13 +1,13 @@
 {
   "files": {
     "dist/index.js": {
-      "bytes": 125050,
-      "gzipBytes": 41250,
+      "bytes": 125800,
+      "gzipBytes": 41550,
       "transitive": true
     },
     "dist/index.cjs": {
-      "bytes": 128850,
-      "gzipBytes": 42250,
+      "bytes": 129600,
+      "gzipBytes": 42550,
       "transitive": true
     },
     "dist/index.d.ts": {
@@ -21,8 +21,8 @@
       "transitive": true
     },
     "dist/core.js": {
-      "bytes": 45600,
-      "gzipBytes": 15150,
+      "bytes": 46350,
+      "gzipBytes": 15450,
       "transitive": true
     },
     "dist/plugins/retry.js": {
@@ -42,7 +42,7 @@
     }
   },
   "package": {
-    "bytes": 108700,
-    "unpackedBytes": 409500
+    "bytes": 109200,
+    "unpackedBytes": 411400
   }
 }

@@ -205,7 +205,7 @@ trusted as native bodies.
 | `timeout` | `number` | disabled | Abort after this many milliseconds (maximum `2_147_483_647`). `0` disables the timer. |
 | `totalTimeout` | `number` | disabled | Bound the complete lifecycle, including hooks, retries, delays, parsing, interceptors, and stream consumption. |
 | `signal` | `AbortSignal` | none | Cancel the request with the platform Abort API. |
-| `maxRequestSize` | `number` | `Infinity` | Maximum preflightable serialized request bytes. |
+| `maxRequestSize` | `number` | `Infinity` | Maximum serialized or streamed request bytes. |
 | `maxResponseSize` | `number` | `Infinity` | Maximum parsed or streamed response bytes. |
 | `maxErrorResponseSize` | `number` | `10 MiB` | Maximum bytes parsed into a thrown `HTTP_ERROR.data`. |
 
@@ -216,9 +216,11 @@ All timeout and external cancellation signals are composed, and retry delays
 are abortable. `maxRequestSize` rejects
 oversized JSON, text, URLSearchParams,
 Blob, ArrayBuffer, and typed-array bodies with `REQUEST_TOO_LARGE` before the
-built-in Fetch or XHR transport sends them. FormData and ReadableStream sizes
-cannot be determined without buffering and are not preflighted. Custom
-adapters must enforce their own request-body limits. `maxResponseSize`
+built-in Fetch or XHR transport sends them. Fetch also counts ReadableStream
+chunks without buffering and cancels the source when the limit is exceeded;
+the allowed prefix may already have been sent. Native FormData remains
+unmeasurable without changing its multipart encoding. Custom adapters must
+enforce their own request-body limits. `maxResponseSize`
 failures use `RESPONSE_TOO_LARGE`; set an explicit limit when responses come
 from an untrusted service. Streaming SSE and NDJSON remain bounded while the
 caller consumes them.

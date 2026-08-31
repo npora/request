@@ -80,6 +80,16 @@ signature can move to the `fetch` option. Node-specific agents, proxies,
 HTTP/2, socket options, or other non-Fetch transport behavior require a custom
 adapter because they are not portable Fetch options.
 
+Axios `maxBodyLength` maps to `maxRequestSize`. Current Axios Fetch adapters
+preflight known-size bodies and count live streams during transport; Npora
+Request follows the same split and preserves `REQUEST_TOO_LARGE` even when a
+Fetch runtime discards the stream error. Native FormData is the deliberate
+exception: Axios may materialize it through `Request.arrayBuffer()` to measure
+it, while Npora Request leaves multipart encoding and buffering entirely to the
+runtime. Ky and ofetch do not expose an equivalent request-size option. Ky also
+documents that retrying a stream uses `tee()` and can buffer the full body;
+Npora Request treats a `ReadableStream` as one-shot and does not retry it.
+
 ## From Ky
 
 Ky's per-attempt `timeout` and overall `totalTimeout` map directly to the same
@@ -119,8 +129,9 @@ or move to `bytes` when a typed byte view is more convenient.
 [Ky](https://github.com/sindresorhus/ky) limits the body parsed into an
 `HTTPError` to 10 MiB. Npora Request matches that safe default through
 `maxErrorResponseSize`: oversized error bodies still produce `HTTP_ERROR`,
-with `data` left `undefined`. Axios's Node-only
-[`maxContentLength`](https://axios-http.com/docs/req_config) is a hard response
+with `data` left `undefined`. Axios's
+[`maxContentLength`](https://github.com/axios/axios/blob/v1.x/docs/pages/advanced/request-config.md)
+is a hard response
 limit (`maxBodyLength` separately limits requests); the nearest Npora Request
 response equivalent is `maxResponseSize`, which deliberately keeps the
 distinct `RESPONSE_TOO_LARGE` classification.
