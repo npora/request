@@ -14,9 +14,15 @@ import type {
   HttpMethod,
   NporaResponse,
   RequestConfig,
+  RequestInputConfig,
+  RequestURL,
   ServerSentEvent,
   StandardSchemaV1
 } from '../types'
+import {
+  isRequest,
+  rememberRequestBody
+} from '../utils/isRequest'
 
 type MethodConfig = Omit<RequestConfig, 'url' | 'method'>
 
@@ -159,13 +165,23 @@ export class Client {
     config: RequestConfig & { schema: Schema }
   ): Promise<StandardSchemaV1.InferOutput<Schema>>
 
+  request<Schema extends StandardSchemaV1>(
+    input: Request,
+    config: RequestInputConfig & { schema: Schema }
+  ): Promise<StandardSchemaV1.InferOutput<Schema>>
+
   request<T = unknown>(config: RequestConfig): Promise<T>
 
-  async request<T = unknown>(config: RequestConfig): Promise<T> {
-    const mergedConfig = ConfigMerger.merge(
-      this.defaults,
-      config
-    )
+  request<T = unknown>(
+    input: Request,
+    config?: RequestInputConfig
+  ): Promise<T>
+
+  async request<T = unknown>(
+    input: RequestConfig | Request,
+    config: RequestInputConfig = EMPTY_METHOD_CONFIG
+  ): Promise<T> {
+    const mergedConfig = this.mergeRequestInput(input, config)
     const response = await this.pipeline.execute<T>(
       mergedConfig,
       false
@@ -178,15 +194,26 @@ export class Client {
     config: RequestConfig & { schema: Schema }
   ): Promise<NporaResponse<StandardSchemaV1.InferOutput<Schema>>>
 
+  requestResponse<Schema extends StandardSchemaV1>(
+    input: Request,
+    config: RequestInputConfig & { schema: Schema }
+  ): Promise<NporaResponse<StandardSchemaV1.InferOutput<Schema>>>
+
   requestResponse<T = unknown>(
     config: RequestConfig
   ): Promise<NporaResponse<T>>
 
   requestResponse<T = unknown>(
-    config: RequestConfig
+    input: Request,
+    config?: RequestInputConfig
+  ): Promise<NporaResponse<T>>
+
+  requestResponse<T = unknown>(
+    input: RequestConfig | Request,
+    config: RequestInputConfig = EMPTY_METHOD_CONFIG
   ): Promise<NporaResponse<T>> {
     try {
-      const mergedConfig = ConfigMerger.merge(this.defaults, config)
+      const mergedConfig = this.mergeRequestInput(input, config)
       return this.pipeline.execute<T>(mergedConfig)
     } catch (error) {
       return Promise.reject(error)
@@ -194,218 +221,252 @@ export class Client {
   }
 
   get<Schema extends StandardSchemaV1>(
-    url: string,
+    url: RequestURL,
     config: SchemaMethodConfig<Schema>
   ): Promise<StandardSchemaV1.InferOutput<Schema>>
 
   get<T = unknown>(
-    url: string,
+    url: RequestURL,
     config?: MethodConfig
   ): Promise<T>
 
   get<T = unknown>(
-    url: string,
+    url: RequestURL,
     config: MethodConfig = EMPTY_METHOD_CONFIG
   ): Promise<T> {
     return this.requestMethod<T>(url, 'GET', config)
   }
 
   getResponse<Schema extends StandardSchemaV1>(
-    url: string,
+    url: RequestURL,
     config: SchemaMethodConfig<Schema>
   ): Promise<NporaResponse<StandardSchemaV1.InferOutput<Schema>>>
 
   getResponse<T = unknown>(
-    url: string,
+    url: RequestURL,
     config?: MethodConfig
   ): Promise<NporaResponse<T>>
 
   getResponse<T = unknown>(
-    url: string,
+    url: RequestURL,
     config: MethodConfig = EMPTY_METHOD_CONFIG
   ): Promise<NporaResponse<T>> {
     return this.requestMethodResponse<T>(url, 'GET', config)
   }
 
   post<Schema extends StandardSchemaV1>(
-    url: string,
+    url: RequestURL,
     config: SchemaMethodConfig<Schema>
   ): Promise<StandardSchemaV1.InferOutput<Schema>>
 
   post<T = unknown>(
-    url: string,
+    url: RequestURL,
     config?: MethodConfig
   ): Promise<T>
 
   post<T = unknown>(
-    url: string,
+    url: RequestURL,
     config: MethodConfig = EMPTY_METHOD_CONFIG
   ): Promise<T> {
     return this.requestMethod<T>(url, 'POST', config)
   }
 
   postResponse<Schema extends StandardSchemaV1>(
-    url: string,
+    url: RequestURL,
     config: SchemaMethodConfig<Schema>
   ): Promise<NporaResponse<StandardSchemaV1.InferOutput<Schema>>>
 
   postResponse<T = unknown>(
-    url: string,
+    url: RequestURL,
     config?: MethodConfig
   ): Promise<NporaResponse<T>>
 
   postResponse<T = unknown>(
-    url: string,
+    url: RequestURL,
     config: MethodConfig = EMPTY_METHOD_CONFIG
   ): Promise<NporaResponse<T>> {
     return this.requestMethodResponse<T>(url, 'POST', config)
   }
 
   put<Schema extends StandardSchemaV1>(
-    url: string,
+    url: RequestURL,
     config: SchemaMethodConfig<Schema>
   ): Promise<StandardSchemaV1.InferOutput<Schema>>
 
   put<T = unknown>(
-    url: string,
+    url: RequestURL,
     config?: MethodConfig
   ): Promise<T>
 
   put<T = unknown>(
-    url: string,
+    url: RequestURL,
     config: MethodConfig = EMPTY_METHOD_CONFIG
   ): Promise<T> {
     return this.requestMethod<T>(url, 'PUT', config)
   }
 
   putResponse<Schema extends StandardSchemaV1>(
-    url: string,
+    url: RequestURL,
     config: SchemaMethodConfig<Schema>
   ): Promise<NporaResponse<StandardSchemaV1.InferOutput<Schema>>>
 
   putResponse<T = unknown>(
-    url: string,
+    url: RequestURL,
     config?: MethodConfig
   ): Promise<NporaResponse<T>>
 
   putResponse<T = unknown>(
-    url: string,
+    url: RequestURL,
     config: MethodConfig = EMPTY_METHOD_CONFIG
   ): Promise<NporaResponse<T>> {
     return this.requestMethodResponse<T>(url, 'PUT', config)
   }
 
   patch<Schema extends StandardSchemaV1>(
-    url: string,
+    url: RequestURL,
     config: SchemaMethodConfig<Schema>
   ): Promise<StandardSchemaV1.InferOutput<Schema>>
 
   patch<T = unknown>(
-    url: string,
+    url: RequestURL,
     config?: MethodConfig
   ): Promise<T>
 
   patch<T = unknown>(
-    url: string,
+    url: RequestURL,
     config: MethodConfig = EMPTY_METHOD_CONFIG
   ): Promise<T> {
     return this.requestMethod<T>(url, 'PATCH', config)
   }
 
   patchResponse<Schema extends StandardSchemaV1>(
-    url: string,
+    url: RequestURL,
     config: SchemaMethodConfig<Schema>
   ): Promise<NporaResponse<StandardSchemaV1.InferOutput<Schema>>>
 
   patchResponse<T = unknown>(
-    url: string,
+    url: RequestURL,
     config?: MethodConfig
   ): Promise<NporaResponse<T>>
 
   patchResponse<T = unknown>(
-    url: string,
+    url: RequestURL,
     config: MethodConfig = EMPTY_METHOD_CONFIG
   ): Promise<NporaResponse<T>> {
     return this.requestMethodResponse<T>(url, 'PATCH', config)
   }
 
+  query<Schema extends StandardSchemaV1>(
+    url: RequestURL,
+    config: SchemaMethodConfig<Schema>
+  ): Promise<StandardSchemaV1.InferOutput<Schema>>
+
+  query<T = unknown>(
+    url: RequestURL,
+    config?: MethodConfig
+  ): Promise<T>
+
+  query<T = unknown>(
+    url: RequestURL,
+    config: MethodConfig = EMPTY_METHOD_CONFIG
+  ): Promise<T> {
+    return this.requestMethod<T>(url, 'QUERY', config)
+  }
+
+  queryResponse<Schema extends StandardSchemaV1>(
+    url: RequestURL,
+    config: SchemaMethodConfig<Schema>
+  ): Promise<NporaResponse<StandardSchemaV1.InferOutput<Schema>>>
+
+  queryResponse<T = unknown>(
+    url: RequestURL,
+    config?: MethodConfig
+  ): Promise<NporaResponse<T>>
+
+  queryResponse<T = unknown>(
+    url: RequestURL,
+    config: MethodConfig = EMPTY_METHOD_CONFIG
+  ): Promise<NporaResponse<T>> {
+    return this.requestMethodResponse<T>(url, 'QUERY', config)
+  }
+
   delete<Schema extends StandardSchemaV1>(
-    url: string,
+    url: RequestURL,
     config: SchemaMethodConfig<Schema>
   ): Promise<StandardSchemaV1.InferOutput<Schema>>
 
   delete<T = unknown>(
-    url: string,
+    url: RequestURL,
     config?: MethodConfig
   ): Promise<T>
 
   delete<T = unknown>(
-    url: string,
+    url: RequestURL,
     config: MethodConfig = EMPTY_METHOD_CONFIG
   ): Promise<T> {
     return this.requestMethod<T>(url, 'DELETE', config)
   }
 
   deleteResponse<Schema extends StandardSchemaV1>(
-    url: string,
+    url: RequestURL,
     config: SchemaMethodConfig<Schema>
   ): Promise<NporaResponse<StandardSchemaV1.InferOutput<Schema>>>
 
   deleteResponse<T = unknown>(
-    url: string,
+    url: RequestURL,
     config?: MethodConfig
   ): Promise<NporaResponse<T>>
 
   deleteResponse<T = unknown>(
-    url: string,
+    url: RequestURL,
     config: MethodConfig = EMPTY_METHOD_CONFIG
   ): Promise<NporaResponse<T>> {
     return this.requestMethodResponse<T>(url, 'DELETE', config)
   }
 
   head(
-    url: string,
+    url: RequestURL,
     config: Omit<MethodConfig, 'schema'> = EMPTY_METHOD_CONFIG
   ): Promise<void> {
     return this.requestMethod<void>(url, 'HEAD', config)
   }
 
   headResponse(
-    url: string,
+    url: RequestURL,
     config: Omit<MethodConfig, 'schema'> = EMPTY_METHOD_CONFIG
   ): Promise<NporaResponse<void>> {
     return this.requestMethodResponse<void>(url, 'HEAD', config)
   }
 
   options<Schema extends StandardSchemaV1>(
-    url: string,
+    url: RequestURL,
     config: SchemaMethodConfig<Schema>
   ): Promise<StandardSchemaV1.InferOutput<Schema>>
 
   options<T = unknown>(
-    url: string,
+    url: RequestURL,
     config?: MethodConfig
   ): Promise<T>
 
   options<T = unknown>(
-    url: string,
+    url: RequestURL,
     config: MethodConfig = EMPTY_METHOD_CONFIG
   ): Promise<T> {
     return this.requestMethod<T>(url, 'OPTIONS', config)
   }
 
   optionsResponse<Schema extends StandardSchemaV1>(
-    url: string,
+    url: RequestURL,
     config: SchemaMethodConfig<Schema>
   ): Promise<NporaResponse<StandardSchemaV1.InferOutput<Schema>>>
 
   optionsResponse<T = unknown>(
-    url: string,
+    url: RequestURL,
     config?: MethodConfig
   ): Promise<NporaResponse<T>>
 
   optionsResponse<T = unknown>(
-    url: string,
+    url: RequestURL,
     config: MethodConfig = EMPTY_METHOD_CONFIG
   ): Promise<NporaResponse<T>> {
     return this.requestMethodResponse<T>(url, 'OPTIONS', config)
@@ -415,7 +476,7 @@ export class Client {
    * Consume a server-sent event response as a lazy async iterable.
    */
   sse(
-    url: string,
+    url: RequestURL,
     config: Omit<
       RequestConfig,
       'url' | 'method' | 'responseType' | 'schema'
@@ -431,7 +492,7 @@ export class Client {
    * Consume a server-sent event response with complete response metadata.
    */
   sseResponse(
-    url: string,
+    url: RequestURL,
     config: Omit<
       RequestConfig,
       'url' | 'method' | 'responseType' | 'schema'
@@ -447,7 +508,7 @@ export class Client {
    * Consume newline-delimited JSON records as a lazy async iterable.
    */
   ndjson<T = unknown>(
-    url: string,
+    url: RequestURL,
     config: Omit<
       RequestConfig,
       'url' | 'method' | 'responseType' | 'schema'
@@ -463,7 +524,7 @@ export class Client {
    * Consume newline-delimited JSON with complete response metadata.
    */
   ndjsonResponse<T = unknown>(
-    url: string,
+    url: RequestURL,
     config: Omit<
       RequestConfig,
       'url' | 'method' | 'responseType' | 'schema'
@@ -476,7 +537,7 @@ export class Client {
   }
 
   private requestMethod<T>(
-    url: string,
+    url: RequestURL,
     method: HttpMethod,
     config: MethodConfig
   ): Promise<T> {
@@ -499,7 +560,7 @@ export class Client {
   }
 
   private requestMethodResponse<T>(
-    url: string,
+    url: RequestURL,
     method: HttpMethod,
     config: MethodConfig
   ): Promise<NporaResponse<T>> {
@@ -521,7 +582,7 @@ export class Client {
   }
 
   private mergeMethodConfig(
-    url: string,
+    url: RequestURL,
     method: HttpMethod,
     config: MethodConfig
   ): RequestConfig {
@@ -541,6 +602,27 @@ export class Client {
     merged.method = method
 
     return merged
+  }
+
+  private mergeRequestInput(
+    input: RequestConfig | Request,
+    overrides: RequestInputConfig
+  ): RequestConfig {
+    if (!isRequest(input)) {
+      return ConfigMerger.merge(this.defaults, input)
+    }
+
+    const requestConfig = requestToConfig(input)
+    const merged = ConfigMerger.merge(this.defaults, requestConfig)
+
+    if (overrides === EMPTY_METHOD_CONFIG) {
+      return merged
+    }
+
+    return ConfigMerger.merge(merged, {
+      ...overrides,
+      url: requestConfig.url
+    })
   }
 
   private createPipeline(adapter: Adapter): Pipeline {
@@ -601,6 +683,33 @@ export class Client {
 
     return undefined
   }
+}
+
+function requestToConfig(
+  input: Request,
+  body: ReadableStream<Uint8Array> | null = input.body
+): RequestConfig {
+  const config: RequestConfig = {
+    url: input.url,
+    method: input.method as HttpMethod,
+    headers: input.headers,
+    body,
+    signal: input.signal,
+    fetchOptions: {
+      cache: input.cache,
+      credentials: input.credentials,
+      integrity: input.integrity,
+      keepalive: input.keepalive,
+      mode: input.mode,
+      redirect: input.redirect,
+      referrer: input.referrer,
+      referrerPolicy: input.referrerPolicy
+    }
+  }
+
+  rememberRequestBody(config, input, body)
+
+  return config
 }
 
 interface InstalledPlugin {

@@ -26,14 +26,16 @@ function parseOrigin(url: string, baseURL?: string): string | undefined {
  * Resolve the isolation origin shared by stateful request plugins.
  */
 export function resolveRequestOrigin(config: RequestConfig): string {
-  if (config.url.includes(':')) {
-    const origin = parseOrigin(config.url)
+  const url = String(config.url)
+
+  if (url.includes(':')) {
+    const origin = parseOrigin(url)
     if (origin !== undefined)
       return origin
   }
 
   if (config.baseURL) {
-    return parseOrigin(config.url, config.baseURL) ?? 'default'
+    return parseOrigin(url, config.baseURL) ?? 'default'
   }
 
   return 'default'

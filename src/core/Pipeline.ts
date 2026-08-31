@@ -3,11 +3,22 @@ import type {
 } from '../interceptors/InterceptorManager'
 import type { PluginHooks } from '../interceptors/PluginHooks'
 import type { Adapter, NporaResponse, RequestConfig } from '../types'
-import { RequestError, SchemaValidationError } from '../errors'
-import { validateRequestConfig } from '../utils'
+import {
+  isRequestError,
+  RequestError,
+  SchemaValidationError
+} from '../errors'
+import {
+  finalizeStreamingResponse,
+  validateRequestConfig
+} from '../utils'
+import { createTimeoutSignal } from '../utils/createTimeoutSignal'
 import { throwIfAborted } from '../utils/createAbortError'
 import { isPromiseLike } from '../utils/isPromiseLike'
 import { MAX_TIMER_DELAY } from '../utils/maxTimerDelay'
+import { normalizeURL } from '../utils/normalizeURL'
+import { waitForSignal } from '../utils/waitForSignal'
+import { isReadableStream } from '../utils/isReadableStream'
 import { RequestContext } from './RequestContext'
 
 export interface PipelineInterceptors {
@@ -32,6 +43,74 @@ export class Pipeline {
     config: RequestConfig,
     preserveRaw = true,
     background = false
+  ): Promise<NporaResponse<T>> {
+    const normalizedURL = normalizeURL(config.url)
+
+    if (
+      normalizedURL !== undefined &&
+      normalizedURL !== config.url
+    ) {
+      config = {
+        ...config,
+        url: normalizedURL
+      }
+    }
+
+    const totalTimeout = config.totalTimeout
+
+    if (
+      typeof totalTimeout === 'number' &&
+      Number.isFinite(totalTimeout) &&
+      totalTimeout > 0 &&
+      totalTimeout <= MAX_TIMER_DELAY
+    ) {
+      let timeoutSignal
+
+      try {
+        timeoutSignal = createTimeoutSignal(
+          config.signal,
+          totalTimeout,
+          `Request total timeout after ${totalTimeout}ms`
+        )
+      } catch (error) {
+        return Promise.reject(new RequestError(
+          'Failed to configure request totalTimeout',
+          {
+            code: 'CONFIG_ERROR',
+            config,
+            cause: error
+          }
+        ))
+      }
+
+      const effectiveConfig = {
+        ...config,
+        signal: timeoutSignal.signal
+      }
+
+      return waitForSignal(
+        () => this.executeConfigured<T>(
+          effectiveConfig,
+          preserveRaw,
+          background
+        ),
+        effectiveConfig
+      ).then(
+        response => finalizeTotalTimeout(response, timeoutSignal.clear),
+        error => {
+          timeoutSignal.clear()
+          throw error
+        }
+      )
+    }
+
+    return this.executeConfigured<T>(config, preserveRaw, background)
+  }
+
+  private executeConfigured<T>(
+    config: RequestConfig,
+    preserveRaw: boolean,
+    background: boolean
   ): Promise<NporaResponse<T>> {
     if (
       !config.schema &&
@@ -551,7 +630,7 @@ function createAbortError(
   reason: unknown,
   config: RequestConfig
 ): RequestError {
-  if (reason instanceof RequestError) {
+  if (isRequestError(reason)) {
     return new RequestError(reason.message, {
       code: reason.code,
       status: reason.status,
@@ -567,4 +646,62 @@ function createAbortError(
     config,
     cause: reason
   })
+}
+
+function finalizeTotalTimeout<T>(
+  response: NporaResponse<T>,
+  clear: () => void
+): NporaResponse<T> {
+  const data = response.data
+
+  if (isReadableStream(data)) {
+    const source = data === response.raw.body
+      ? response.raw
+      : new Response(data, {
+          status: response.status,
+          statusText: response.statusText,
+          headers: response.headers
+        })
+    const raw = finalizeStreamingResponse(
+      source,
+      undefined,
+      response.config,
+      clear
+    )
+
+    return {
+      ...response,
+      data: raw.body as T,
+      raw
+    }
+  }
+
+  if (isAsyncIterable(data)) {
+    return {
+      ...response,
+      data: finalizeAsyncIterable(data, clear) as T
+    }
+  }
+
+  clear()
+  return response
+}
+
+function finalizeAsyncIterable<T>(
+  iterable: AsyncIterable<T>,
+  clear: () => void
+): AsyncIterable<T> {
+  return (async function* () {
+    try {
+      yield* iterable
+    } finally {
+      clear()
+    }
+  })()
+}
+
+function isAsyncIterable(value: unknown): value is AsyncIterable<unknown> {
+  return typeof value === 'object' &&
+    value !== null &&
+    Symbol.asyncIterator in value
 }

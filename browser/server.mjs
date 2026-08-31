@@ -85,6 +85,16 @@ const server = createServer(
         return
       }
 
+      if (url.pathname === '/api/invalid-error-json') {
+        response.writeHead(422, {
+          'content-type': 'application/json; charset=utf-8',
+          'cache-control': 'no-store'
+        })
+        response.end('invalid-json')
+
+        return
+      }
+
       if (url.pathname === '/api/slow') {
         await delay(100)
 
@@ -101,6 +111,12 @@ const server = createServer(
           200,
           downloadFixture
         )
+
+        return
+      }
+
+      if (url.pathname === '/api/form-data') {
+        sendFormData(response)
 
         return
       }
@@ -426,6 +442,27 @@ function sendBinary(
 ) {
   response.writeHead(statusCode, {
     'content-type': 'application/octet-stream',
+    'content-length': String(content.byteLength),
+    'cache-control': 'no-store',
+    'access-control-allow-origin': '*'
+  })
+
+  response.end(content)
+}
+
+function sendFormData(response) {
+  const boundary = 'npora-browser-boundary'
+  const content = Buffer.from(
+    `--${boundary}\r\n` +
+    'Content-Disposition: form-data; name="name"\r\n\r\n' +
+    `Npora\r\n--${boundary}\r\n` +
+    'Content-Disposition: form-data; name="role"\r\n\r\n' +
+    `browser\r\n--${boundary}--\r\n`,
+    'utf8'
+  )
+
+  response.writeHead(200, {
+    'content-type': `multipart/form-data; boundary=${boundary}`,
     'content-length': String(content.byteLength),
     'cache-control': 'no-store',
     'access-control-allow-origin': '*'

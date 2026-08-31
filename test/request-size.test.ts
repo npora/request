@@ -50,20 +50,76 @@ describe('request body size limits', () => {
     expect(xhrConstructor).not.toHaveBeenCalled()
   })
 
-  it('should leave indeterminate streaming sizes to the transport', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(
-      new Response('{}', {
-        headers: {
-          'content-type': 'application/json'
+  it('should enforce streaming sizes while Fetch consumes the body', async () => {
+    const cancel = vi.fn(() => new Promise<void>(() => {}))
+    const fetchMock = vi.fn(async (_url: string, init?: RequestInit) => {
+      const reader = (init?.body as ReadableStream).getReader()
+
+      try {
+        while (!(await reader.read()).done) {
+          // Consume the request exactly as a Fetch transport would.
         }
+      } catch {
+        // Some Fetch implementations discard the stream error and its cause.
+        throw new TypeError('fetch failed')
+      }
+
+      return new Response('{}', {
+        headers: { 'content-type': 'application/json' }
       })
+    })
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    let pulls = 0
+    const body = new ReadableStream({
+      pull(controller) {
+        controller.enqueue(new Uint8Array(pulls++ === 0 ? 1 : 4))
+      },
+      cancel
+    })
+
+    await expect(new FetchAdapter().request({
+      url: 'https://api.example.com/upload',
+      method: 'POST',
+      body,
+      maxRequestSize: 4
+    })).rejects.toMatchObject({
+      code: 'REQUEST_TOO_LARGE'
+    })
+
+    expect(fetchMock).toHaveBeenCalledOnce()
+    expect(cancel).toHaveBeenCalledWith(
+      expect.objectContaining({ code: 'REQUEST_TOO_LARGE' })
     )
+  })
+
+  it('should allow a stream exactly at maxRequestSize', async () => {
+    let received = 0
+    const fetchMock = vi.fn(async (_url: string, init?: RequestInit) => {
+      const reader = (init?.body as ReadableStream<Uint8Array>).getReader()
+
+      for (;;) {
+        const result = await reader.read()
+
+        if (result.done) {
+          break
+        }
+
+        received += result.value.byteLength
+      }
+
+      return new Response('{}', {
+        headers: { 'content-type': 'application/json' }
+      })
+    })
 
     vi.stubGlobal('fetch', fetchMock)
 
     const body = new ReadableStream({
       start(controller) {
-        controller.enqueue(new Uint8Array(8))
+        controller.enqueue(new Uint8Array(2))
+        controller.enqueue(new Uint8Array(3))
         controller.close()
       }
     })
@@ -72,9 +128,10 @@ describe('request body size limits', () => {
       url: 'https://api.example.com/upload',
       method: 'POST',
       body,
-      maxRequestSize: 1
+      maxRequestSize: 5
     })
 
     expect(fetchMock).toHaveBeenCalledOnce()
+    expect(received).toBe(5)
   })
 })

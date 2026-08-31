@@ -6,6 +6,7 @@ export type HttpMethod =
   | 'POST'
   | 'PUT'
   | 'PATCH'
+  | 'QUERY'
   | 'DELETE'
   | 'HEAD'
   | 'OPTIONS'

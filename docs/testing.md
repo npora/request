@@ -70,9 +70,9 @@ pnpm exec playwright install chromium firefox webkit
 pnpm test:browser
 ```
 
-Playwright validates Chromium, Firefox, and WebKit, including Fetch requests,
-SSE and NDJSON streaming, Web Workers, plugin lifecycle, HEAD/OPTIONS, and
-concurrent XHR upload/download progress.
+Playwright validates Chromium, Firefox, and WebKit, including native Fetch
+inputs, SSE and NDJSON streaming, Web Workers, plugin lifecycle,
+HEAD/OPTIONS/QUERY, and concurrent XHR upload/download progress.
 
 ## Performance checks
 

@@ -9,6 +9,10 @@ export function validateResponseStatus(
   config: RequestConfig
 ): boolean {
   try {
+    if (config.throwHttpErrors === false) {
+      return true
+    }
+
     return config.validateStatus
       ? config.validateStatus(status)
       : status >= 200 && status < 300

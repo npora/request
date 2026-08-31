@@ -155,6 +155,138 @@ envelope. The root, cache, tarball, and unpacked budgets include only this
 measured guard and narrow headroom; declarations and unrelated subpaths remain
 fixed.
 
+The post-1.15 retry correction adds timeout and HTTP 425 classification to the
+existing retry subpath, while privacy-reduced `RequestError` JSON output adds a
+small public method declaration and shared runtime helper. Root and declaration
+budgets were raised only by the measured cost plus narrow headroom; retry and
+all other subpath, gzip, tarball, and unpacked-package budgets remain fixed.
+
+Explicit inherited-header removal and cross-realm native `Headers` detection
+add guarded core merge and validation paths without widening `HeadersInit` or
+adding dependencies. Root, core, declaration, and unpacked-package budgets
+track the measured implementation cost plus narrow headroom; unrelated plugin,
+testing, and tarball budgets remain fixed.
+
+Fetch-compatible transport injection adds one validated public option and a
+single built-in adapter dispatch branch. Root, core, declaration, and unpacked
+budgets include the measured implementation and type cost plus narrow
+headroom; plugin, testing, runtime gzip, and tarball budgets remain fixed.
+
+Custom buffered JSON codecs add validated request callbacks, asynchronous
+Fetch and XHR parsing, serializer return checks, and a cache-safety guard. Root,
+core, cache, testing, declaration, tarball, and unpacked budgets track the
+measured feature cost plus narrow headroom; unrelated plugin budgets remain
+fixed and no runtime dependency was added.
+
+Server-directed retry timing adds ordered parsing for `Retry-After`, standard
+rate-limit reset timing, common vendor aliases, and timestamp-aware HTTP 413
+gating. Root, retry, tarball, and unpacked budgets include the measured cost
+plus narrow headroom; core, cache, testing, declaration, and unrelated plugin
+budgets remain fixed.
+
+Custom object-query serialization adds one validated callback, shared Fetch/XHR
+URL encoding, and a cache-safety opt-in through explicit keys. Root, core,
+declaration, tarball, and unpacked budgets include the measured implementation
+and public type cost plus narrow headroom; cache and unrelated plugin budgets
+remain fixed and no runtime dependency was added.
+
+Explicit FormData response parsing adds native Fetch, bounded-buffer, and XHR
+branches plus a cache-safety exclusion for mutable multipart values. Root,
+core, testing, tarball, and unpacked budgets track the measured cost plus narrow
+headroom; declarations, cache, and unrelated plugin budgets remain fixed.
+
+Overall request deadlines add lifecycle-wide signal racing, retry-delay and
+hook coverage, plus deterministic cleanup for buffered and streaming results.
+Root, core, declaration, tarball, and unpacked budgets include the measured
+implementation and public option cost plus narrow headroom; plugin and testing
+subpath budgets remain fixed.
+
+Portable byte responses add native `Response.bytes()` dispatch, an ArrayBuffer
+fallback, bounded-read and XHR conversion branches, and a cache-safety guard.
+Root, core, cache, testing, tarball, and unpacked budgets track the measured
+cost plus narrow headroom; declarations and unrelated plugin budgets remain
+fixed.
+
+Context-aware JSON parsing adds one public context type and supplies existing
+request and response objects to the callback across Fetch and XHR paths. Only
+declaration, tarball, and unpacked budgets were raised by the measured type and
+documentation cost plus narrow headroom; runtime budgets remain fixed.
+
+Declarative retry status and timeout policies add normalized status matching
+plus tri-state custom-decision fallback. Root, retry, declaration, tarball, and
+unpacked budgets track the measured implementation and public type cost plus
+narrow headroom; core, cache, testing, and unrelated plugin budgets remain
+fixed.
+
+Bounded HTTP-error parsing prevents stalled response bodies and asynchronous
+JSON decoders from keeping requests pending forever. The shared Fetch/XHR
+implementation raises only the root, core, testing, tarball, and unpacked
+budgets by its measured cost plus narrow headroom; declarations, retry, cache,
+and unrelated plugin budgets remain fixed, with no runtime dependency added.
+
+Malformed HTTP-error payload fallback reuses the same shared boundary and
+error-data sentinel, preserving HTTP classification without adding public API
+or a runtime dependency. Existing package-size headroom covers the small
+branch; no budget is raised pre-emptively.
+
+Complete JSON root-value support corrects null-body validation and widens the
+existing public shortcut type without adding a serialization branch. Only the
+unpacked-package budget required measured adjustment plus narrow headroom;
+runtime, declaration, subpath, gzip, and tarball budgets remain fixed.
+
+Shallow-merged local request context adds validated metadata cloning through
+core configuration and request snapshots. Root, core, declaration, tarball,
+and unpacked budgets track the measured implementation, type, and documentation
+cost plus narrow headroom; plugin and testing budgets remain fixed and no
+runtime dependency was added.
+
+Opaque Fetch response handling adds filtered-response classification and cache
+isolation without a public type or dependency. Root, core, tarball, and
+unpacked budgets plus the cache subpath track the measured implementation and
+documentation cost with narrow headroom; declarations and unrelated plugin
+subpath budgets remain fixed.
+
+Response-type-driven content negotiation adds a compact media-type lookup on
+the shared Fetch/XHR request builder. Root, core, tarball, and unpacked budgets
+track the measured implementation and documentation cost plus narrow headroom;
+declaration and plugin subpath budgets remain fixed and no dependency was
+added.
+
+Native `URL` inputs add cross-realm brand checking, early lifecycle
+normalization, and public method/type declarations. Root, core, declaration,
+tarball, and unpacked budgets track the measured implementation and documented
+API cost plus narrow headroom; plugin and testing subpath budgets remain fixed
+and no dependency was added.
+
+Non-throwing HTTP status handling adds policy validation, inherited-policy
+replacement, and shared Fetch/XHR/Mock status dispatch. Root, core, declaration,
+testing, tarball, and unpacked budgets track the measured implementation and
+documented API cost plus narrow headroom; retry and cache plugin budgets remain
+within their existing limits and no dependency was added.
+
+Cross-realm error guards add shared non-enumerable brands, public type guards,
+and internal classification across transports and plugins. Root, core, retry,
+cache, testing, declaration, tarball, and unpacked budgets track their measured
+cost plus narrow headroom; no runtime dependency was added.
+
+Query-safe `baseURL` composition adds a fast-path URL-reference split for base
+queries, fragments, and suffix-only inputs. Root, core, tarball, and unpacked
+budgets track the measured runtime and documentation cost plus narrow headroom;
+declaration and plugin subpath budgets remain fixed and no dependency was added.
+
+Bounded HTTP error parsing adds a 10 MiB default guard, known-length Fetch
+preflight, chunked-body cancellation, XHR parse avoidance, and one public
+configuration option. Root, core, declaration, tarball, and unpacked budgets
+track the measured implementation and type cost plus narrow headroom; plugin
+and testing subpath budgets remain fixed and no dependency was added.
+
+Cross-realm native body support replaces `instanceof` checks with
+non-consuming platform brand checks for streams, multipart values, blobs, and
+array buffers. Detection code is split by body category so retry and cache
+subpaths load only what they use. Root, core, retry, cache, testing, tarball,
+and unpacked budgets track the measured safety cost plus narrow headroom; no
+runtime dependency was added.
+
 `pnpm test:package` includes the size check, so release verification cannot
 publish a package that exceeds the checked-in budgets. CI also stores the JSON
 report for comparing changes over time.

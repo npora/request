@@ -5,7 +5,7 @@ import type {
   QueryParams,
   RequestConfig
 } from '../types'
-import { RequestError } from '../errors'
+import { isRequestError, RequestError } from '../errors'
 import { isURLSearchParams } from '../utils/isURLSearchParams'
 import { isPromiseLike } from '../utils/isPromiseLike'
 import { waitForSignal } from '../utils/waitForSignal'
@@ -894,7 +894,7 @@ export function cachePlugin(
 
         if (
           !cache.enabled ||
-          !isCacheableRequest(requestContext.config, methods)
+          !isCacheableRequest(requestContext.config, methods, cache)
         ) {
           return
         }
@@ -1054,13 +1054,23 @@ export function cachePlugin(
         if (
           !cache?.enabled ||
           !requestContext.response ||
-          !isCacheableRequest(requestContext.config, methods) ||
+          !isCacheableRequest(requestContext.config, methods, cache) ||
           noStoreRequests.has(requestContext)
         ) {
           return
         }
 
         const revalidation = revalidations.get(requestContext)
+
+        if (
+          requestContext.response.raw.type === 'opaque' ||
+          requestContext.response.raw.type === 'opaqueredirect'
+        ) {
+          if (leaders.get(requestContext)?.owner === requestContext) {
+            uncacheableLeaders.add(requestContext)
+          }
+          return
+        }
 
         if (
           revalidation &&
@@ -1940,7 +1950,7 @@ function cloneSharedError(
   error: unknown,
   config: RequestConfig
 ): unknown {
-  if (!(error instanceof RequestError)) {
+  if (!isRequestError(error)) {
     return error
   }
 
@@ -2000,13 +2010,20 @@ function restoreCacheEntry(
 
 function isCacheableRequest(
   config: RequestConfig,
-  methods: ReadonlySet<HttpMethod>
+  methods: ReadonlySet<HttpMethod>,
+  cache: CacheOptions
 ): boolean {
   return (
     methods.has(config.method ?? 'GET') &&
+    (!config.parseJson || Boolean(cache.key)) &&
+    (!config.querySerializer || Boolean(cache.key)) &&
     config.responseType !== 'stream' &&
     config.responseType !== 'sse' &&
-    config.responseType !== 'ndjson'
+    config.responseType !== 'ndjson' &&
+    config.responseType !== 'bytes' &&
+    config.responseType !== 'formData' &&
+    config.fetchOptions?.mode !== 'no-cors' &&
+    config.fetchOptions?.redirect !== 'manual'
   )
 }
 
@@ -2017,7 +2034,7 @@ function isAsyncIterable(value: unknown): value is AsyncIterable<unknown> {
 }
 
 function isSchemaValidationFailure(error: unknown): boolean {
-  return error instanceof RequestError && error.code === 'SCHEMA_ERROR'
+  return isRequestError(error) && error.code === 'SCHEMA_ERROR'
 }
 
 interface ResponseCachePolicy {
@@ -2413,7 +2430,7 @@ function abortBackgroundRefreshes(
 }
 
 function isEligibleStaleIfError(error: unknown): boolean {
-  return error instanceof RequestError && (
+  return isRequestError(error) && (
     error.code === 'NETWORK_ERROR' ||
     error.code === 'TIMEOUT_ERROR' ||
     (
@@ -2475,13 +2492,17 @@ function prepareConditionalRevalidation(
   }
 
   const validateStatus = config.validateStatus
+  const throwHttpErrors = config.throwHttpErrors
 
   config.headers = headers
+  config.throwHttpErrors = undefined
   config.validateStatus = status => {
     return status === 304 || (
       validateStatus
         ? validateStatus(status)
-        : status >= 200 && status < 300
+        : throwHttpErrors === false || (
+          status >= 200 && status < 300
+        )
     )
   }
   return true
@@ -2520,6 +2541,7 @@ function createCacheKey(
   }
 
   const method = config.method ?? 'GET'
+  const url = String(config.url)
   const responseType = config.responseType ?? 'auto'
   const bare = !config.headers && !config.query && !config.searchParams
 
@@ -2528,7 +2550,7 @@ function createCacheKey(
     memo.key !== undefined &&
     memo.method === method &&
     memo.baseURL === config.baseURL &&
-    memo.url === config.url &&
+    memo.url === url &&
     memo.responseType === responseType
   ) {
     return memo.key
@@ -2537,7 +2559,7 @@ function createCacheKey(
   const key = JSON.stringify({
     method,
     baseURL: config.baseURL,
-    url: config.url,
+    url,
     query: bare
       ? EMPTY_QUERY
       : normalizeQuery(config.searchParams ?? config.query),
@@ -2553,7 +2575,7 @@ function createCacheKey(
   if (bare) {
     memo.method = method
     memo.baseURL = config.baseURL
-    memo.url = config.url
+    memo.url = url
     memo.responseType = responseType
     memo.key = key
   }

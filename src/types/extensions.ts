@@ -37,16 +37,31 @@ export interface RetryOptions {
   /**
    * HTTP methods that may be retried.
    *
-   * @default GET, HEAD, OPTIONS, PUT and DELETE
+   * @default GET, HEAD, OPTIONS, QUERY, PUT and DELETE
    */
   methods?: readonly HttpMethod[]
+
+  /**
+   * HTTP response status codes that may be retried.
+   *
+   * When omitted, HTTP 408, 425, 429, 5xx, and timed 413 responses are
+   * retried. A configured 413 still requires a valid retry timing header.
+   */
+  statusCodes?: readonly number[]
+
+  /**
+   * Retry per-attempt timeout failures.
+   *
+   * @default true
+   */
+  retryOnTimeout?: boolean
 
   delay?:
     | number
     | ((attempt: number, error: unknown) => number | Promise<number>)
 
   /**
-   * Respect the server Retry-After response header.
+   * Respect Retry-After and common rate-limit reset response headers.
    *
    * @default true
    */
@@ -64,7 +79,7 @@ export interface RetryOptions {
    *
    * `true` applies full jitter between zero and the configured delay.
    * A function receives the pending retry event and returns the final delay.
-   * Server-provided Retry-After delays are not jittered.
+   * Server-provided retry delays are not jittered.
    *
    * @default false
    */
@@ -83,7 +98,7 @@ export interface RetryOptions {
   shouldRetry?: (
     error: unknown,
     attempt: number
-  ) => boolean | Promise<boolean>
+  ) => boolean | undefined | Promise<boolean | undefined>
 
   /**
    * Observe a scheduled retry.

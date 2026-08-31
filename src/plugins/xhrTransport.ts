@@ -1,4 +1,4 @@
-import { RequestError } from '../errors'
+import { isRequestError, RequestError } from '../errors'
 import { createAbortError } from '../utils/createAbortError'
 import type {
   NporaResponse,
@@ -11,11 +11,19 @@ import {
 import {
   buildRequest,
   isBodylessResponse,
+  parseJsonText,
   parseResponse,
   resolveResponseType
 } from '../utils'
 import type { ResponseType } from '../types'
 import { validateResponseStatus } from '../utils/validateResponseStatus'
+import { resolveErrorResponseSizeLimit } from '../utils/errorResponseSize'
+import { isBlob } from '../utils/isBinaryBody'
+import { isReadableStream } from '../utils/isReadableStream'
+import {
+  ERROR_RESPONSE_DATA_UNAVAILABLE,
+  withErrorResponseTimeout
+} from '../utils/errorResponseTimeout'
 
 type TransferProgress = TransferProgressSnapshot
 
@@ -164,10 +172,7 @@ export function xhrRequest<T>(
 
       const body = request.init.body
 
-      if (
-        typeof ReadableStream !== 'undefined' &&
-        body instanceof ReadableStream
-      ) {
+      if (isReadableStream(body)) {
         abortWith(
           new RequestError(
             'XMLHttpRequest cannot send a ReadableStream body',
@@ -204,7 +209,7 @@ async function processResponse<T>(
       xhr.getAllResponseHeaders()
     )
     const blob =
-      xhr.response instanceof Blob
+      isBlob(xhr.response)
         ? xhr.response
         : new Blob(
             xhr.response === null
@@ -228,6 +233,13 @@ async function processResponse<T>(
     const directBuffered =
       !Number.isFinite(config.maxResponseSize)
       && isBufferedResponseType(responseType)
+    const errorResponseSizeLimit =
+      !validStatus && isBufferedResponseType(responseType)
+        ? resolveErrorResponseSizeLimit(config)
+        : undefined
+    const errorBodyTooLarge =
+      errorResponseSizeLimit !== undefined &&
+      blob.size > errorResponseSizeLimit
     const raw =
       bodyless || (directBuffered && !preserveRaw && validStatus)
         ? emptyRaw
@@ -239,11 +251,17 @@ async function processResponse<T>(
       !preserveRaw
         ? raw
         : raw.clone()
-    const data = bodyless
+    const parseData = () => directBuffered
+      ? parseBufferedBlob<T>(blob, responseType, raw, config)
+      : parseResponse<T>(parseTarget, config)
+    const parsed = bodyless || errorBodyTooLarge
       ? undefined as T
-      : directBuffered
-        ? await parseBufferedBlob<T>(blob, responseType, raw, config)
-        : await parseResponse<T>(parseTarget, config)
+      : !validStatus
+        ? await withErrorResponseTimeout(config, parseData)
+        : await parseData()
+    const data = parsed === ERROR_RESPONSE_DATA_UNAVAILABLE
+      ? undefined as T
+      : parsed
     const response: NporaResponse<T> = {
       data,
       status: xhr.status,
@@ -264,7 +282,7 @@ async function processResponse<T>(
 
     return response
   } catch (error) {
-    if (error instanceof RequestError) {
+    if (isRequestError(error)) {
       throw error
     }
 
@@ -281,29 +299,39 @@ async function processResponse<T>(
 
 function isBufferedResponseType(
   type: ResponseType | undefined
-): type is 'json' | 'text' | 'blob' | 'arrayBuffer' {
+): type is 'json' | 'text' | 'blob' | 'arrayBuffer' | 'bytes' | 'formData' {
   return type === 'json' ||
     type === 'text' ||
     type === 'blob' ||
-    type === 'arrayBuffer'
+    type === 'arrayBuffer' ||
+    type === 'bytes' ||
+    type === 'formData'
 }
 
 async function parseBufferedBlob<T>(
   blob: Blob,
-  type: 'json' | 'text' | 'blob' | 'arrayBuffer',
+  type: 'json' | 'text' | 'blob' | 'arrayBuffer' | 'bytes' | 'formData',
   response: Response,
   config: RequestConfig
 ): Promise<T> {
   try {
     switch (type) {
       case 'json':
-        return JSON.parse(await blob.text()) as T
+        return await parseJsonText<T>(await blob.text(), config, response)
 
       case 'text':
         return await blob.text() as T
 
       case 'arrayBuffer':
         return await blob.arrayBuffer() as T
+
+      case 'bytes':
+        return new Uint8Array(await blob.arrayBuffer()) as T
+
+      case 'formData':
+        return await new Response(blob, {
+          headers: response.headers
+        }).formData() as T
 
       default: {
         const contentType = response.headers.get('content-type') ?? ''
@@ -396,7 +424,7 @@ function createConfigError(
   config: RequestConfig,
   cause: unknown
 ): RequestError {
-  if (cause instanceof RequestError) {
+  if (isRequestError(cause)) {
     return cause
   }
 

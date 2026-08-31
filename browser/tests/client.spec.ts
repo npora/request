@@ -11,12 +11,31 @@ interface User {
 interface BrowserRequestClient {
   extend(options?: BrowserClientOptions): BrowserRequestClient
 
+  request<T>(
+    input: Request,
+    config?: BrowserRequestConfig
+  ): Promise<T>
+
   get<T>(
+    url: string | URL,
+    config?: BrowserRequestConfig
+  ): Promise<T>
+
+  getResponse<T>(
+    url: string,
+    config?: BrowserRequestConfig
+  ): Promise<{
+    data: T
+    status: number
+    raw: Response
+  }>
+
+  post<T>(
     url: string,
     config?: BrowserRequestConfig
   ): Promise<T>
 
-  post<T>(
+  query<T>(
     url: string,
     config?: BrowserRequestConfig
   ): Promise<T>
@@ -37,26 +56,61 @@ interface BrowserRequestClient {
 
 interface BrowserClientOptions {
   baseURL?: string
+  fetch?: typeof globalThis.fetch
+  context?: Record<string, unknown>
+  parseJson?: (
+    text: string,
+    context: BrowserJsonParserContext
+  ) => unknown | Promise<unknown>
+  stringifyJson?: (value: unknown) => string
   headers?: Record<string, string>
-  query?: Record<string, string | number>
+  query?: BrowserQuery
+  querySerializer?: (query: BrowserQuery) => string
 }
 
 interface BrowserRequestConfig {
+  body?: BodyInit
+  formData?: FormData | Record<string, unknown>
+  fetch?: typeof globalThis.fetch
+  fetchOptions?: RequestInit
+  context?: Record<string, unknown>
+  parseJson?: (
+    text: string,
+    context: BrowserJsonParserContext
+  ) => unknown | Promise<unknown>
+  stringifyJson?: (value: unknown) => string
   headers?: Record<string, string>
-  json?: Record<string, unknown>
-  query?: Record<string, string | number>
+  json?: unknown
+  query?: BrowserQuery
+  querySerializer?: (query: BrowserQuery) => string
   timeout?: number
+  totalTimeout?: number
+  throwHttpErrors?: boolean
   maxResponseSize?: number
+  maxRequestSize?: number
+  maxErrorResponseSize?: number
   schema?: BrowserStandardSchema
   responseType?:
     | 'json'
     | 'text'
     | 'blob'
     | 'arrayBuffer'
+    | 'bytes'
+    | 'formData'
     | 'stream'
     | 'sse'
     | 'ndjson'
 }
+
+interface BrowserJsonParserContext {
+  readonly config: BrowserRequestConfig & { url: string }
+  readonly response: Response
+}
+
+type BrowserQuery = Record<
+  string,
+  string | number | ReadonlyArray<string | number>
+>
 
 interface BrowserStandardSchema {
   readonly '~standard': {
@@ -121,6 +175,210 @@ test(
     expect(user).toEqual({
       id: 1,
       name: 'Npora'
+    })
+  }
+)
+
+test(
+  'should accept a native URL created by another realm',
+  async ({ page }) => {
+    await openFixture(page)
+
+    const result = await page.evaluate(async () => {
+      const request = (window as BrowserWindow).nporaRequest
+
+      if (!request) {
+        throw new Error('Npora request client is unavailable')
+      }
+
+      const frame = document.createElement('iframe')
+      document.body.append(frame)
+
+      try {
+        const ForeignURL = frame.contentWindow?.URL
+
+        if (!ForeignURL) {
+          throw new Error('Foreign URL constructor is unavailable')
+        }
+
+        const url = new ForeignURL('/api/user', window.location.href)
+
+        return await request.get<User>(url)
+      } finally {
+        frame.remove()
+      }
+    })
+
+    expect(result).toEqual({
+      id: 1,
+      name: 'Npora'
+    })
+  }
+)
+
+test(
+  'should accept a native Request created by another realm',
+  async ({ page }) => {
+    await openFixture(page)
+
+    const result = await page.evaluate(async () => {
+      const request = (window as BrowserWindow).nporaRequest
+      const frame = document.createElement('iframe')
+      document.body.append(frame)
+
+      try {
+        const foreign = frame.contentWindow
+
+        if (!request || !foreign) {
+          throw new Error('Request fixture is unavailable')
+        }
+
+        const input = new foreign.Request(
+          new foreign.URL('/api/echo?native=true', location.href),
+          {
+            headers: {
+              'x-native': 'yes'
+            }
+          }
+        )
+        const foreignResult = await request.request<{
+          method: string
+          query: Record<string, string>
+          headers: Record<string, string>
+        }>(input, {
+          headers: { 'x-override': 'yes' }
+        })
+        const sameRealmResult = await request.request<{
+          method: string
+          body: { source: string }
+        }>(new Request(new URL('/api/echo', location.href), {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ source: 'request' })
+        }))
+
+        return { foreignResult, sameRealmResult }
+      } finally {
+        frame.remove()
+      }
+    })
+
+    expect(result.foreignResult.method).toBe('GET')
+    expect(result.foreignResult.query).toEqual({ native: 'true' })
+    expect(result.foreignResult.headers['x-native']).toBe('yes')
+    expect(result.foreignResult.headers['x-override']).toBe('yes')
+    expect(result.sameRealmResult.method).toBe('POST')
+    expect(result.sameRealmResult.body).toEqual({ source: 'request' })
+  }
+)
+
+test(
+  'should compose baseURL query and fragments safely',
+  async ({ page }) => {
+    await openFixture(page)
+
+    const result = await page.evaluate(async () => {
+      const request = (window as BrowserWindow).nporaRequest
+
+      if (!request) {
+        throw new Error('Npora request client is unavailable')
+      }
+
+      const api = request.extend({
+        baseURL: '/api?tenant=npora#base'
+      })
+
+      return api.get<{
+        queryEntries: Array<[string, string]>
+      }>('/echo?active=true#result')
+    })
+
+    expect(result.queryEntries).toEqual([
+      ['tenant', 'npora'],
+      ['active', 'true']
+    ])
+  }
+)
+
+test(
+  'should preserve an opaque no-cors response in the browser',
+  async ({ page }) => {
+    await page.route(
+      'http://opaque.test/resource',
+      route => route.fulfill({
+        status: 200,
+        contentType: 'text/plain',
+        body: 'unreadable response body'
+      })
+    )
+    await openFixture(page)
+
+    const result = await page.evaluate(async () => {
+      const request = (window as BrowserWindow).nporaRequest
+
+      if (!request) {
+        throw new Error('Npora request client is unavailable')
+      }
+
+      const response = await request.getResponse<void>(
+        'http://opaque.test/resource',
+        {
+          fetchOptions: {
+            mode: 'no-cors'
+          }
+        }
+      )
+
+      return {
+        data: response.data,
+        status: response.status,
+        type: response.raw.type,
+        bodyIsNull: response.raw.body === null,
+        headerCount: [...response.raw.headers].length
+      }
+    })
+
+    expect(result).toEqual({
+      data: undefined,
+      status: 0,
+      type: 'opaque',
+      bodyIsNull: true,
+      headerCount: 0
+    })
+  }
+)
+
+test(
+  'should use an extended custom Fetch implementation in the browser',
+  async ({ page }) => {
+    await openFixture(page)
+
+    const result = await page.evaluate(async () => {
+      const request = (window as BrowserWindow).nporaRequest
+
+      if (!request) {
+        throw new Error('Npora request client is unavailable')
+      }
+
+      const calls: string[] = []
+      const nativeFetch = window.fetch.bind(window)
+      const tracedRequest = request.extend({
+        fetch: async (input, init) => {
+          calls.push(String(input))
+          return nativeFetch(input, init)
+        }
+      })
+      const user = await tracedRequest.get<User>('/user')
+
+      return { calls, user }
+    })
+
+    expect(result).toEqual({
+      calls: [expect.stringContaining('/user')],
+      user: {
+        id: 1,
+        name: 'Npora'
+      }
     })
   }
 )
@@ -197,6 +455,7 @@ test(
         headers: {
           'x-request': 'child'
         },
+        responseType: 'json',
         json: {
           name: 'Npora'
         }
@@ -211,12 +470,84 @@ test(
       headers: {
         'x-client': 'browser',
         'x-request': 'child',
+        accept: 'application/json',
         'content-type': 'application/json'
       },
       body: {
         name: 'Npora'
       }
     })
+  }
+)
+
+test(
+  'should use custom JSON codecs in the browser',
+  async ({ page }) => {
+    await openFixture(page)
+
+    const result = await page.evaluate(async () => {
+      const request = (window as BrowserWindow).nporaRequest
+
+      if (!request) {
+        throw new Error('Npora request client is unavailable')
+      }
+
+      return request.post<{
+        parsedBy: string
+        parserStatus: number
+        parserUrl: string
+        parserTrace: unknown
+        body: { wrapped: unknown }
+      }>('/echo', {
+        json: { name: 'Npora' },
+        context: { traceId: 'browser-json' },
+        stringifyJson: value => JSON.stringify({ wrapped: value }),
+        parseJson: async (text, { config, response }) => ({
+          ...JSON.parse(text),
+          parsedBy: 'custom',
+          parserStatus: response.status,
+          parserUrl: config.url,
+          parserTrace: config.context?.traceId
+        })
+      })
+    })
+
+    expect(result).toMatchObject({
+      parsedBy: 'custom',
+      parserStatus: 200,
+      parserUrl: '/echo',
+      parserTrace: 'browser-json',
+      body: {
+        wrapped: { name: 'Npora' }
+      }
+    })
+  }
+)
+
+test(
+  'should send primitive JSON values in the browser',
+  async ({ page }) => {
+    await openFixture(page)
+
+    const bodies = await page.evaluate(async () => {
+      const request = (window as BrowserWindow).nporaRequest
+
+      if (!request) {
+        throw new Error('Npora request client is unavailable')
+      }
+
+      const values: unknown[] = ['npora', 42, false, null]
+
+      return Promise.all(values.map(async json => {
+        const result = await request.post<{ body: unknown }>('/echo', {
+          json
+        })
+
+        return result.body
+      }))
+    })
+
+    expect(bodies).toEqual(['npora', 42, false, null])
   }
 )
 
@@ -248,6 +579,106 @@ test(
       ['search', 'hello world'],
       ['tag', 'second']
     ])
+  }
+)
+
+test(
+  'should inherit a custom query serializer in the browser',
+  async ({ page }) => {
+    await openFixture(page)
+
+    const result = await page.evaluate(async () => {
+      const request = (window as BrowserWindow).nporaRequest
+
+      if (!request) {
+        throw new Error('Npora request client is unavailable')
+      }
+
+      const api = request.extend({
+        querySerializer(query) {
+          const tags = query.tags as string[]
+
+          return tags
+            .map(tag => `tags[]=${encodeURIComponent(tag)}`)
+            .join('&')
+        }
+      })
+
+      return api.get<{
+        queryEntries: Array<[string, string]>
+      }>('/echo', {
+        query: { tags: ['first value', 'second'] }
+      })
+    })
+
+    expect(result.queryEntries).toEqual([
+      ['tags[]', 'first value'],
+      ['tags[]', 'second']
+    ])
+  }
+)
+
+test(
+  'should parse a FormData response in the browser',
+  async ({ page }) => {
+    await openFixture(page)
+
+    const entries = await page.evaluate(async () => {
+      const request = (window as BrowserWindow).nporaRequest
+
+      if (!request) {
+        throw new Error('Npora request client is unavailable')
+      }
+
+      const data = await request.get<FormData>('/form-data', {
+        responseType: 'formData',
+        maxResponseSize: 1024
+      })
+
+      return [...data.entries()].map(([name, value]) => [
+        name,
+        typeof value === 'string' ? value : value.name
+      ])
+    })
+
+    expect(entries).toEqual([
+      ['name', 'Npora'],
+      ['role', 'browser']
+    ])
+  }
+)
+
+test(
+  'should parse a byte response in the browser',
+  async ({ page }) => {
+    await openFixture(page)
+
+    const result = await page.evaluate(async () => {
+      const request = (window as BrowserWindow).nporaRequest
+
+      if (!request) {
+        throw new Error('Npora request client is unavailable')
+      }
+
+      const data = await request.get<Uint8Array>('/download', {
+        responseType: 'bytes',
+        maxResponseSize: 64 * 1024
+      })
+
+      return {
+        constructor: data.constructor.name,
+        length: data.byteLength,
+        first: data[0],
+        last: data[data.byteLength - 1]
+      }
+    })
+
+    expect(result).toEqual({
+      constructor: 'Uint8Array',
+      length: 64 * 1024,
+      first: 0x6e,
+      last: 0x6e
+    })
   }
 )
 
@@ -286,6 +717,192 @@ test(
       ['tag', 'first'],
       ['tag', 'second']
     ])
+  }
+)
+
+test(
+  'should merge native Headers created by another realm',
+  async ({ page }) => {
+    await openFixture(page)
+
+    const result = await page.evaluate(async () => {
+      const request = (window as BrowserWindow).nporaRequest
+      const frame = document.createElement('iframe')
+
+      document.body.append(frame)
+
+      try {
+        if (!request || !frame.contentWindow) {
+          throw new Error('Npora request client or iframe is unavailable')
+        }
+
+        const headers = new frame.contentWindow.Headers({
+          'x-cross-realm': 'preserved'
+        })
+
+        return request.get<{
+          headers: Record<string, string>
+        }>('/echo', {
+          headers
+        })
+      } finally {
+        frame.remove()
+      }
+    })
+
+    expect(result.headers['x-cross-realm']).toBe('preserved')
+  }
+)
+
+test(
+  'should preserve native body values created by another realm',
+  async ({ page }) => {
+    await openFixture(page)
+
+    const result = await page.evaluate(async () => {
+      const frame = document.createElement('iframe')
+
+      document.body.append(frame)
+
+      try {
+        const foreign = frame.contentWindow
+
+        if (!foreign) {
+          throw new Error('Iframe realm is unavailable')
+        }
+
+        const module = await import('/dist/index.js')
+        const request = module.createClient({ baseURL: '/api' })
+        const formData = new foreign.FormData()
+
+        formData.append('name', 'npora')
+
+        const nativeForm = await request.post<{
+          received: number
+          contentType: string
+        }>('/upload', { formData })
+        const recordForm = await request.post<{
+          received: number
+          contentType: string
+        }>('/upload', {
+          formData: {
+            file: new foreign.Blob(['foreign blob'])
+          }
+        })
+        const captureSizeError = async (body: BodyInit) => {
+          try {
+            await request.post('/upload', {
+              body,
+              maxRequestSize: 4
+            })
+          } catch (error) {
+            return (error as { code?: string }).code
+          }
+
+          return undefined
+        }
+        let attempts = 0
+        let duplex: unknown
+        const retrying = module.createClient({
+          fetch: async (_url: string, init: RequestInit) => {
+            attempts += 1
+            duplex = (init as RequestInit & { duplex?: unknown }).duplex
+
+            return new Response('busy', { status: 503 })
+          }
+        }).use(module.retryPlugin({
+          retries: 1,
+          methods: ['POST'],
+          delay: 0
+        }))
+        const stream = new foreign.ReadableStream({
+          start(controller) {
+            controller.enqueue(new foreign.Uint8Array([1, 2, 3]))
+            controller.close()
+          }
+        })
+
+        try {
+          await retrying.post('/stream', {
+            body: stream,
+            responseType: 'text'
+          })
+        } catch {
+          // The 503 is expected; the one-shot stream must not be retried.
+        }
+
+        let streamPulls = 0
+        let streamCancelled = false
+        const limitedStream = new foreign.ReadableStream({
+          pull(controller) {
+            controller.enqueue(
+              new foreign.Uint8Array(streamPulls++ === 0 ? 2 : 3)
+            )
+          },
+          cancel() {
+            streamCancelled = true
+          }
+        })
+        const limiting = module.createClient({
+          fetch: async (_url: string, init: RequestInit) => {
+            const reader = (
+              init.body as ReadableStream<Uint8Array>
+            ).getReader()
+
+            try {
+              while (!(await reader.read()).done) {
+                // Consume incrementally to preserve stream backpressure.
+              }
+            } catch {
+              // Simulate runtimes that discard a request-stream error.
+              throw new TypeError('fetch failed')
+            }
+
+            return new Response('{}', {
+              headers: { 'content-type': 'application/json' }
+            })
+          }
+        })
+        let streamLimit: string | undefined
+
+        try {
+          await limiting.post('/stream-limit', {
+            body: limitedStream,
+            maxRequestSize: 4
+          })
+        } catch (error) {
+          streamLimit = (error as { code?: string }).code
+        }
+
+        return {
+          nativeForm,
+          recordForm,
+          blobLimit: await captureSizeError(
+            new foreign.Blob(['12345'])
+          ),
+          bufferLimit: await captureSizeError(
+            new foreign.ArrayBuffer(5)
+          ),
+          streamLimit,
+          streamCancelled,
+          attempts,
+          duplex
+        }
+      } finally {
+        frame.remove()
+      }
+    })
+
+    expect(result.nativeForm.received).toBeGreaterThan(0)
+    expect(result.nativeForm.contentType).toContain('multipart/form-data')
+    expect(result.recordForm.received).toBeGreaterThan(0)
+    expect(result.recordForm.contentType).toContain('multipart/form-data')
+    expect(result.blobLimit).toBe('REQUEST_TOO_LARGE')
+    expect(result.bufferLimit).toBe('REQUEST_TOO_LARGE')
+    expect(result.streamLimit).toBe('REQUEST_TOO_LARGE')
+    expect(result.streamCancelled).toBe(true)
+    expect(result.attempts).toBe(1)
+    expect(result.duplex).toBe('half')
   }
 )
 
@@ -329,12 +946,39 @@ test(
       }
 
       return {
+        ignoredHttp: await request.getResponse<{
+          message: string
+        }>('/error', {
+          throwHttpErrors: false
+        }).then(response => ({
+          status: response.status,
+          data: response.data
+        })),
         http: await capture(() => {
           return request.get('/error')
+        }),
+        boundedHttp: await capture(() => {
+          return request.get('/error', {
+            maxErrorResponseSize: 4
+          })
+        }),
+        malformedHttp: await capture(() => {
+          return request.get('/invalid-error-json')
+        }),
+        timedErrorParser: await capture(() => {
+          return request.get('/error', {
+            timeout: 10,
+            parseJson: () => new Promise(() => {})
+          })
         }),
         timeout: await capture(() => {
           return request.get('/slow', {
             timeout: 10
+          })
+        }),
+        totalTimeout: await capture(() => {
+          return request.get('/slow', {
+            totalTimeout: 10
           })
         })
       }
@@ -347,7 +991,33 @@ test(
         message: 'Invalid browser request'
       }
     })
+    expect(errors.ignoredHttp).toEqual({
+      status: 422,
+      data: {
+        message: 'Invalid browser request'
+      }
+    })
+    expect(errors.boundedHttp).toEqual({
+      code: 'HTTP_ERROR',
+      status: 422,
+      data: undefined
+    })
+    expect(errors.malformedHttp).toEqual({
+      code: 'HTTP_ERROR',
+      status: 422,
+      data: undefined
+    })
+    expect(errors.timedErrorParser).toEqual({
+      code: 'TIMEOUT_ERROR',
+      status: undefined,
+      data: undefined
+    })
     expect(errors.timeout).toEqual({
+      code: 'TIMEOUT_ERROR',
+      status: undefined,
+      data: undefined
+    })
+    expect(errors.totalTimeout).toEqual({
       code: 'TIMEOUT_ERROR',
       status: undefined,
       data: undefined
@@ -2083,7 +2753,7 @@ test(
 )
 
 test(
-  'should send HEAD and OPTIONS requests in the browser',
+  'should send HEAD, OPTIONS, and QUERY requests in the browser',
   async ({ page }) => {
     await openFixture(page)
 
@@ -2099,22 +2769,37 @@ test(
 
       const head = await request.headResponse('/user')
       const options = await request.options('/user')
+      const query = await request.query<{
+        method: string
+        body: { filter: string }
+        headers: Record<string, string>
+      }>('/echo', {
+        json: { filter: 'active' }
+      })
 
       return {
         head: {
           data: head.data,
           status: head.status
         },
-        options
+        options,
+        query
       }
     })
 
-    expect(result).toEqual({
+    expect(result).toMatchObject({
       head: {
         data: undefined,
         status: 200
       },
-      options: undefined
+      options: undefined,
+      query: {
+        method: 'QUERY',
+        body: { filter: 'active' },
+        headers: expect.objectContaining({
+          'content-type': 'application/json'
+        })
+      }
     })
   }
 )

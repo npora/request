@@ -32,10 +32,27 @@ const inferredPost: Promise<User> = request.post('/user', {
     name: 'Npora'
   }
 })
+const inferredQuery: Promise<User> = request.query('/user-query', {
+  schema: userSchema,
+  json: { name: 'Npora' }
+})
+const inferredQueryResponse: Promise<NporaResponse<User>> =
+  request.queryResponse('/user-query', {
+    schema: userSchema,
+    json: { name: 'Npora' }
+  })
 const inferredRequest: Promise<User> = request.request({
   url: '/user',
   schema: userSchema
 })
+const inferredNativeRequest: Promise<User> = request.request(
+  new Request('https://api.example.com/user'),
+  { schema: userSchema }
+)
+const nativeResponse: Promise<NporaResponse<User>> = request.requestResponse(
+  new Request('https://api.example.com/user'),
+  { schema: userSchema }
+)
 const inferredResponse: Promise<NporaResponse<User>> = request.getResponse(
   '/user',
   {
@@ -52,6 +69,10 @@ request.extend({ schema: userSchema })
 
 void inferredUser
 void inferredPost
+void inferredQuery
+void inferredQueryResponse
 void inferredRequest
+void inferredNativeRequest
+void nativeResponse
 void inferredResponse
 void explicitLegacyType

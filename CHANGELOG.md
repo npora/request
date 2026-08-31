@@ -1,5 +1,95 @@
 # @npora/request
 
+## 1.17.0
+
+### Minor Changes
+
+- 55f1eb3: Accept native and cross-realm `Request` inputs in `request()` and
+  `requestResponse()`, with client defaults and explicit per-call overrides.
+- e23e6cc: Support the RFC 10008 QUERY method with typed data and response shortcuts,
+  content-bearing requests, and safe default retries for replayable bodies.
+- b435a41: Enforce `maxRequestSize` incrementally for Fetch `ReadableStream` uploads,
+  preserving backpressure and cancelling the source when the limit is exceeded.
+
+### Patch Changes
+
+- 4d37de0: Consume Fetch HTTP error bodies once while populating bounded error data instead
+  of retaining a separately readable cloned stream, preventing ignored errors
+  from buffering an unread response branch while preserving native metadata.
+
+## 1.16.0
+
+### Minor Changes
+
+- Add inheritable `parseJson` and `stringifyJson` options for custom buffered
+  JSON decoding and request-body encoding across Fetch and XHR transports.
+- Add portable `bytes` response parsing that returns `Uint8Array` across native
+  Fetch, bounded reads, and XHR transports.
+- Add `removeHeaders` for case-insensitive removal of inherited defaults without
+  widening the standard `HeadersInit` contract. Preserve native `Headers` created
+  by another JavaScript realm while merging client defaults.
+- Pass the final request configuration and native response metadata to custom
+  JSON parsers across Fetch, XHR, bounded, and HTTP-error response paths.
+- Add shallow-merged local request context that remains available across
+  interceptors, plugins, parsers, responses, retries, and errors.
+- Add an inheritable `querySerializer` option for backend-specific object query
+  formats with strict validation and explicit cache-key isolation.
+- Add explicit FormData response parsing across Fetch and XHR transports with
+  response-size enforcement and cache-safe behavior.
+- Add declarative retry status codes, independent timeout retry control, and
+  default-policy fallback from custom retry decisions.
+- Accept native and cross-realm URL request inputs across direct and method APIs,
+  snapshot them before asynchronous lifecycle work, and preserve URL boundary,
+  cache, origin isolation, and log-redaction behavior.
+- Add a Fetch-compatible `fetch` configuration option that can be inherited by a
+  client and overridden per request while retaining the built-in adapter's full
+  validation, timeout, retry, parsing, streaming, and error lifecycle.
+- Honor standard and common rate-limit retry timing headers, including reset
+  timestamps, and retry HTTP 413 only when the server supplies valid timing.
+- Add `throwHttpErrors: false` for parsed, non-throwing HTTP error responses
+  across Fetch, XHR, and MockAdapter while preserving non-HTTP error handling and
+  explicit `validateStatus` policies.
+- Add cross-realm `isRequestError` and `isSchemaValidationError` type guards and
+  use shared non-enumerable error brands throughout transports and plugins so
+  duplicated package instances preserve stable error classification.
+- Add an overall `totalTimeout` deadline that covers hooks, retries, delays,
+  response processing, and stream consumption independently from each attempt's
+  `timeout`.
+- Allow complete JSON root values, including primitives and explicit null, in
+  the JSON request-body shortcut with consistent merging and validation.
+- Negotiate response media types with an automatic `Accept` header for explicit
+  JSON, text, FormData, binary, stream, SSE, and NDJSON response modes while
+  preserving caller-provided headers.
+
+### Patch Changes
+
+- Bound HTTP error-body reads and asynchronous JSON parsing by the configured
+  timeout or a 10-second fallback, cancel stalled Fetch readers, preserve
+  HTTP_ERROR when only the fallback expires, and keep explicit timeout,
+  total-timeout, and external-abort classification authoritative across Fetch
+  and XHR.
+- Align the default retry policy with its documented contract by retrying request
+  timeouts and HTTP 425 responses for replayable methods. Close an abort race in
+  timeout signal composition, and make `RequestError` JSON serialization exclude
+  request configuration, response data, and causes that may contain secrets.
+- Limit buffered data attached to HTTP errors to 10 MiB by default across Fetch
+  and XHR, add `maxErrorResponseSize` with an `Infinity` opt-out, avoid cloning
+  Fetch bodies known to exceed the limit, and preserve stricter explicit
+  `maxResponseSize` failures.
+- Preserve HTTP_ERROR with undefined data when rejected Fetch or XHR response
+  payload parsing fails, while keeping successful and explicitly non-throwing
+  responses strict and leaving timeout, abort, and hard size errors authoritative.
+- Handle native opaque and manual-redirect Fetch responses without false HTTP or
+  parser failures, while isolating unreadable responses from cache reuse and
+  preserving explicit status validation.
+- Compose `baseURL` path prefixes safely when base and request URLs contain query
+  strings, fragments, or suffix-only references while preserving established
+  absolute-URL and security-boundary behavior.
+- Recognize native FormData, Blob, ArrayBuffer, and ReadableStream request bodies
+  across JavaScript realms with non-consuming platform brand checks, preserving
+  multipart data, size limits, Fetch duplex setup, XHR rejection, retry safety,
+  mock responses, streaming timeout cleanup, and cache size estimation.
+
 ## 1.15.1
 
 ### Patch Changes

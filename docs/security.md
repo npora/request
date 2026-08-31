@@ -92,13 +92,17 @@ application.
   succeeds. Failed authorization, validation, interception, cancellation, and
   exhausted retries do not evict previously valid data.
 - Parsed and streamed responses can be bounded with `maxResponseSize`.
-- Deterministically sized request bodies can be bounded with
-  `maxRequestSize` before built-in transports dispatch them.
+- Buffered bodies attached to thrown HTTP errors are limited to 10 MiB by
+  default with `maxErrorResponseSize`, independently of successful responses.
+- `maxRequestSize` bounds deterministically sized request bodies before
+  dispatch and Fetch ReadableStream uploads during consumption.
 - Successful parsed responses can be validated and transformed with a
   Standard Schema v1 compatible validator before application response
   interceptors run.
 - FormData array flattening rejects circular references and limits nesting to
   32 levels by default.
+- Native body types use non-consuming platform brand checks across realms;
+  `Symbol.toStringTag` lookalikes cannot bypass request-size or retry safety.
 - Authentication refresh is deduplicated per client and token persistence is
   delegated to application-provided storage.
 - Circuit-breaker isolation defaults to URL origins, excluding credentials,
@@ -111,6 +115,12 @@ application.
 - Timeout, abort, XHR, hook, and plugin resources are cleaned up when a buffered
   request settles. Streaming resources remain active only until the response
   body completes, is cancelled, or errors.
+- Error-body reads and asynchronous JSON parsers cannot stall error propagation
+  indefinitely: disabled per-attempt timeouts receive a 10-second fallback.
+- Malformed HTTP error payloads cannot obscure their status classification;
+  they retain `HTTP_ERROR` without exposing partially parsed data.
+- Fetch HTTP errors consume one response stream without retaining an unread
+  cloned body; payload inspection uses the bounded `error.data` field.
 - The published package has zero runtime dependencies and an exact tarball
   allowlist.
 
@@ -128,6 +138,9 @@ Applications must still:
   debugging context and may contain credentials or application data. Log an
   explicit allowlist of fields such as `name`, `message`, `code`, and `status`,
   or use `loggerPlugin`, which emits a safe summary.
+- Treat `isRequestError()` and `isSchemaValidationError()` as type-identification
+  helpers, not as an authenticity or trust boundary. Like other runtime brands,
+  their shared symbols can be deliberately reproduced by code in the process.
 - Configure CORS, TLS, cookies, redirects, and content security policy at the
   application and server layers.
 - Review custom adapters, plugins, interceptors, schemas, cache keys, and

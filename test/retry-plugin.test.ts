@@ -50,6 +50,195 @@ describe('retryPlugin', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2)
   })
 
+  it('should not retry a non-throwing HTTP response', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response('Service Unavailable', { status: 503 })
+    )
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient().use(
+      retryPlugin({ retries: 2, delay: 0 })
+    )
+
+    await expect(request.getResponse<string>('/status', {
+      responseType: 'text',
+      throwHttpErrors: false
+    })).resolves.toMatchObject({
+      status: 503,
+      data: 'Service Unavailable'
+    })
+    expect(fetchMock).toHaveBeenCalledOnce()
+  })
+
+  it('should preserve a custom Fetch implementation across retries', async () => {
+    const globalFetch = vi.fn()
+    const customFetch = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response('Service Unavailable', { status: 503 })
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ ok: true }), {
+          headers: { 'content-type': 'application/json' }
+        })
+      )
+
+    vi.stubGlobal('fetch', globalFetch)
+
+    const request = createClient({ fetch: customFetch }).use(
+      retryPlugin({ retries: 1, delay: 0 })
+    )
+
+    await expect(request.get('/retry')).resolves.toEqual({ ok: true })
+    expect(customFetch).toHaveBeenCalledTimes(2)
+    expect(globalFetch).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    {
+      name: 'request timeout',
+      first: () => Promise.reject(
+        new RequestError('Request timeout', {
+          code: 'TIMEOUT_ERROR'
+        })
+      )
+    },
+    {
+      name: 'HTTP 425',
+      first: () => Promise.resolve(
+        new Response('Too Early', { status: 425 })
+      )
+    }
+  ])('should retry $name by default', async ({ first }) => {
+    const fetchMock = vi
+      .fn()
+      .mockImplementationOnce(first)
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ ok: true }), {
+          status: 200,
+          headers: {
+            'content-type': 'application/json'
+          }
+        })
+      )
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient().use(
+      retryPlugin({ retries: 1, delay: 0 })
+    )
+
+    await expect(request.get('/retry')).resolves.toEqual({ ok: true })
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('should restrict HTTP retries to configured status codes', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response('Service Unavailable', {
+        status: 503,
+        headers: { 'retry-after': '0' }
+      })
+    )
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient().use(retryPlugin({
+      retries: 1,
+      delay: 0,
+      statusCodes: [409]
+    }))
+
+    await expect(request.get('/retry')).rejects.toMatchObject({
+      code: 'HTTP_ERROR',
+      status: 503
+    })
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('should retry a configured HTTP status code', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(new Response('Conflict', { status: 409 }))
+      .mockResolvedValueOnce(new Response('ok'))
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient().use(retryPlugin({
+      retries: 1,
+      delay: 0,
+      statusCodes: [409]
+    }))
+
+    await expect(request.get('/retry', {
+      responseType: 'text'
+    })).resolves.toBe('ok')
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('should replace plugin status codes per request', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response('Busy', { status: 503 })
+    )
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient().use(retryPlugin({
+      retries: 1,
+      delay: 0,
+      statusCodes: [503]
+    }))
+
+    await expect(request.get('/retry', {
+      extensions: {
+        retry: { statusCodes: [] }
+      }
+    })).rejects.toMatchObject({
+      code: 'HTTP_ERROR',
+      status: 503
+    })
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('should allow timeout retries to be disabled', async () => {
+    const timeout = new RequestError('Request timeout', {
+      code: 'TIMEOUT_ERROR'
+    })
+    const fetchMock = vi.fn().mockRejectedValue(timeout)
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient().use(retryPlugin({
+      retries: 1,
+      retryOnTimeout: false
+    }))
+
+    await expect(request.get('/retry')).rejects.toBe(timeout)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('should fall back when shouldRetry returns undefined', async () => {
+    const shouldRetry = vi.fn(async () => undefined)
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(new Response('Busy', { status: 503 }))
+      .mockResolvedValueOnce(new Response('ok'))
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient().use(retryPlugin({
+      retries: 1,
+      delay: 0,
+      shouldRetry
+    }))
+
+    await expect(request.get('/retry', {
+      responseType: 'text'
+    })).resolves.toBe('ok')
+    expect(shouldRetry).toHaveBeenCalledOnce()
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
   it('should read retry options from extensions', async () => {
     const fetchMock = vi
       .fn()
@@ -153,6 +342,38 @@ describe('retryPlugin', () => {
 
     expect(data).toEqual({ ok: true })
     expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('should retry replayable QUERY requests by default', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(new Response('busy', { status: 503 }))
+      .mockResolvedValueOnce(new Response('{"ok":true}', {
+        headers: { 'content-type': 'application/json' }
+      }))
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient().use(retryPlugin({
+      retries: 1,
+      delay: 0
+    }))
+
+    await expect(request.query<{ ok: boolean }>('/search', {
+      json: { filter: 'active' }
+    })).resolves.toEqual({ ok: true })
+
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+
+    for (const [, init] of fetchMock.mock.calls) {
+      expect(init).toMatchObject({
+        method: 'QUERY',
+        body: '{"filter":"active"}'
+      })
+      expect(new Headers(init?.headers).get('content-type')).toBe(
+        'application/json'
+      )
+    }
   })
 
   it('should not retry non-idempotent methods by default', async () => {
@@ -399,6 +620,142 @@ describe('retryPlugin', () => {
     await vi.advanceTimersByTimeAsync(1)
     await expect(promise).resolves.toEqual({ ok: true })
   })
+
+  it.each([
+    'ratelimit-reset',
+    'x-ratelimit-retry-after',
+    'x-ratelimit-reset',
+    'x-rate-limit-reset'
+  ])('should respect the %s retry timing header', async header => {
+    vi.useFakeTimers()
+
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response('Rate limited', {
+          status: 429,
+          headers: { [header]: '1' }
+        })
+      )
+      .mockResolvedValueOnce(
+        new Response('{"ok":true}', {
+          headers: { 'content-type': 'application/json' }
+        })
+      )
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient().use(
+      retryPlugin({ retries: 1, delay: 0 })
+    )
+    const promise = request.get('/limited')
+
+    await vi.advanceTimersByTimeAsync(999)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+
+    await vi.advanceTimersByTimeAsync(1)
+    await expect(promise).resolves.toEqual({ ok: true })
+  })
+
+  it('should interpret a current-era reset value as a Unix timestamp', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-08-21T00:00:00Z'))
+
+    const reset = String(Math.floor(Date.now() / 1000) + 1)
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response('Rate limited', {
+          status: 429,
+          headers: { 'ratelimit-reset': reset }
+        })
+      )
+      .mockResolvedValueOnce(
+        new Response('{"ok":true}', {
+          headers: { 'content-type': 'application/json' }
+        })
+      )
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient().use(
+      retryPlugin({ retries: 1, delay: 0 })
+    )
+    const promise = request.get('/limited')
+
+    await vi.advanceTimersByTimeAsync(999)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+
+    await vi.advanceTimersByTimeAsync(1)
+    await expect(promise).resolves.toEqual({ ok: true })
+  })
+
+  it('should give Retry-After precedence over rate-limit headers', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response('Rate limited', {
+          status: 429,
+          headers: {
+            'retry-after': '0',
+            'ratelimit-reset': '60'
+          }
+        })
+      )
+      .mockResolvedValueOnce(
+        new Response('{"ok":true}', {
+          headers: { 'content-type': 'application/json' }
+        })
+      )
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient().use(
+      retryPlugin({ retries: 1, delay: 0 })
+    )
+
+    await expect(request.get('/limited')).resolves.toEqual({ ok: true })
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it.each([
+    { header: undefined, expectedCalls: 1 },
+    { header: '0', expectedCalls: 2 }
+  ])(
+    'should retry HTTP 413 only with valid timing: $header',
+    async ({ header, expectedCalls }) => {
+      const fetchMock = vi
+        .fn()
+        .mockResolvedValueOnce(
+          new Response('Payload too large', {
+            status: 413,
+            headers: header === undefined
+              ? undefined
+              : { 'retry-after': header }
+          })
+        )
+        .mockResolvedValueOnce(
+          new Response('{"ok":true}', {
+            headers: { 'content-type': 'application/json' }
+          })
+        )
+
+      vi.stubGlobal('fetch', fetchMock)
+
+      const request = createClient().use(
+        retryPlugin({ retries: 1, delay: 0 })
+      )
+      const outcome = request.get('/large')
+
+      if (header === undefined) {
+        await expect(outcome).rejects.toMatchObject({ status: 413 })
+      } else {
+        await expect(outcome).resolves.toEqual({ ok: true })
+      }
+
+      expect(fetchMock).toHaveBeenCalledTimes(expectedCalls)
+    }
+  )
 
   it('should cap retry delays at the platform timer limit', async () => {
     vi.useFakeTimers()

@@ -315,7 +315,7 @@ describe('client', () => {
     expect(requestInterceptor).not.toHaveBeenCalled()
   })
 
-  it('should send HEAD and OPTIONS requests', async () => {
+  it('should send HEAD, OPTIONS, and QUERY requests', async () => {
     const methods: Array<RequestConfig['method']> = []
     const adapter: Adapter = {
       async request<T = unknown>(
@@ -334,7 +334,7 @@ describe('client', () => {
           status: 200,
           statusText: 'OK',
           headers: new Headers({
-            allow: 'GET, HEAD, OPTIONS'
+            allow: 'GET, HEAD, OPTIONS, QUERY'
           }),
           config,
           raw: new Response()
@@ -363,12 +363,31 @@ describe('client', () => {
         allowed: true
       }
     })
+    await expect(
+      client.query<{ allowed: boolean }>('/resource', {
+        json: { filter: 'active' }
+      })
+    ).resolves.toEqual({
+      allowed: true
+    })
+    await expect(
+      client.queryResponse<{ allowed: boolean }>('/resource', {
+        json: { filter: 'active' }
+      })
+    ).resolves.toMatchObject({
+      status: 200,
+      data: {
+        allowed: true
+      }
+    })
 
     expect(methods).toEqual([
       'HEAD',
       'HEAD',
       'OPTIONS',
-      'OPTIONS'
+      'OPTIONS',
+      'QUERY',
+      'QUERY'
     ])
   })
 })

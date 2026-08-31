@@ -5,6 +5,27 @@
 For option types, defaults, merge behavior, runtime support, and plugin-owned
 request fields, see the [configuration reference](configuration.md).
 
+## Core guarantees
+
+- **Native transport model:** Fetch-compatible inputs, responses, cancellation,
+  streams, and transport overrides remain visible instead of being hidden by a
+  private request abstraction.
+- **Two deliberate response APIs:** data-first methods return parsed values;
+  complete-response methods add status, headers, effective configuration, and
+  the native response without changing request configuration.
+- **Bounded body handling:** request streams, successful responses, thrown HTTP
+  error data, SSE, NDJSON, and progress streams honor explicit limits without
+  forcing full-body buffering.
+- **Stable failures:** transport, timeout, abort, HTTP, parser, schema, size,
+  plugin, and configuration failures use typed errors with stable codes and
+  preserve their causal metadata.
+- **Deterministic extensibility:** interceptors and official plugins share an
+  ordered lifecycle with isolated client state, cancellation, cleanup, and
+  retry rules.
+- **Portable delivery:** the same public contract is tested in Node.js,
+  Chromium, Firefox, WebKit, Web Workers, ESM, and CommonJS, with zero runtime
+  dependencies.
+
 ## Package entrypoints
 
 The root entrypoint remains backward compatible and exports the complete API.
@@ -80,6 +101,8 @@ the child client.
 ```ts
 request.request<T>(config): Promise<T>
 request.requestResponse<T>(config): Promise<NporaResponse<T>>
+request.request<T>(nativeRequest, config?): Promise<T>
+request.requestResponse<T>(nativeRequest, config?): Promise<NporaResponse<T>>
 ```
 
 `request()` returns parsed response data. `requestResponse()` returns the
@@ -99,6 +122,16 @@ const response = await request.requestResponse<User>({
 console.log(response.status)
 ```
 
+A native `Request`, including one created by another same-origin realm, can be
+passed directly. Client defaults are applied first, then the Request URL,
+method, headers, body, signal, and Fetch properties, followed by explicit
+per-call overrides. Bodies are not cloned or buffered, and the original native
+Request remains the Fetch input while URL, method, and body are unchanged.
+Bodyless cross-realm Requests are supported. For a portable body-bearing
+cross-realm call, provide an explicit replacement `body`, `json`, `form`, or
+`formData`, because browsers do not transfer the original consistently. Callers
+must not consume a Request body elsewhere after dispatch.
+
 ---
 
 ## HTTP Methods
@@ -108,6 +141,7 @@ request.get<T>(url, config?)
 request.post<T>(url, config?)
 request.put<T>(url, config?)
 request.patch<T>(url, config?)
+request.query<T>(url, config?)
 request.delete<T>(url, config?)
 request.head(url, config?)
 request.options<T>(url, config?)
@@ -118,6 +152,7 @@ request.getResponse<T>(url, config?)
 request.postResponse<T>(url, config?)
 request.putResponse<T>(url, config?)
 request.patchResponse<T>(url, config?)
+request.queryResponse<T>(url, config?)
 request.deleteResponse<T>(url, config?)
 request.headResponse(url, config?)
 request.optionsResponse<T>(url, config?)
@@ -137,6 +172,13 @@ console.log(response.headers)
 `head()` resolves to `undefined` because HEAD responses do not contain a
 response body. Use `headResponse()` to inspect status and headers.
 
+`query()` implements the safe, idempotent, content-bearing HTTP QUERY method
+defined by RFC 10008. Include a media type by using `json`, `form`, `formData`,
+or an explicit `content-type` header with `body`. QUERY is retryable by default
+when the body is replayable. The built-in cache excludes QUERY because its
+current cache keys intentionally do not inspect request content; do not add it
+to `cachePlugin({ methods })`.
+
 ---
 
 # Config
@@ -147,12 +189,19 @@ response body. Use `headResponse()` to inspect status and headers.
 {
   baseURL?: string
   allowAbsoluteUrls?: boolean
-  url: string
+  url: string | URL
   method?: HttpMethod
+  fetch?: FetchFunction
   fetchOptions?: FetchOptions
+  parseJson?: JsonParser
+  stringifyJson?: JsonStringifier
+  context?: Record<string, unknown>
   headers?: HeadersInit
+  removeHeaders?: readonly string[]
   query?: QueryParams
+  querySerializer?: QuerySerializer
   searchParams?: URLSearchParams
+  json?: unknown
   extensions?: RequestExtensions
 }
 ```
@@ -160,14 +209,69 @@ response body. Use `headResponse()` to inspect status and headers.
 `fetchOptions` passes native Fetch options to the adapter. Npora Request
 continues to manage `method`, `headers`, `body` and `signal`.
 
+Every method URL parameter and `RequestConfig.url` accepts a string or native
+`URL`. Cross-realm URL objects are supported and are snapshotted to strings
+before asynchronous lifecycle work. URL-shaped plain objects are rejected;
+absolute URL boundary enforcement, query merging, cache keys, origin-isolated
+plugins, and credential/query redaction use the normalized string.
+
+`fetch` replaces `globalThis.fetch` for the built-in `FetchAdapter`. Client
+defaults are inherited by `extend()` and individual requests may override the
+function without bypassing request hooks, retries, caching, parsing, limits, or
+error normalization.
+
+`context` carries local metadata through request interceptors, plugin hooks,
+parsers, responses, and errors. Client and request values are shallow merged;
+nested objects are replaced. Context is never added to the native Fetch/XHR
+request and does not affect automatic cache keys. `RequestError.toJSON()` omits
+it with the rest of the potentially sensitive request configuration.
+
+`parseJson` replaces `JSON.parse` for buffered JSON success and error bodies;
+it may return a value or a promise. Its second parameter is typed as:
+
+```ts
+interface JsonParserContext {
+  readonly config: RequestConfig
+  readonly response: Response
+}
+```
+
+The context contains the final request configuration and native response
+metadata for success and HTTP-error bodies. The response body has already been
+buffered. `stringifyJson` replaces `JSON.stringify` for `json` and plain-object
+request bodies and must return a string. Both callbacks are inherited through
+`extend()` and may be overridden per request. SSE and NDJSON stream parsing
+are unchanged.
+
+Header names merge case-insensitively. `removeHeaders` deletes inherited names
+case-insensitively before request-specific headers are applied, so a request
+can still explicitly replace a header removed by an extended client. Native
+`Headers` values are preserved across JavaScript realms.
+
+`json` accepts any value handled by the configured `stringifyJson` callback.
+With the default serializer this includes every standard JSON root value, not
+only objects and arrays. Explicit `null` is serialized as the four-byte JSON
+body `null`; `undefined` means that the shortcut is not configured.
+
 Object `query` parameters are shallow merged with client defaults. Native
 `searchParams` replace inherited query defaults and preserve repeated keys,
 entry order and native `URLSearchParams` encoding semantics. `query` and
 `searchParams` are mutually exclusive.
 
+`querySerializer` replaces the default object-query encoding and must return a
+string. It is inherited through `extend()`, may be overridden per request, and
+does not affect native `searchParams`. A leading `?` is removed before the
+result is appended to the URL.
+
 Absolute request URLs bypass `baseURL` by default. Set
 `allowAbsoluteUrls: false` to reject absolute and protocol-relative request
 URLs whenever `baseURL` is configured.
+
+`baseURL` uses predictable path-prefix composition rather than WHATWG
+`new URL(input, base)` resolution. Base query parameters are merged before the
+request URL and configured query values, while fragments remain last and a
+request fragment takes precedence. This prevents a base query or hash from
+splitting the combined path into a malformed URL.
 
 ```ts
 await request.get('/account', {
@@ -198,6 +302,11 @@ to 32. Circular arrays and values deeper than the configured limit fail with a
 `CONFIG_ERROR` before Fetch or XMLHttpRequest sends data. Use `Infinity` only
 when the FormData structure is fully trusted.
 
+Body values may originate in another same-origin window or iframe. Native
+`FormData`, nested `Blob` values, `ArrayBuffer`, and `ReadableStream` retain
+their platform semantics across realms; streams remain unlocked during
+detection, automatically receive Fetch half-duplex mode, and are not retried.
+
 ---
 
 ## Control
@@ -205,20 +314,44 @@ when the FormData structure is fully trusted.
 ```ts
 {
   timeout?: number
+  totalTimeout?: number
   signal?: AbortSignal
   maxRequestSize?: number
   maxResponseSize?: number
+  maxErrorResponseSize?: number
 }
 ```
 
+`timeout` is the per-attempt transport timeout. `totalTimeout` bounds the
+complete operation, including request hooks, retries and delays, response
+parsing, schema validation, response interceptors, and stream consumption. A
+total deadline uses the same stable `TIMEOUT_ERROR` code and composes with the
+caller's `signal`.
+
 Timeout timers and composed abort listeners are released when a request
 settles, times out or is externally aborted. `maxRequestSize` preflights
-deterministically sized bodies and fails with `REQUEST_TOO_LARGE`; FormData,
-ReadableStream, and custom-adapter bodies require transport-specific limits.
+deterministically sized bodies and fails with `REQUEST_TOO_LARGE`. The Fetch
+adapter also counts ReadableStream chunks during upload without buffering and
+cancels the source on overflow; an allowed prefix may already be on the wire.
+Native FormData and custom-adapter bodies require transport-specific limits.
 `maxResponseSize` limits parsed and streamed response bytes and defaults to
 `Infinity`. A response that exceeds the limit fails with
 `RESPONSE_TOO_LARGE`; a trustworthy `Content-Length` can reject it before the
 body is consumed.
+
+Thrown HTTP error data has a separate 10 MiB default limit. If an error body
+exceeds `maxErrorResponseSize`, the result remains an `HTTP_ERROR` with status,
+headers, configuration, and raw response metadata, but `error.data` and
+`error.response.data` are `undefined`. Set the option to `Infinity` to disable
+this guard. A stricter explicit `maxResponseSize` remains a hard limit and
+fails with `RESPONSE_TOO_LARGE`; `throwHttpErrors: false` bypasses the
+error-only guard.
+
+Reading and asynchronously parsing thrown HTTP error data uses the configured
+per-attempt `timeout`. If that timeout is disabled, a 10-second fallback keeps
+a never-ending error stream or parser from blocking error delivery and retries;
+the result remains `HTTP_ERROR` with undefined data. Explicit timeout,
+`totalTimeout`, and external abort failures retain their normal error codes.
 
 ---
 
@@ -231,13 +364,47 @@ body is consumed.
     | 'text'
     | 'blob'
     | 'arrayBuffer'
+    | 'bytes'
+    | 'formData'
     | 'stream'
     | 'sse'
     | 'ndjson'
   schema?: StandardSchemaV1
   validateStatus?: (status: number) => boolean
+  throwHttpErrors?: boolean
 }
 ```
+
+`throwHttpErrors` defaults to `true`. Set it to `false` to resolve parsed 4xx
+and 5xx responses, preferably through a complete-response method so the status
+can be inspected directly. This is mutually exclusive with `validateStatus`
+at the same configuration level; a request or `extend()` policy replaces an
+inherited policy. `validateStatus` remains the precise option for accepting a
+custom status range. The switch affects HTTP status rejection only; transport,
+timeout, cancellation, parsing, schema, and native Fetch error responses still
+reject normally.
+
+For rejected HTTP statuses, unreadable or malformed error payloads do not
+replace the status failure: `HTTP_ERROR` is preserved with `data: undefined`.
+Successful statuses and `throwHttpErrors: false` remain strict and report
+`PARSER_ERROR` when their selected response parser fails.
+
+Set `responseType: 'formData'` to parse multipart or URL-encoded response
+bodies with the runtime's native `Response.formData()` implementation. This
+works in the Fetch and XHR transports, remains subject to `maxResponseSize`,
+and bypasses cache persistence and in-flight sharing because FormData is
+mutable and not portable across persistent cache stores.
+
+Set `responseType: 'bytes'` to receive a `Uint8Array` without manually wrapping
+an ArrayBuffer. Native `Response.bytes()` is used when available, with a
+portable `arrayBuffer()` fallback. Byte responses honor `maxResponseSize` and
+bypass cache persistence and in-flight sharing.
+
+When `responseType` is explicit, the client also sets a matching `Accept`
+header unless the caller supplied one. JSON, text, FormData, SSE, and NDJSON
+use representation-specific media types; binary and raw stream modes use
+`*/*`. Automatic response detection leaves `Accept` unset, and request JSON
+does not imply that the response must also be JSON.
 
 `schema` accepts any Standard Schema v1 compatible validator. It validates the
 parsed value for successful responses after plugin response hooks and before
@@ -250,6 +417,12 @@ by data-only and complete-response methods.
 HEAD, 204, 205, and 304 responses are treated as bodyless. A 304 response still
 fails the default status policy with `HTTP_ERROR`, but it does not become a
 `PARSER_ERROR` solely because a JSON content type accompanies its empty body.
+
+Fetch `opaque` and `opaqueredirect` responses are also bodyless and resolve by
+default with status `0` and `data: undefined`, preserving the unreadable native
+response as `raw`. Supply `validateStatus` to reject status `0` deliberately.
+Opaque-capable `no-cors` and manual-redirect requests bypass plugin caching and
+in-flight sharing to prevent collisions with readable responses.
 
 Schemas are endpoint-specific request configuration and are intentionally not
 accepted as client or `extend()` defaults, preventing one endpoint's contract
@@ -284,11 +457,12 @@ application-provided code and should be reviewed like interceptors and
 plugins.
 
 Data-only methods parse successful Fetch responses directly when no response
-hooks or interceptors are installed. Complete response methods, response
-lifecycle extensions and HTTP errors preserve a separately readable `raw`
-Response for buffered response types. Streaming response types deliberately do
-not clone the body because an unread clone could buffer an unbounded stream;
-their `raw` response refers to the same body consumed by the async iterable.
+hooks or interceptors are installed. Complete successful response methods and
+response lifecycle extensions preserve a separately readable `raw` Response
+for buffered response types. HTTP errors consume their raw body once and expose
+the parsed value through `error.data`, preventing an ignored error from retaining
+an unread clone. Streaming response types likewise do not clone the body; their
+`raw` response refers to the same body consumed by the async iterable.
 
 `stream` exposes the native `ReadableStream`. `sse` and `ndjson` return lazy
 `AsyncIterable` values that decode records without buffering the complete
@@ -348,6 +522,8 @@ custom adapter is used.
 
 Native `ReadableStream` request bodies automatically use Fetch half-duplex
 mode, as required by Node's Fetch implementation for streaming uploads.
+XMLHttpRequest transports reject streams with `CONFIG_ERROR` instead of
+attempting to coerce them.
 
 ---
 
@@ -407,9 +583,9 @@ adapter
   .reply(200, { ok: true })
 ```
 
-Mock HTTP statuses follow `validateStatus` and produce the same `HTTP_ERROR`
-shape as Fetch responses. Network and timeout failures can be simulated
-directly:
+Mock HTTP statuses follow `validateStatus` and `throwHttpErrors`, producing the
+same response or `HTTP_ERROR` shape as Fetch and XHR. Network and timeout
+failures can be simulated directly:
 
 ```ts
 adapter.onGet('/offline').networkError()
@@ -733,7 +909,9 @@ const request = createClient().use(
   retryPlugin({
     retries: 2,
     delay: 200,
-    methods: ['GET', 'HEAD', 'OPTIONS', 'PUT', 'DELETE'],
+    methods: ['GET', 'HEAD', 'OPTIONS', 'QUERY', 'PUT', 'DELETE'],
+    statusCodes: [408, 425, 429, 500, 502, 503, 504],
+    retryOnTimeout: false,
     respectRetryAfter: true,
     maxDelay: 60000,
     jitter: true,
@@ -749,11 +927,23 @@ Retry defaults to idempotent methods. `POST` and `PATCH` are not retried unless
 they are explicitly included in `methods`. Requests with a `ReadableStream`
 body are not retried because their body cannot be replayed safely.
 
+By default, network failures, per-attempt timeouts, HTTP 408/425/429/5xx, and
+HTTP 413 with a valid retry timing header are eligible. `statusCodes` replaces
+only the HTTP status set; network failures remain eligible. A configured 413
+still requires a timing header. `retryOnTimeout` independently controls timeout
+retries and defaults to `true` for backward compatibility. `shouldRetry` may
+return `true` or `false` to override the decision, or `undefined` to use these
+defaults.
+
 Retry delays are interrupted immediately when the request signal is aborted.
 Asynchronous `shouldRetry`, delay and jitter results observe the same signal,
 so application retry policies cannot keep an aborted request pending.
-Valid `Retry-After` response headers take precedence over the configured delay
-and are capped by `maxDelay`. They are not randomized.
+Valid `Retry-After`, `RateLimit-Reset`, `X-RateLimit-Retry-After`,
+`X-RateLimit-Reset`, and `X-Rate-Limit-Reset` response headers take precedence
+over the configured delay and are capped by `maxDelay`. `Retry-After` is
+authoritative when present. Reset values may be delay seconds or current-era
+Unix timestamps. Server delays are not randomized. HTTP 413 is retried by
+default only when a valid timing header is present.
 
 Setting `jitter` to `true` applies full jitter between zero and the configured
 delay, reducing synchronized retry spikes. A custom jitter function can return
@@ -929,6 +1119,11 @@ privacy-safe `invalidation-error` event. Each snapshot is a copy.
 Resetting statistics does not clear cached data. Events contain only `type` and
 `timestamp`; callback exceptions and rejected promises are ignored so
 telemetry cannot change request results.
+
+Requests using `parseJson` or `querySerializer` bypass cache persistence and
+in-flight sharing by default because cached values and generated URL keys
+cannot infer callback semantics. Set an explicit `extensions.cache.key` only
+when that key safely identifies the parser output and serialized query.
 
 Seed parsed data or update an existing entry by effective request
 configuration:
@@ -1526,10 +1721,15 @@ console.log(response.raw)
 All request errors should be thrown as `RequestError`.
 
 ```ts
+import {
+  isRequestError,
+  isSchemaValidationError
+} from '@npora/request'
+
 try {
   await request.get('/user')
 } catch (error) {
-  if (error instanceof RequestError) {
+  if (isRequestError(error)) {
     console.log(error.code)
     console.log(error.status)
     console.log(error.data)
@@ -1539,14 +1739,24 @@ try {
 }
 ```
 
+`isRequestError<T>(value)` recognizes every Npora request error, including
+`SchemaValidationError`, and narrows its parsed data type to `T`.
+`isSchemaValidationError<T>(value)` narrows schema-specific `issues` and
+`schemaVendor`. Both guards use non-enumerable brands shared through the global
+symbol registry, so they work across browser realms and duplicated copies of
+the package. `instanceof` remains valid when producer and consumer use the same
+constructor.
+
 When an HTTP response is available, `RequestError<T>` preserves its parsed
 body and complete response metadata.
 
-Do not serialize the complete error into logs or telemetry. Its `config`,
-`response`, `data`, and `cause` fields may contain credentials, request bodies,
-response data, or other application secrets. Log an explicit allowlist such as
-`name`, `message`, `code`, and `status`, or use `loggerPlugin` for a structured
-safe summary.
+`JSON.stringify(error)` and `error.toJSON()` return only `name`, `message`,
+`code`, and the optional `status`, excluding structured request and response
+data from routine logs and telemetry. Error messages are application-visible
+text and should still follow your redaction policy. Directly logging or
+spreading the complete error object can expose `config`, `response`, `data`, or
+`cause`; use the serialized form or `loggerPlugin` when those fields may contain
+application secrets.
 
 Error codes:
 
@@ -1572,6 +1782,14 @@ Default adapter:
 
 ```ts
 FetchAdapter
+```
+
+Inject a Fetch-compatible implementation without replacing the adapter:
+
+```ts
+const request = createClient({
+  fetch: instrumentedFetch
+})
 ```
 
 Custom adapter:

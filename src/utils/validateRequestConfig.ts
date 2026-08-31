@@ -4,6 +4,7 @@ import { isURLSearchParams } from './isURLSearchParams'
 import { MAX_TIMER_DELAY } from './maxTimerDelay'
 import { hasOwnProperty } from './hasOwnProperty'
 import { isAbsoluteURL } from './buildRequest'
+import { normalizeURL } from './normalizeURL'
 
 const BODY_FIELDS = [
   'body',
@@ -20,10 +21,15 @@ export function validateRequestConfig(
   headersRequired: boolean
 ): Headers | undefined {
   validateConfigPrototype(config)
+  validateContext(config)
   validateURL(config)
   validateMethod(config)
+  validateFetch(config)
+  validateJsonCodec(config)
   validateTimeout(config)
   validateLimits(config)
+  validateRemoveHeaders(config)
+  validateQuerySerializer(config)
   validateQuery(config)
   validateResponseOptions(config)
   validateSchema(config)
@@ -33,6 +39,21 @@ export function validateRequestConfig(
   validateBody(config)
 
   return headers
+}
+
+function validateContext(config: RequestConfig): void {
+  const context = config.context
+
+  if (
+    context !== undefined &&
+    (
+      context === null ||
+      typeof context !== 'object' ||
+      Array.isArray(context)
+    )
+  ) {
+    throw configError('Request context must be an object', config)
+  }
 }
 
 function validateConfigPrototype(
@@ -77,6 +98,18 @@ function validateQuery(config: RequestConfig): void {
   }
 }
 
+function validateQuerySerializer(config: RequestConfig): void {
+  if (
+    config.querySerializer !== undefined &&
+    typeof config.querySerializer !== 'function'
+  ) {
+    throw configError(
+      'Request querySerializer must be a function',
+      config
+    )
+  }
+}
+
 function validateMethod(config: RequestConfig): void {
   switch (config.method) {
     case undefined:
@@ -84,6 +117,7 @@ function validateMethod(config: RequestConfig): void {
     case 'POST':
     case 'PUT':
     case 'PATCH':
+    case 'QUERY':
     case 'DELETE':
     case 'HEAD':
     case 'OPTIONS':
@@ -94,6 +128,31 @@ function validateMethod(config: RequestConfig): void {
   }
 }
 
+function validateFetch(config: RequestConfig): void {
+  if (
+    config.fetch !== undefined &&
+    typeof config.fetch !== 'function'
+  ) {
+    throw configError('Request fetch must be a function', config)
+  }
+}
+
+function validateJsonCodec(config: RequestConfig): void {
+  if (
+    config.parseJson !== undefined &&
+    typeof config.parseJson !== 'function'
+  ) {
+    throw configError('Request parseJson must be a function', config)
+  }
+
+  if (
+    config.stringifyJson !== undefined &&
+    typeof config.stringifyJson !== 'function'
+  ) {
+    throw configError('Request stringifyJson must be a function', config)
+  }
+}
+
 function validateResponseOptions(config: RequestConfig): void {
   switch (config.responseType) {
     case undefined:
@@ -101,6 +160,8 @@ function validateResponseOptions(config: RequestConfig): void {
     case 'text':
     case 'blob':
     case 'arrayBuffer':
+    case 'bytes':
+    case 'formData':
     case 'stream':
     case 'sse':
     case 'ndjson':
@@ -115,6 +176,23 @@ function validateResponseOptions(config: RequestConfig): void {
     typeof config.validateStatus !== 'function'
   ) {
     throw configError('Request validateStatus must be a function', config)
+  }
+
+  if (
+    config.throwHttpErrors !== undefined &&
+    typeof config.throwHttpErrors !== 'boolean'
+  ) {
+    throw configError('Request throwHttpErrors must be a boolean', config)
+  }
+
+  if (
+    config.throwHttpErrors !== undefined &&
+    config.validateStatus !== undefined
+  ) {
+    throw configError(
+      'Request throwHttpErrors and validateStatus are mutually exclusive',
+      config
+    )
   }
 }
 
@@ -167,6 +245,11 @@ function validateLimits(config: RequestConfig): void {
     config
   )
   validateLimit(
+    config.maxErrorResponseSize,
+    'Request maxErrorResponseSize',
+    config
+  )
+  validateLimit(
     config.maxFormDataDepth,
     'Request maxFormDataDepth',
     config
@@ -191,9 +274,13 @@ function validateLimit(
 }
 
 function validateURL(config: RequestConfig): void {
-  if (typeof config.url !== 'string') {
-    throw configError('Request url must be a string', config)
+  const url = normalizeURL(config.url)
+
+  if (url === undefined) {
+    throw configError('Request url must be a string or URL', config)
   }
+
+  config.url = url
 
   if (
     config.baseURL !== undefined &&
@@ -242,17 +329,30 @@ function isMalformedHttpURL(value: string): boolean {
 }
 
 function validateTimeout(config: RequestConfig): void {
-  if (config.timeout === undefined) {
+  validateTimeoutValue(config.timeout, 'Request timeout', config)
+  validateTimeoutValue(
+    config.totalTimeout,
+    'Request totalTimeout',
+    config
+  )
+}
+
+function validateTimeoutValue(
+  value: number | undefined,
+  name: string,
+  config: RequestConfig
+): void {
+  if (value === undefined) {
     return
   }
 
   if (
-    !Number.isFinite(config.timeout) ||
-    config.timeout < 0 ||
-    config.timeout > MAX_TIMER_DELAY
+    !Number.isFinite(value) ||
+    value < 0 ||
+    value > MAX_TIMER_DELAY
   ) {
     throw configError(
-      'Request timeout is out of range',
+      `${name} is out of range`,
       config
     )
   }
@@ -266,10 +366,34 @@ function validateHeaders(config: RequestConfig): Headers {
   }
 }
 
+function validateRemoveHeaders(config: RequestConfig): void {
+  const names = config.removeHeaders
+
+  if (names === undefined) {
+    return
+  }
+
+  if (!Array.isArray(names)) {
+    throw configError('Request removeHeaders must be an array', config)
+  }
+
+  try {
+    for (const name of names) {
+      if (typeof name !== 'string') {
+        throw new TypeError('Header name must be a string')
+      }
+
+      new Headers([[name, '']])
+    }
+  } catch (error) {
+    throw configError('Request removeHeaders is invalid', config, error)
+  }
+}
+
 function validateBody(config: RequestConfig): void {
   let hasBody = config.body != null
 
-  if (config.json != null) {
+  if (config.json !== undefined) {
     if (hasBody) {
       throwBodyConflict(config)
     }
@@ -313,7 +437,9 @@ function throwBodyConflict(config: RequestConfig): never {
   const activeFields = BODY_FIELDS.filter(field => {
     const value = config[field]
 
-    return value !== undefined && value !== null
+    return field === 'json'
+      ? value !== undefined
+      : value !== undefined && value !== null
   })
 
   throw configError(

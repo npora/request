@@ -56,6 +56,37 @@ afterEach(() => {
 })
 
 describe('cachePlugin', () => {
+  it('should normalize equivalent URL objects to one cache key', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response('{"source":"network"}', {
+        headers: {
+          'cache-control': 'max-age=60',
+          'content-type': 'application/json'
+        }
+      })
+    )
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient().use(cachePlugin())
+    const config = {
+      extensions: {
+        cache: {
+          enabled: true,
+          ttl: 60000
+        }
+      }
+    }
+
+    await request.get(new URL('https://api.example.com/users'), config)
+    await expect(request.get(
+      new URL('https://api.example.com/users'),
+      config
+    )).resolves.toEqual({ source: 'network' })
+
+    expect(fetchMock).toHaveBeenCalledOnce()
+  })
+
   it('should abort while an asynchronous cache read is pending', async () => {
     const store: CacheStore = {
       get: vi.fn(() => new Promise<CacheEntry | undefined>(() => {})),
@@ -452,6 +483,7 @@ describe('cachePlugin', () => {
 
     const request = createClient().use(cachePlugin())
     const config = {
+      throwHttpErrors: false,
       extensions: {
         cache: {
           enabled: true,
@@ -727,6 +759,91 @@ describe('cachePlugin', () => {
     })).resolves.toEqual({ version: 2 })
     await expect(request.get('/request-no-store', { extensions }))
       .resolves.toEqual({ version: 1 })
+
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it.each([
+    ['no-cors', { mode: 'no-cors' }],
+    ['manual redirect', { redirect: 'manual' }]
+  ] as const)(
+    'should bypass cache reads, writes and dedupe for %s requests',
+    async (_label, fetchOptions) => {
+      const fetchMock = vi.fn().mockImplementation(() => {
+        const response = new Response(null)
+
+        Object.defineProperties(response, {
+          status: {
+            configurable: true,
+            value: 0
+          },
+          type: {
+            configurable: true,
+            value: fetchOptions.mode === 'no-cors'
+              ? 'opaque'
+              : 'opaqueredirect'
+          }
+        })
+
+        return Promise.resolve(response)
+      })
+
+      vi.stubGlobal('fetch', fetchMock)
+
+      const request = createClient().use(cachePlugin())
+      const config = {
+        fetchOptions,
+        extensions: {
+          cache: {
+            enabled: true,
+            ttl: 60000
+          }
+        }
+      }
+
+      await expect(request.get('/filtered-response', config))
+        .resolves.toBeUndefined()
+      await expect(request.get('/filtered-response', config))
+        .resolves.toBeUndefined()
+
+      expect(fetchMock).toHaveBeenCalledTimes(2)
+    }
+  )
+
+  it('should not store an opaque response returned by custom Fetch', async () => {
+    const fetchMock = vi.fn().mockImplementation(() => {
+      const response = new Response(null)
+
+      Object.defineProperties(response, {
+        status: {
+          configurable: true,
+          value: 0
+        },
+        type: {
+          configurable: true,
+          value: 'opaque'
+        }
+      })
+
+      return Promise.resolve(response)
+    })
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient().use(cachePlugin())
+    const config = {
+      extensions: {
+        cache: {
+          enabled: true,
+          ttl: 60000
+        }
+      }
+    }
+
+    await expect(request.get('/custom-opaque', config))
+      .resolves.toBeUndefined()
+    await expect(request.get('/custom-opaque', config))
+      .resolves.toBeUndefined()
 
     expect(fetchMock).toHaveBeenCalledTimes(2)
   })
@@ -1849,6 +1966,31 @@ describe('cachePlugin', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 
+  it('should not vary cache keys by local request context', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(createJsonResponse({ ok: true }))
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient().use(cachePlugin())
+    const cache = {
+      enabled: true,
+      ttl: 1000
+    }
+
+    const first = await request.getResponse('/context-cache', {
+      context: { traceId: 'first' },
+      extensions: { cache }
+    })
+    const second = await request.getResponse('/context-cache', {
+      context: { traceId: 'second' },
+      extensions: { cache }
+    })
+
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(first.config.context).toEqual({ traceId: 'first' })
+    expect(second.config.context).toEqual({ traceId: 'second' })
+  })
+
   it('should preserve the default headerless cache key', async () => {
     const capturedKeys: string[] = []
     const store: CacheStore = {
@@ -2076,6 +2218,65 @@ describe('cachePlugin', () => {
 
     expect(text).toBe('Npora')
     expect(new TextDecoder().decode(buffer)).toBe('Npora')
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('should not cache FormData responses', async () => {
+    const boundary = 'npora-cache-boundary'
+    const body =
+      `--${boundary}\r\n` +
+      'Content-Disposition: form-data; name="name"\r\n\r\n' +
+      `Npora\r\n--${boundary}--\r\n`
+    const fetchMock = vi.fn().mockImplementation(() => {
+      return Promise.resolve(new Response(body, {
+        headers: {
+          'content-type': `multipart/form-data; boundary=${boundary}`
+        }
+      }))
+    })
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient().use(cachePlugin())
+    const config = {
+      responseType: 'formData' as const,
+      extensions: {
+        cache: {
+          enabled: true,
+          ttl: Infinity
+        }
+      }
+    }
+
+    await expect(request.get<FormData>('/form-data', config)).resolves
+      .toBeInstanceOf(FormData)
+    await expect(request.get<FormData>('/form-data', config)).resolves
+      .toBeInstanceOf(FormData)
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('should not cache byte responses', async () => {
+    const fetchMock = vi.fn().mockImplementation(() => {
+      return Promise.resolve(new Response(new Uint8Array([1, 2, 3])))
+    })
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient().use(cachePlugin())
+    const config = {
+      responseType: 'bytes' as const,
+      extensions: {
+        cache: {
+          enabled: true,
+          ttl: Infinity
+        }
+      }
+    }
+
+    await expect(request.get<Uint8Array>('/bytes', config)).resolves
+      .toBeInstanceOf(Uint8Array)
+    await expect(request.get<Uint8Array>('/bytes', config)).resolves
+      .toBeInstanceOf(Uint8Array)
     expect(fetchMock).toHaveBeenCalledTimes(2)
   })
 
@@ -3732,6 +3933,122 @@ describe('cachePlugin', () => {
     })
     expect(thirdData).toEqual({
       value: 1
+    })
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('should not cache custom-parsed responses without an explicit key', async () => {
+    let version = 0
+    const fetchMock = vi.fn().mockImplementation(() => {
+      version += 1
+      return Promise.resolve(createJsonResponse({ version }))
+    })
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient().use(cachePlugin())
+    const config = {
+      parseJson: (text: string) => JSON.parse(text),
+      extensions: {
+        cache: {
+          enabled: true,
+          ttl: Infinity
+        }
+      }
+    }
+
+    await expect(request.get('/custom-parser', config)).resolves.toEqual({
+      version: 1
+    })
+    await expect(request.get('/custom-parser', config)).resolves.toEqual({
+      version: 2
+    })
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('should cache custom-parsed responses under an explicit key', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      createJsonResponse({ value: 'network' })
+    )
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient().use(cachePlugin())
+    const config = {
+      parseJson: (text: string) => JSON.parse(text),
+      extensions: {
+        cache: {
+          enabled: true,
+          key: 'custom-parser-v1',
+          ttl: Infinity
+        }
+      }
+    }
+
+    await expect(request.get('/custom-parser', config)).resolves.toEqual({
+      value: 'network'
+    })
+    await expect(request.get('/custom-parser', config)).resolves.toEqual({
+      value: 'network'
+    })
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('should not cache custom-serialized queries without an explicit key', async () => {
+    let version = 0
+    const fetchMock = vi.fn().mockImplementation(() => {
+      version += 1
+      return Promise.resolve(createJsonResponse({ version }))
+    })
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient().use(cachePlugin())
+    const config = {
+      query: { tags: ['first', 'second'] },
+      querySerializer: () => 'tags[]=first&tags[]=second',
+      extensions: {
+        cache: {
+          enabled: true,
+          ttl: Infinity
+        }
+      }
+    }
+
+    await expect(request.get('/custom-query', config)).resolves.toEqual({
+      version: 1
+    })
+    await expect(request.get('/custom-query', config)).resolves.toEqual({
+      version: 2
+    })
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('should cache custom-serialized queries under an explicit key', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      createJsonResponse({ value: 'network' })
+    )
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient().use(cachePlugin())
+    const config = {
+      query: { tags: ['first', 'second'] },
+      querySerializer: () => 'tags[]=first&tags[]=second',
+      extensions: {
+        cache: {
+          enabled: true,
+          key: 'custom-query-v1',
+          ttl: Infinity
+        }
+      }
+    }
+
+    await expect(request.get('/custom-query', config)).resolves.toEqual({
+      value: 'network'
+    })
+    await expect(request.get('/custom-query', config)).resolves.toEqual({
+      value: 'network'
     })
     expect(fetchMock).toHaveBeenCalledTimes(1)
   })

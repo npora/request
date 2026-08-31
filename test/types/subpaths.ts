@@ -3,7 +3,11 @@ import type {
   RequestConfig,
   RequestError
 } from '@npora/request/core'
-import { createClient } from '@npora/request/core'
+import {
+  createClient,
+  isRequestError,
+  isSchemaValidationError
+} from '@npora/request/core'
 import type {
   CacheEvent,
   CachePluginOptions,
@@ -90,6 +94,8 @@ const client: Client = createClient({ adapter })
 const config: RequestConfig = { url: '/typed-subpath' }
 
 void client.request(config)
+void isRequestError(new Error())
+void isSchemaValidationError(new Error())
 
 type CoreError = RequestError
 

@@ -1,4 +1,4 @@
-import { RequestError } from '../errors'
+import { isRequestError, RequestError } from '../errors'
 import type { RequestConfig } from '../types'
 
 export function throwIfAborted(config: RequestConfig): void {
@@ -14,7 +14,7 @@ export function createAbortError(
   config: RequestConfig,
   cause: unknown = reason
 ): RequestError {
-  if (reason instanceof RequestError) {
+  if (isRequestError(reason)) {
     return new RequestError(reason.message, {
       code: reason.code,
       status: reason.status,

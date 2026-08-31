@@ -1,10 +1,10 @@
 # Performance Benchmarks
 
-The benchmark suite measures request-library overhead without network latency.
+The core benchmark measures request-library overhead without network latency.
 It uses a minimal stateless adapter, a warm-up phase and the same workload for
-every scenario. The adapter intentionally omits request history so test-only
-observability storage is not mistaken for production request overhead during
-long stress runs.
+every scenario. A separate HTTP benchmark uses a localhost server. The core
+adapter intentionally omits request history so test-only observability storage
+is not mistaken for production request overhead during long stress runs.
 
 Run the default benchmark:
 
@@ -255,9 +255,10 @@ adapter attempt. FetchAdapter reuses that instance for request construction;
 direct adapter calls and retries still perform their own validation.
 
 Successful data-only Fetch requests parse the original response without
-cloning when no response hooks or interceptors need `raw`. Complete responses,
-response lifecycle extensions and HTTP errors retain a separately readable
-raw body.
+cloning when no response hooks or interceptors need `raw`. Complete successful
+responses and response lifecycle extensions retain a separately readable raw
+body. HTTP errors parse the original body so ignored failures cannot retain an
+unread stream branch; their parsed payload remains available as `error.data`.
 
 Data-only XHR progress requests likewise avoid teeing a body solely to preserve
 an unused raw branch. Buffered JSON, text, Blob and ArrayBuffer responses parse

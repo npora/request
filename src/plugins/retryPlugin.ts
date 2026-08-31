@@ -1,4 +1,4 @@
-import { RequestError } from '../errors'
+import { isRequestError } from '../errors'
 import type {
   HttpMethod,
   RequestConfig,
@@ -10,11 +10,13 @@ import { isPromiseLike } from '../utils/isPromiseLike'
 import { waitForSignal } from '../utils/waitForSignal'
 import { MAX_TIMER_DELAY } from '../utils/maxTimerDelay'
 import { resolveExtensionConfig } from './resolveExtensionConfig'
+import { isReadableStream } from '../utils/isReadableStream'
 
 const DEFAULT_RETRY_METHODS: readonly HttpMethod[] = [
   'GET',
   'HEAD',
   'OPTIONS',
+  'QUERY',
   'PUT',
   'DELETE'
 ]
@@ -23,6 +25,10 @@ interface NormalizedRetryOptions {
   retries: number
 
   methods: ReadonlySet<HttpMethod>
+
+  statusCodes?: ReadonlySet<number>
+
+  retryOnTimeout: boolean
 
   delay: (
     attempt: number,
@@ -37,10 +43,7 @@ interface NormalizedRetryOptions {
 
   maxElapsedTime: number
 
-  shouldRetry: (
-    error: unknown,
-    attempt: number
-  ) => boolean | Promise<boolean>
+  shouldRetry?: RetryOptions['shouldRetry']
 
   onRetry?: RetryOptions['onRetry']
 }
@@ -95,7 +98,8 @@ export function retryPlugin(
           return undefined
         }
 
-        const shouldRetry = retryOptions.shouldRetry(
+        const shouldRetry = resolveShouldRetry(
+          retryOptions,
           requestContext.error,
           attempt
         )
@@ -160,6 +164,12 @@ function resolveRetryOptions(
       retry.methods === undefined
         ? defaults.methods
         : normalizeMethods(retry.methods),
+    statusCodes:
+      retry.statusCodes === undefined
+        ? defaults.statusCodes
+        : normalizeStatusCodes(retry.statusCodes),
+    retryOnTimeout:
+      retry.retryOnTimeout ?? defaults.retryOnTimeout,
     delay:
       retry.delay === undefined
         ? defaults.delay
@@ -222,16 +232,16 @@ function finalizeRetryDecision(
   retry: true
   delay: number
 } | undefined> {
-  const retryAfter = options.respectRetryAfter
-    ? parseRetryAfter(error)
+  const serverDelay = options.respectRetryAfter
+    ? parseServerRetryDelay(error)
     : undefined
   const baseDelay = normalizeRetryDelay(
-    retryAfter ?? configuredDelay,
+    serverDelay ?? configuredDelay,
     options.maxDelay
   )
 
   if (
-    (retryAfter !== undefined || options.jitter === false) &&
+    (serverDelay !== undefined || options.jitter === false) &&
     options.maxElapsedTime === Number.POSITIVE_INFINITY &&
     !options.onRetry
   ) {
@@ -249,7 +259,7 @@ function finalizeRetryDecision(
     error
   }
   const jitteredDelay =
-    retryAfter === undefined
+    serverDelay === undefined
       ? applyJitter(options.jitter, pendingEvent)
       : baseDelay
 
@@ -299,6 +309,8 @@ function normalizeRetryOptions(
     return {
       retries: normalizeRetries(retry),
       methods: normalizeMethods(defaults.methods),
+      statusCodes: normalizeStatusCodes(defaults.statusCodes),
+      retryOnTimeout: defaults.retryOnTimeout ?? true,
       delay: normalizeDelay(defaults.delay),
       respectRetryAfter:
         defaults.respectRetryAfter ?? true,
@@ -307,8 +319,7 @@ function normalizeRetryOptions(
       maxElapsedTime: normalizeMaxElapsedTime(
         defaults.maxElapsedTime
       ),
-      shouldRetry:
-        defaults.shouldRetry ?? defaultShouldRetry,
+      shouldRetry: defaults.shouldRetry,
       onRetry: defaults.onRetry
     }
   }
@@ -320,6 +331,11 @@ function normalizeRetryOptions(
     methods: normalizeMethods(
       retry?.methods ?? defaults.methods
     ),
+    statusCodes: normalizeStatusCodes(
+      retry?.statusCodes ?? defaults.statusCodes
+    ),
+    retryOnTimeout:
+      retry?.retryOnTimeout ?? defaults.retryOnTimeout ?? true,
     delay: normalizeDelay(
       retry?.delay ?? defaults.delay
     ),
@@ -334,10 +350,7 @@ function normalizeRetryOptions(
     maxElapsedTime: normalizeMaxElapsedTime(
       retry?.maxElapsedTime ?? defaults.maxElapsedTime
     ),
-    shouldRetry:
-      retry?.shouldRetry ??
-      defaults.shouldRetry ??
-      defaultShouldRetry,
+    shouldRetry: retry?.shouldRetry ?? defaults.shouldRetry,
     onRetry: retry?.onRetry ?? defaults.onRetry
   }
 }
@@ -346,6 +359,12 @@ function normalizeMethods(
   methods?: readonly HttpMethod[]
 ): ReadonlySet<HttpMethod> {
   return new Set(methods ?? DEFAULT_RETRY_METHODS)
+}
+
+function normalizeStatusCodes(
+  statusCodes?: readonly number[]
+): ReadonlySet<number> | undefined {
+  return statusCodes ? new Set(statusCodes) : undefined
 }
 
 function normalizeMaxDelay(maxDelay?: number): number {
@@ -470,26 +489,30 @@ function canRetryRequest(
   return !isReadableStream(config.body)
 }
 
-function isReadableStream(value: unknown): boolean {
-  return (
-    typeof ReadableStream !== 'undefined' &&
-    value instanceof ReadableStream
-  )
-}
-
-function parseRetryAfter(error: unknown): number | undefined {
-  if (!(error instanceof RequestError)) {
+function parseServerRetryDelay(error: unknown): number | undefined {
+  if (!isRequestError(error)) {
     return undefined
   }
 
-  const value = error.response?.headers.get('retry-after')
+  const timing = getServerRetryTiming(error.response?.headers)
 
-  if (!value) {
+  if (!timing) {
     return undefined
   }
+
+  const { value, allowTimestamp } = timing
 
   if (/^\d+$/.test(value)) {
-    return Number(value) * 1000
+    let delay = Number(value) * 1000
+
+    if (
+      allowTimestamp &&
+      delay >= Date.parse('2024-01-01T00:00:00Z')
+    ) {
+      delay -= Date.now()
+    }
+
+    return Math.max(0, delay)
   }
 
   if (
@@ -508,8 +531,59 @@ function parseRetryAfter(error: unknown): number | undefined {
   return Math.max(0, date - Date.now())
 }
 
-function defaultShouldRetry(error: unknown): boolean {
-  if (!(error instanceof RequestError)) {
+function getServerRetryTiming(
+  headers: Headers | undefined
+): { value: string; allowTimestamp: boolean } | undefined {
+  if (!headers) {
+    return undefined
+  }
+
+  const retryAfter = headers.get('retry-after')
+
+  if (retryAfter !== null) {
+    return { value: retryAfter, allowTimestamp: false }
+  }
+
+  const rateLimitReset = headers.get('ratelimit-reset')
+
+  if (rateLimitReset !== null) {
+    return { value: rateLimitReset, allowTimestamp: true }
+  }
+
+  const rateLimitRetryAfter = headers.get('x-ratelimit-retry-after')
+
+  if (rateLimitRetryAfter !== null) {
+    return { value: rateLimitRetryAfter, allowTimestamp: false }
+  }
+
+  const rateLimitResetAlias =
+    headers.get('x-ratelimit-reset') ??
+    headers.get('x-rate-limit-reset')
+
+  return rateLimitResetAlias === null
+    ? undefined
+    : { value: rateLimitResetAlias, allowTimestamp: true }
+}
+
+function resolveShouldRetry(
+  options: NormalizedRetryOptions,
+  error: unknown,
+  attempt: number
+): boolean | Promise<boolean> {
+  const decision = options.shouldRetry?.(error, attempt)
+
+  return isPromiseLike(decision)
+    ? Promise.resolve(decision).then(result => {
+        return result ?? defaultShouldRetry(error, options)
+      })
+    : decision ?? defaultShouldRetry(error, options)
+}
+
+function defaultShouldRetry(
+  error: unknown,
+  options: NormalizedRetryOptions
+): boolean {
+  if (!isRequestError(error)) {
     return false
   }
 
@@ -517,13 +591,33 @@ function defaultShouldRetry(error: unknown): boolean {
     return true
   }
 
+  if (error.code === 'TIMEOUT_ERROR') {
+    return options.retryOnTimeout
+  }
+
   if (error.status === undefined) {
     return false
   }
 
-  return (
-    error.status === 408 ||
-    error.status === 429 ||
-    error.status >= 500
-  )
+  if (error.status === 413) {
+    return isRetryStatus(413, options) &&
+      parseServerRetryDelay(error) !== undefined
+  }
+
+  return isRetryStatus(error.status, options)
+}
+
+function isRetryStatus(
+  status: number,
+  options: NormalizedRetryOptions
+): boolean {
+  return options.statusCodes
+    ? options.statusCodes.has(status)
+    : (
+        status === 408 ||
+        status === 413 ||
+        status === 425 ||
+        status === 429 ||
+        status >= 500
+      )
 }

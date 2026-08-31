@@ -163,6 +163,33 @@ describe('createTimeoutSignal', () => {
     }
   })
 
+  it('should observe an abort racing with listener registration', () => {
+    vi.useFakeTimers()
+
+    try {
+      const reason = new RequestError('racing abort', {
+        code: 'ABORT_ERROR'
+      })
+      const signal = {
+        aborted: false,
+        reason,
+        addEventListener() {
+          // Model an AbortSignal that transitions immediately before the
+          // listener is registered. Abort events are not replayed.
+          this.aborted = true
+        },
+        removeEventListener() {}
+      } as unknown as AbortSignal
+      const result = createTimeoutSignal(signal, 1000)
+
+      expect(result.signal?.aborted).toBe(true)
+      expect(result.signal?.reason).toBe(reason)
+      expect(vi.getTimerCount()).toBe(0)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('should clear a timeout when listener removal throws', () => {
     vi.useFakeTimers()
 

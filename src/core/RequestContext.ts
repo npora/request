@@ -1,4 +1,5 @@
 import type { NporaResponse, RequestConfig } from '../types'
+import { normalizeURL } from '../utils/normalizeURL'
 
 export class RequestContext<T = unknown> {
   public config: RequestConfig
@@ -35,11 +36,15 @@ function cloneRequestConfig(config: RequestConfig): RequestConfig {
   try {
     return {
       ...config,
+      url: normalizeURL(config.url) ?? config.url,
       extensions: config.extensions
         ? { ...config.extensions }
         : undefined,
       fetchOptions: config.fetchOptions
         ? { ...config.fetchOptions }
+        : undefined,
+      context: config.context
+        ? { ...config.context }
         : undefined,
       headers: config.headers
         ? new Headers(config.headers)

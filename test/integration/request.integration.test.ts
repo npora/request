@@ -78,6 +78,29 @@ describe('request integration', () => {
     })
   })
 
+  it('should stop a native Fetch stream above maxRequestSize', async () => {
+    const request = createClient({
+      baseURL: testServer.baseURL
+    })
+    let pulls = 0
+    const body = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        if (pulls++ < 2) {
+          controller.enqueue(new Uint8Array(3))
+        } else {
+          controller.close()
+        }
+      }
+    })
+
+    await expect(request.post('/upload', {
+      body,
+      maxRequestSize: 4
+    })).rejects.toMatchObject({
+      code: 'REQUEST_TOO_LARGE'
+    })
+  })
+
   it('should retry a failed request', async () => {
     const request = createClient({
       baseURL: testServer.baseURL
@@ -187,6 +210,17 @@ async function startTestServer(): Promise<TestServer> {
       const body = await readRequestBody(request)
 
       response.end(body)
+
+      return
+    }
+
+    if (url.pathname === '/upload') {
+      request.on('error', () => {})
+      request.on('aborted', () => response.destroy())
+      request.resume()
+      request.on('end', () => {
+        response.end('{}')
+      })
 
       return
     }

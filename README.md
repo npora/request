@@ -27,6 +27,12 @@ authentication, and upload/download progress.
   composable plugins over the standard Fetch API.
 - **Use one predictable contract everywhere.** Browsers, Web Workers, Node.js,
   ESM, and CommonJS share the same typed lifecycle and stable error codes.
+- **Keep native platform values native.** `URL`, `Request`, `Headers`,
+  `FormData`, `Blob`, `ArrayBuffer`, and `ReadableStream` retain their Fetch
+  semantics, including supported cross-realm inputs.
+- **Bound untrusted traffic.** Separate request, successful response, and error
+  response limits prevent accidental buffering while preserving meaningful
+  error codes and cancellation.
 - **Ship less supply-chain risk.** The package has no runtime dependencies and
   verifies public exports, browser behavior, security regressions, and size
   budgets before release.
@@ -48,14 +54,27 @@ claims about every remote workload; commands and limitations are in the
 ## Features
 
 - Data-first and complete-response APIs with TypeScript inference.
+- Native `URL` and `Request` inputs with explicit per-call overrides and stable
+  lifecycle snapshots.
+- First-class RFC 10008 `QUERY` helpers with JSON bodies and safe retries for
+  replayable content.
+- Query- and fragment-safe `baseURL` prefix composition.
 - Object query merging plus native ordered `URLSearchParams` through
   `searchParams`.
+- Native multipart and URL-encoded response parsing through `formData`.
+- Raw binary response parsing as a portable `Uint8Array` through `bytes`.
+- Response-type-driven `Accept` negotiation with custom-header precedence.
+- Standards-correct opaque and manual-redirect Fetch responses without false
+  HTTP or parser failures.
+- Optional non-throwing HTTP status handling with parsed response data and
+  complete metadata.
 - Standard Schema v1 validation and transformation for untrusted responses.
 - Incremental SSE and NDJSON async iterables with cancellation and size limits.
 - Progress-aware file download streams that preserve backpressure and avoid
   buffering the complete response in memory.
 - Unified errors across Fetch, XHR, parsing, validation, timeouts, and aborts.
 - Request/response/error interceptors with deterministic priority ordering.
+- Shallow-merged local request context for tracing and lifecycle policies.
 - Official retry, cache, circuit-breaker, concurrency, authentication, logger,
   upload, and download plugins.
 - Method-aware `MockAdapter` routing, matching, delays, failures, and history.
@@ -120,6 +139,44 @@ console.log(response.headers)
 console.log(response.raw)
 ```
 
+## Native Fetch inputs
+
+Use a native `Request` directly when another platform layer already owns the
+request construction. Client defaults and explicit overrides still participate
+in the normal lifecycle, while an unchanged body is not cloned or buffered:
+
+```ts
+const input = new Request('https://api.example.com/users/1', {
+  headers: {
+    authorization: `Bearer ${accessToken}`
+  }
+})
+
+const user = await api.request<User>(input, {
+  timeout: 3000
+})
+```
+
+Native `URL`, `Headers`, body values, cancellation signals, and Fetch options
+remain available throughout interceptors, plugins, responses, and errors.
+
+## Content-bearing queries
+
+Use the standardized `QUERY` method for safe, idempotent queries whose input
+belongs in a typed request body instead of a long URL:
+
+```ts
+const users = await api.query<User[]>('/users/search', {
+  json: {
+    status: 'active',
+    teams: ['platform', 'web']
+  }
+})
+```
+
+JSON supplies the required media type automatically. Replayable QUERY bodies
+participate in safe retries when the retry plugin is installed.
+
 ## Response validation
 
 Validate untrusted response data with any Standard Schema v1 compatible
@@ -174,6 +231,26 @@ the loop cancels the response reader. `maxResponseSize` remains enforced while
 the stream is consumed. A response schema validates the parsed response value
 once; it does not validate individual SSE events or NDJSON records.
 
+Native `FormData`, `Blob`, `ArrayBuffer`, and `ReadableStream` request bodies
+also work when created by another same-origin window or iframe. Detection does
+not lock streams, and retry safety and request-size limits remain active.
+With Fetch, `maxRequestSize` counts stream chunks without buffering and
+cancels the source once the limit is exceeded.
+
+Buffered bodies attached to thrown HTTP errors are capped at 10 MiB by
+default. Override `maxErrorResponseSize`, or set it to `Infinity` for trusted
+services that require complete error payloads. This guard preserves
+`HTTP_ERROR`; a stricter `maxResponseSize` remains a hard
+`RESPONSE_TOO_LARGE` limit.
+
+Error-body reads and asynchronous JSON parsing are also bounded by `timeout`,
+or by a 10-second error-only fallback when timeout is disabled. The fallback
+keeps `HTTP_ERROR` and omits stalled data; explicit and total timeouts retain
+`TIMEOUT_ERROR`. Malformed or rejected error payloads likewise keep
+`HTTP_ERROR` with unavailable data, so parser failures cannot hide the server
+status. Successful and explicitly non-throwing responses retain strict parser
+errors. Fetch consumes error bodies once; use `error.data` for their payload.
+
 ## Request configuration
 
 ```ts
@@ -196,6 +273,7 @@ Query objects merge with client defaults. Native `searchParams` replace
 inherited query defaults while preserving repeated keys and order.
 
 The body options `body`, `json`, `form`, and `formData` are mutually exclusive.
+`json` accepts complete JSON root values, including primitives and `null`.
 `GET` and `HEAD` requests cannot contain a body. Invalid configuration throws a
 `RequestError` before the adapter sends a request.
 
@@ -222,11 +300,14 @@ isolated to each client.
 ```ts
 api.request(config)
 api.requestResponse(config)
+api.request(nativeRequest, config)
+api.requestResponse(nativeRequest, config)
 
 api.get(url, config)
 api.post(url, config)
 api.put(url, config)
 api.patch(url, config)
+api.query(url, config)
 api.delete(url, config)
 api.head(url, config)
 api.options(url, config)
@@ -237,6 +318,7 @@ api.getResponse(url, config)
 api.postResponse(url, config)
 api.putResponse(url, config)
 api.patchResponse(url, config)
+api.queryResponse(url, config)
 api.deleteResponse(url, config)
 api.headResponse(url, config)
 api.optionsResponse(url, config)
@@ -613,12 +695,12 @@ const api = createClient({ adapter })
 ## Errors
 
 ```ts
-import { RequestError } from '@npora/request'
+import { isRequestError } from '@npora/request'
 
 try {
   await api.get('/users/missing')
 } catch (error) {
-  if (error instanceof RequestError) {
+  if (isRequestError(error)) {
     console.error(error.code)
     console.error(error.status)
     console.error(error.data)
@@ -644,6 +726,10 @@ Stable request error codes:
 request failures through the unified base class while still inspecting schema
 issues when `error.code === 'SCHEMA_ERROR'`.
 
+Prefer `isRequestError()` and `isSchemaValidationError()` when narrowing an
+unknown caught value. Their non-enumerable shared brands work across iframes
+and duplicated package instances, where `instanceof` can fail.
+
 ## Supply-chain verification
 
 The published package contains only the built `dist` artifacts, has no runtime
@@ -658,7 +744,6 @@ allowlist, and size budgets.
 - [API reference](https://github.com/npora/request/blob/main/docs/api.md)
 - [Architecture](https://github.com/npora/request/blob/main/docs/architecture.md)
 - [Migration from 0.x](https://github.com/npora/request/blob/main/docs/migration.md)
-- [Migration from Axios or Ky](https://github.com/npora/request/blob/main/docs/migration-from-axios-and-ky.md)
 - [Security model](https://github.com/npora/request/blob/main/docs/security.md)
 - [Testing and release gates](https://github.com/npora/request/blob/main/docs/testing.md)
 - [Performance benchmarks](https://github.com/npora/request/blob/main/docs/benchmark.md)

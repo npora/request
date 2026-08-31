@@ -3,11 +3,35 @@ import { RequestError } from '../errors'
 import { createTimeoutSignal } from './createTimeoutSignal'
 import { hasOwnProperty } from './hasOwnProperty'
 import { isURLSearchParams } from './isURLSearchParams'
+import { isArrayBuffer, isBlob } from './isBinaryBody'
+import { isFormData } from './isFormData'
+import { isReadableStream } from './isReadableStream'
+import { getRequestForBody } from './isRequest'
+
+const RESPONSE_ACCEPT = {
+  json: 'application/json',
+  text: 'text/*',
+  blob: '*/*',
+  arrayBuffer: '*/*',
+  bytes: '*/*',
+  formData: 'multipart/form-data',
+  stream: '*/*',
+  sse: 'text/event-stream',
+  ndjson: 'application/x-ndjson, application/ndjson'
+} satisfies Record<
+  NonNullable<RequestConfig['responseType']>,
+  string
+>
+
+const URL_REFERENCE = /^([^?#]*)(?:\?([^#]*))?(#.*)?$/
 
 export interface BuiltRequest {
   url: string
+  input?: Request
+  useNativeInput?: boolean
   init: RequestInit
   clear: () => void
+  bodyError?: { current?: RequestError }
 }
 
 /**
@@ -26,23 +50,32 @@ export function buildRequestWithHeaders(
   config: RequestConfig,
   headers: Headers
 ): BuiltRequest {
-  const body = buildBody(config, headers)
+  setAccept(headers, config.responseType)
+  let body = buildBody(config, headers)
   validateRequestBodySize(body, config)
+  const bodyError: { current?: RequestError } = {}
+  const originalBody = body
+  body = limitStreamingRequestBody(body, config, bodyError)
   const url = buildURL(config)
+  const input = resolveNativeRequestInput(
+    config,
+    body,
+    url,
+    config.method
+  )
   const init: RequestInit = {
     ...config.fetchOptions,
     method: config.method ?? 'GET',
     headers,
-    body,
     signal: config.signal
   }
 
-  if (
-    body &&
-    typeof ReadableStream !== 'undefined' &&
-    body instanceof ReadableStream
-  ) {
-    (init as RequestInit & { duplex: 'half' }).duplex = 'half'
+  if (!input) {
+    init.body = body
+
+    if (body && isReadableStream(body)) {
+      (init as RequestInit & { duplex: 'half' }).duplex = 'half'
+    }
   }
 
   const timeoutEnabled = Boolean(
@@ -56,23 +89,97 @@ export function buildRequestWithHeaders(
     init.signal = timeoutSignal.signal
   }
 
+  const useNativeInput = input
+    ? canUseNativeInput(input, init, config.fetchOptions)
+    : false
+
   return {
     url,
+    input,
+    useNativeInput,
     init,
-    clear: timeoutSignal?.clear ?? noop
+    clear: timeoutSignal?.clear ?? noop,
+    bodyError: body === originalBody ? undefined : bodyError
   }
 }
 
+function canUseNativeInput(
+  input: Request,
+  init: RequestInit,
+  fetchOptions: RequestConfig['fetchOptions']
+): boolean {
+  if (
+    init.method !== input.method ||
+    init.signal !== input.signal ||
+    !headersEqual(input.headers, init.headers)
+  ) {
+    return false
+  }
+
+  return fetchOptions === undefined || (
+    fetchOptions.cache === input.cache &&
+    fetchOptions.credentials === input.credentials &&
+    fetchOptions.integrity === input.integrity &&
+    fetchOptions.keepalive === input.keepalive &&
+    fetchOptions.mode === input.mode &&
+    fetchOptions.redirect === input.redirect &&
+    fetchOptions.referrer === input.referrer &&
+    fetchOptions.referrerPolicy === input.referrerPolicy &&
+    Reflect.ownKeys(fetchOptions).length === 8
+  )
+}
+
+function headersEqual(
+  left: Headers,
+  right: HeadersInit | undefined
+): boolean {
+  const expected = new Headers(right)
+
+  if ([...left].length !== [...expected].length) {
+    return false
+  }
+
+  for (const [key, value] of left) {
+    if (expected.get(key) !== value) {
+      return false
+    }
+  }
+
+  return true
+}
+
+function resolveNativeRequestInput(
+  config: RequestConfig,
+  body: BodyInit | undefined,
+  url: string,
+  method: RequestConfig['method']
+): Request | undefined {
+  const input = getRequestForBody(config, body)
+
+  return input?.url === url && input.method === (method ?? 'GET')
+    ? input
+    : undefined
+}
+
+function setAccept(
+  headers: Headers,
+  responseType: RequestConfig['responseType']
+): void {
+  if (!responseType || headers.has('accept')) {
+    return
+  }
+
+  headers.set('accept', RESPONSE_ACCEPT[responseType])
+}
+
 function buildURL(config: RequestConfig): string {
-  const url = joinURL(config.baseURL, config.url)
+  const url = joinURL(config.baseURL, String(config.url))
 
   if (!config.query && !config.searchParams) {
     return url
   }
 
-  const query = config.searchParams
-    ? config.searchParams.toString()
-    : stringifyQuery(config.query as QueryParams)
+  const query = serializeQuery(config)
 
   if (!query) {
     return url
@@ -86,11 +193,78 @@ function buildURL(config: RequestConfig): string {
   return `${target}${separator}${query}${hash}`
 }
 
+export function serializeQuery(config: RequestConfig): string {
+  if (config.searchParams) {
+    return config.searchParams.toString()
+  }
+
+  const query = config.query as QueryParams
+
+  if (!config.querySerializer) {
+    return stringifyQuery(query)
+  }
+
+  let serialized: unknown
+
+  try {
+    serialized = config.querySerializer(query)
+  } catch (error) {
+    throw new RequestError('Request query serialization failed', {
+      code: 'CONFIG_ERROR',
+      config,
+      cause: error
+    })
+  }
+
+  if (typeof serialized !== 'string') {
+    throw new RequestError(
+      'Request querySerializer must return a string',
+      {
+        code: 'CONFIG_ERROR',
+        config
+      }
+    )
+  }
+
+  return serialized.startsWith('?')
+    ? serialized.slice(1)
+    : serialized
+}
+
 function joinURL(baseURL: string | undefined, url: string): string {
   if (!baseURL || isAbsoluteURL(url)) {
     return url
   }
 
+  if (!url) {
+    return baseURL
+  }
+
+  const baseHasSuffix = baseURL.includes('?') || baseURL.includes('#')
+  const firstInputCharacter = url.charCodeAt(0)
+
+  if (
+    !baseHasSuffix &&
+    firstInputCharacter !== 63 &&
+    firstInputCharacter !== 35
+  ) {
+    return joinURLPath(baseURL, url)
+  }
+
+  const base = URL_REFERENCE.exec(baseURL)!
+  const input = URL_REFERENCE.exec(url)!
+  const path = joinURLPath(base[1]!, input[1]!)
+  const baseQuery = base[2] ?? ''
+  const inputQuery = input[2] ?? ''
+  const query = baseQuery && inputQuery
+    ? `${baseQuery}&${inputQuery}`
+    : baseQuery || inputQuery
+  const hash = input[3] || base[3] || ''
+
+  return `${path}${query ? `?${query}` : ''}${hash}`
+}
+
+function joinURLPath(baseURL: string, url: string): string {
   if (!url) {
     return baseURL
   }
@@ -178,7 +352,7 @@ function buildBody(
 ): BodyInit | undefined {
   if (config.json !== undefined) {
     setContentType(headers, 'application/json')
-    return JSON.stringify(config.json)
+    return stringifyJson(config.json, config)
   }
 
   if (config.form !== undefined) {
@@ -203,10 +377,25 @@ function buildBody(
 
   if (isPlainObject(config.body)) {
     setContentType(headers, 'application/json')
-    return JSON.stringify(config.body)
+    return stringifyJson(config.body, config)
   }
 
   return config.body
+}
+
+function stringifyJson(
+  value: unknown,
+  config: RequestConfig
+): string {
+  const serialized = config.stringifyJson
+    ? config.stringifyJson(value)
+    : JSON.stringify(value)
+
+  if (typeof serialized !== 'string') {
+    throw new TypeError('Request JSON stringifier must return a string')
+  }
+
+  return serialized
 }
 
 function buildURLSearchParams(
@@ -233,7 +422,7 @@ function buildFormData(
   input: FormData | Record<string, unknown>,
   maxDepth = 32
 ): FormData {
-  if (input instanceof FormData) {
+  if (isFormData(input)) {
     return input
   }
 
@@ -305,7 +494,7 @@ function appendFormDataValue(
     return
   }
 
-  if (value instanceof Blob) {
+  if (isBlob(value)) {
     formData.append(key, value)
     return
   }
@@ -354,11 +543,11 @@ function getRequestBodySize(body: BodyInit): number | undefined {
     return utf8ByteLength(body.toString())
   }
 
-  if (typeof Blob !== 'undefined' && body instanceof Blob) {
+  if (isBlob(body)) {
     return body.size
   }
 
-  if (body instanceof ArrayBuffer) {
+  if (isArrayBuffer(body)) {
     return body.byteLength
   }
 
@@ -367,6 +556,83 @@ function getRequestBodySize(body: BodyInit): number | undefined {
   }
 
   return undefined
+}
+
+function limitStreamingRequestBody(
+  body: BodyInit | undefined,
+  config: RequestConfig,
+  bodyError: { current?: RequestError }
+): BodyInit | undefined {
+  const maxSize = config.maxRequestSize
+
+  if (!isReadableStream(body) || !Number.isFinite(maxSize)) {
+    return body
+  }
+
+  const source = body as ReadableStream<Uint8Array<ArrayBufferLike>>
+  let reader: ReadableStreamDefaultReader<
+    Uint8Array<ArrayBufferLike>
+  > | undefined
+  let size = 0
+
+  return new ReadableStream<Uint8Array<ArrayBufferLike>>({
+    async pull(controller) {
+      reader ??= source.getReader()
+
+      try {
+        const result = await reader.read()
+
+        if (result.done) {
+          reader.releaseLock()
+          reader = undefined
+          controller.close()
+          return
+        }
+
+        size += result.value.byteLength
+
+        if (size > (maxSize ?? Number.POSITIVE_INFINITY)) {
+          const error = new RequestError(
+            `Request body exceeds maxRequestSize ${maxSize}`,
+            {
+              code: 'REQUEST_TOO_LARGE',
+              config
+            }
+          )
+          bodyError.current = error
+
+          void reader.cancel(error).catch(() => {
+            // The size error remains authoritative.
+          })
+          reader.releaseLock()
+          reader = undefined
+
+          throw error
+        }
+
+        controller.enqueue(result.value)
+      } catch (error) {
+        if (reader) {
+          reader.releaseLock()
+          reader = undefined
+        }
+
+        throw error
+      }
+    },
+    async cancel(reason) {
+      if (reader) {
+        try {
+          await reader.cancel(reason)
+        } finally {
+          reader.releaseLock()
+          reader = undefined
+        }
+      } else if (!source.locked) {
+        await source.cancel(reason)
+      }
+    }
+  })
 }
 
 function utf8ByteLength(value: string): number {
