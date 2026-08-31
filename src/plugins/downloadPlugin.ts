@@ -9,6 +9,8 @@ import { isBodylessResponse } from '../utils/parseResponse'
 import { resolveExtensionConfig } from './resolveExtensionConfig'
 import { xhrRequest } from './xhrTransport'
 import { createTransferProgressTracker } from './transferProgress'
+import { isArrayBuffer } from '../utils/isBinaryBody'
+import { isReadableStream } from '../utils/isReadableStream'
 
 export type DownloadTransport = 'auto' | 'fetch' | 'xhr'
 
@@ -136,7 +138,8 @@ export function downloadPlugin(
             stream === undefined &&
             isBodylessResponse(
               response.config.method,
-              response.status
+              response.status,
+              response.raw.type
             )
           ) {
             stream = createEmptyDownloadStream()
@@ -247,16 +250,6 @@ function unavailableDownloadStream(
       status: response.status,
       config: response.config
     }
-  )
-}
-
-function isReadableStream(
-  value: unknown
-): value is ReadableStream<Uint8Array<ArrayBufferLike>> {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    typeof (value as ReadableStream).getReader === 'function'
   )
 }
 
@@ -406,7 +399,7 @@ function monitorDownloadStream(
 function toDownloadBuffer(
   chunk: Uint8Array<ArrayBufferLike>
 ): ArrayBuffer {
-  if (chunk.buffer instanceof ArrayBuffer) {
+  if (isArrayBuffer(chunk.buffer)) {
     if (
       chunk.byteOffset === 0 &&
       chunk.byteLength === chunk.buffer.byteLength

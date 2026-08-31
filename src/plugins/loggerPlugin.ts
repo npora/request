@@ -1,4 +1,4 @@
-import { RequestError } from '../errors'
+import { isRequestError, RequestError } from '../errors'
 import type {
   ErrorLogEntry,
   LoggerOptions,
@@ -27,7 +27,7 @@ export function loggerPlugin(defaultOptions: LoggerOptions = {}): Plugin {
           return
         }
 
-        const url = requestContext.config.url
+        const url = String(requestContext.config.url)
         const state: LoggerState = {
           requestId:
             options.createRequestId?.() ??
@@ -64,7 +64,10 @@ export function loggerPlugin(defaultOptions: LoggerOptions = {}): Plugin {
           duration: Math.max(0, timestamp - requestContext.startTime),
           attempts: requestContext.attempt + 1,
           method: requestContext.config.method ?? 'GET',
-          url: resolveRedactedURL(state, requestContext.config.url),
+          url: resolveRedactedURL(
+            state,
+            String(requestContext.config.url)
+          ),
           status: requestContext.response.status
         })
       })
@@ -83,7 +86,7 @@ export function loggerPlugin(defaultOptions: LoggerOptions = {}): Plugin {
             return
           }
 
-          const url = requestContext.config.url
+          const url = String(requestContext.config.url)
           state = {
             requestId:
               options.createRequestId?.() ??
@@ -114,7 +117,10 @@ export function loggerPlugin(defaultOptions: LoggerOptions = {}): Plugin {
             Math.max(0, timestamp - requestContext.startTime),
             requestContext.attempt + 1,
             requestContext.config.method ?? 'GET',
-            resolveRedactedURL(state, requestContext.config.url)
+            resolveRedactedURL(
+              state,
+              String(requestContext.config.url)
+            )
           )
         )
       })
@@ -299,7 +305,7 @@ function createErrorLog(
     url
   }
 
-  if (error instanceof RequestError) {
+  if (isRequestError(error)) {
     return {
       ...lifecycle,
       name: error.name,

@@ -1,21 +1,26 @@
-import { RequestError } from '../errors'
+import { isRequestError, RequestError } from '../errors'
 import type { RequestConfig, ResponseType } from '../types'
 import {
   parseNdjson,
   parseServerSentEvents
 } from './parseStreamingResponse'
+import { isArrayBuffer } from './isBinaryBody'
 
 const TEXT_DECODER = new TextDecoder()
 
 /** Classify responses that cannot expose an HTTP message body. */
 export function isBodylessResponse(
   method: RequestConfig['method'],
-  status: number
+  status: number,
+  responseType?: Response['type']
 ): boolean {
   return method === 'HEAD' ||
     status === 204 ||
     status === 205 ||
-    status === 304
+    status === 304 ||
+    responseType === 'opaque' ||
+    responseType === 'opaqueredirect' ||
+    responseType === 'error'
 }
 
 /**
@@ -198,18 +203,27 @@ export function finalizeStreamingResponse(
 export async function parseResponse<T = unknown>(
   response: Response,
   config: RequestConfig,
-  resolvedResponseType?: ResponseType
+  resolvedResponseType?: ResponseType,
+  responseSizeLimit = config.maxResponseSize,
+  readSignal?: AbortSignal
 ): Promise<T> {
   const responseType =
     resolvedResponseType ?? resolveResponseType(response, config)
-  const maxSize = config.maxResponseSize
+  const maxSize = responseSizeLimit
 
   try {
-    if (maxSize !== undefined && Number.isFinite(maxSize)) {
-      rejectOversizedContentLength(response, maxSize, config)
+    if (
+      readSignal ||
+      (maxSize !== undefined && Number.isFinite(maxSize))
+    ) {
+      const limit = Number.isFinite(maxSize)
+        ? maxSize as number
+        : Number.POSITIVE_INFINITY
+
+      rejectOversizedContentLength(response, limit, config)
 
       if (isStreamingResponseType(responseType)) {
-        const stream = limitResponseStream(response, maxSize, config)
+        const stream = limitResponseStream(response, limit, config)
 
         return parseStreamingResponse<T>(
           new Response(stream, response),
@@ -218,14 +232,26 @@ export async function parseResponse<T = unknown>(
         )
       }
 
-      const bytes = await readLimitedBody(response, maxSize, config)
+      const bytes = await readLimitedBody(
+        response,
+        limit,
+        config,
+        readSignal
+      )
 
-      return parseBufferedResponse<T>(bytes, responseType, response)
+      return await parseBufferedResponse<T>(
+        bytes,
+        responseType,
+        response,
+        config
+      )
     }
 
     switch (responseType) {
       case 'json':
-        return (await response.json()) as T
+        return config.parseJson
+          ? await parseJsonText<T>(await response.text(), config, response)
+          : (await response.json()) as T
 
       case 'text':
         return (await response.text()) as T
@@ -235,6 +261,12 @@ export async function parseResponse<T = unknown>(
 
       case 'arrayBuffer':
         return (await response.arrayBuffer()) as T
+
+      case 'bytes':
+        return await readResponseBytes(response) as T
+
+      case 'formData':
+        return (await response.formData()) as T
 
       case 'stream':
         return response.body as T
@@ -249,7 +281,7 @@ export async function parseResponse<T = unknown>(
         return (await response.text()) as T
     }
   } catch (error) {
-    if (error instanceof RequestError) {
+    if (isRequestError(error)) {
       throw error
     }
 
@@ -285,7 +317,8 @@ function rejectOversizedContentLength(
 async function readLimitedBody(
   response: Response,
   maxSize: number,
-  config: RequestConfig
+  config: RequestConfig,
+  signal?: AbortSignal
 ): Promise<Uint8Array> {
   if (!response.body) {
     return new Uint8Array()
@@ -294,10 +327,32 @@ async function readLimitedBody(
   const reader = response.body.getReader()
   const chunks: Uint8Array[] = []
   let size = 0
+  let abortReason: unknown
+  const onAbort = signal
+    ? () => {
+        abortReason = signal.reason ?? new DOMException(
+          'The operation was aborted',
+          'AbortError'
+        )
+        void reader.cancel(abortReason).catch(() => {
+          // Preserve the abort reason.
+        })
+      }
+    : undefined
 
   try {
+    signal?.addEventListener('abort', onAbort!, { once: true })
+
+    if (signal?.aborted) {
+      onAbort!()
+    }
+
     while (true) {
       const result = await reader.read()
+
+      if (abortReason !== undefined) {
+        throw abortReason
+      }
 
       if (result.done) {
         break
@@ -317,6 +372,13 @@ async function readLimitedBody(
       chunks.push(result.value)
     }
   } finally {
+    if (onAbort) {
+      try {
+        signal?.removeEventListener('abort', onAbort)
+      } catch {
+        // Reader cleanup must continue.
+      }
+    }
     reader.releaseLock()
   }
 
@@ -331,14 +393,19 @@ async function readLimitedBody(
   return bytes
 }
 
-function parseBufferedResponse<T>(
+async function parseBufferedResponse<T>(
   bytes: Uint8Array,
   responseType: Exclude<ResponseType, 'stream' | 'sse' | 'ndjson'>,
-  response: Response
-): T {
+  response: Response,
+  config: RequestConfig
+): Promise<T> {
   switch (responseType) {
     case 'json':
-      return JSON.parse(TEXT_DECODER.decode(bytes)) as T
+      return await parseJsonText<T>(
+        TEXT_DECODER.decode(bytes),
+        config,
+        response
+      )
 
     case 'blob':
       return new Blob([toArrayBuffer(bytes)], {
@@ -351,9 +418,39 @@ function parseBufferedResponse<T>(
         bytes.byteOffset + bytes.byteLength
       ) as T
 
+    case 'bytes':
+      return bytes as T
+
+    case 'formData':
+      return await new Response(toArrayBuffer(bytes), {
+        headers: response.headers
+      }).formData() as T
+
     default:
       return TEXT_DECODER.decode(bytes) as T
   }
+}
+
+export function parseJsonText<T>(
+  text: string,
+  config: RequestConfig,
+  response: Response
+): T | Promise<T> {
+  return (
+    config.parseJson
+      ? config.parseJson(text, { config, response })
+      : JSON.parse(text)
+  ) as T | Promise<T>
+}
+
+async function readResponseBytes(response: Response): Promise<Uint8Array> {
+  const bytes = (response as Response & {
+    bytes?: () => Promise<Uint8Array>
+  }).bytes
+
+  return typeof bytes === 'function'
+    ? bytes.call(response)
+    : new Uint8Array(await response.arrayBuffer())
 }
 
 function parseStreamingResponse<T>(
@@ -389,7 +486,7 @@ export function resolveResponseType(
 }
 
 function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
-  if (bytes.buffer instanceof ArrayBuffer) {
+  if (isArrayBuffer(bytes.buffer)) {
     return bytes.buffer.slice(
       bytes.byteOffset,
       bytes.byteOffset + bytes.byteLength
@@ -502,7 +599,7 @@ function streamingReadError(
     return error
   }
 
-  if (signal.reason instanceof RequestError) {
+  if (isRequestError(signal.reason)) {
     return new RequestError(signal.reason.message, {
       code: signal.reason.code,
       status: signal.reason.status,

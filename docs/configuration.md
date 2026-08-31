@@ -20,19 +20,73 @@ await api.get('/users', {
 
 | Option | Type | Default | Purpose |
 | --- | --- | --- | --- |
-| `url` | `string` | required | Absolute URL, or a URL resolved against `baseURL`. |
+| `url` | `string \| URL` | required | Relative string, absolute string, or native absolute URL. |
 | `method` | `HttpMethod` | `GET` | HTTP method. Method helpers set this automatically. |
 | `baseURL` | `string` | none | Base used to resolve relative request URLs. |
 | `allowAbsoluteUrls` | `boolean` | `true` | Allow an absolute request URL to bypass `baseURL`. |
 | `headers` | `HeadersInit` | none | Request headers. Names merge case-insensitively. |
+| `removeHeaders` | `readonly string[]` | `[]` | Case-insensitive inherited header names to remove. |
 | `query` | `QueryParams` | none | Object query values appended to the URL. |
+| `querySerializer` | `QuerySerializer` | `URLSearchParams` encoding | Serialize object `query` values with a custom wire format. |
 | `searchParams` | `URLSearchParams` | none | Native ordered query parameters, including repeated keys. |
+| `json` | `unknown` | none | Serialize any JSON value with `stringifyJson` and set the JSON content type. |
+| `fetch` | `FetchFunction` | `globalThis.fetch` | Fetch-compatible transport used by `FetchAdapter`; inheritable and overridable per request. |
 | `fetchOptions` | `FetchOptions` | none | Native Fetch options not managed directly by the client. |
+| `parseJson` | `JsonParser` | `JSON.parse` | Parse buffered JSON responses with request and response context; asynchronous parsers are supported. |
+| `stringifyJson` | `JsonStringifier` | `JSON.stringify` | Serialize `json` and plain-object request bodies. |
+| `context` | `Record<string, unknown>` | none | Local application metadata available throughout the request lifecycle. |
 | `extensions` | `RequestExtensions` | none | Namespaced configuration owned by installed plugins. |
 
 `query` and `searchParams` are mutually exclusive. Object `query` values may be
 strings, numbers, booleans, `null`, `undefined`, or arrays of those values.
 `undefined` values are omitted; `null` is serialized as an empty value.
+
+Native `URL` values are accepted by `request()`, every method shortcut, and
+both response APIs. The client applies a native brand check, so URL values from
+another browser realm work while URL-shaped objects are rejected. A URL is
+snapshotted to its serialized string before asynchronous interceptors, cache
+keys, retries, logging, and adapters observe it; later mutation of the original
+object cannot redirect an in-flight request. URL objects are absolute, ignore
+`baseURL`, and remain subject to `allowAbsoluteUrls: false`.
+
+`baseURL` keeps path-prefix semantics for Axios/ofetch compatibility: leading
+and trailing slashes are normalized and `/users` remains below a `/v1` prefix.
+If the base contains query parameters, they are placed after the combined path
+and before request/query options. Base and request query strings retain their
+order. A request fragment overrides a base fragment; otherwise the base
+fragment is preserved at the end of the final URL. Query-only and fragment-only
+request references do not insert an extra path slash.
+
+The `json` shortcut accepts objects, arrays, strings, numbers, booleans, and
+`null`. An explicit `json: null` is a real body containing `null`, participates
+in body-option conflict checks, and is rejected on GET and HEAD like every
+other request body. Values unsupported by native `JSON.stringify`, such as
+BigInt, require a custom `stringifyJson` implementation.
+
+Use `querySerializer` when an API requires bracket arrays, comma-separated
+values, strict signing order, or another backend-specific format:
+
+```ts
+const api = createClient({
+  querySerializer(query) {
+    return qs.stringify(query, { arrayFormat: 'brackets' })
+  }
+})
+```
+
+The callback applies only to object `query`; native `searchParams` retain their
+ordered `URLSearchParams` encoding. A single leading `?` in the returned string
+is accepted and removed. Throws and non-string results fail with `CONFIG_ERROR`
+before network I/O.
+
+Use `removeHeaders` to remove a case-insensitively matched client default. This
+is useful for public endpoints on a client that normally carries authorization:
+
+```ts
+await api.get('/public', {
+  removeHeaders: ['authorization']
+})
+```
 
 Set `allowAbsoluteUrls: false` when `baseURL` defines a trusted request
 boundary. Absolute and protocol-relative request URLs then fail with a
@@ -43,6 +97,66 @@ interceptors or plugin hooks. Without `baseURL`, absolute URLs remain valid.
 `body`, and `signal`, which have dedicated options. Common values include
 `credentials`, `cache`, `redirect`, `mode`, `integrity`, `keepalive`,
 `referrer`, and `referrerPolicy`.
+
+Supply `fetch` when the runtime provides an instrumented or environment-bound
+Fetch implementation. It runs through the normal adapter lifecycle, including
+timeouts, cancellation, retries, response limits, parsing, and unified errors:
+
+```ts
+const api = createClient({
+  fetch: tracedFetch
+})
+
+await api.get('/health', {
+  fetch: isolatedFetch
+})
+```
+
+The request-level function overrides the client default. Use a custom `Adapter`
+only when the transport is not Fetch-compatible.
+
+Use `stringifyJson` for values such as BigInt, dates, or application-specific
+wire formats, and `parseJson` for matching decoding or hardened JSON parsers:
+
+```ts
+const api = createClient({
+  stringifyJson: value => JSON.stringify(value, bigintReplacer),
+  parseJson: async (text, { config, response }) => {
+    auditJsonResponse(config.url, response.status)
+    return secureJsonParse(text)
+  }
+})
+```
+
+The custom parser applies to successful and HTTP-error JSON bodies in both
+Fetch and XHR transports, including size-limited responses. It does not alter
+SSE or NDJSON streaming parsers. Parser failures remain `PARSER_ERROR`s and
+stringifier failures remain `CONFIG_ERROR`s. The second callback parameter
+contains the final `RequestConfig` and native `Response`. Its body
+has already been buffered, so use the response for metadata such as status,
+headers, and URL rather than reading the body again. Existing one-parameter
+parsers remain compatible.
+
+Use `context` for trace identifiers, operation names, feature decisions, or
+other application metadata needed by interceptors, plugin hooks, custom JSON
+parsers, and error handling:
+
+```ts
+const api = createClient({
+  context: { application: 'dashboard' }
+})
+
+await api.get('/users', {
+  context: { traceId: currentTraceId }
+})
+```
+
+Context is shallow merged, so request keys override client defaults and nested
+objects are replaced rather than recursively merged. The context container is
+copied, but nested values retain their references. It is not passed to Fetch or
+XHR, does not vary generated cache keys, and is omitted by the privacy-reduced
+`RequestError.toJSON()` representation. It remains available on the in-memory
+effective request configuration, including `error.config.context`.
 
 ### XHR transport limitations
 
@@ -77,17 +191,30 @@ Only one of `body`, `json`, `form`, and `formData` may be present. `GET` and
 `maxFormDataDepth` fail before network I/O. Do not set the multipart
 `Content-Type` manually because the runtime must add its boundary.
 
+Native `FormData`, `Blob`, `ArrayBuffer`, and `ReadableStream` values are
+recognized across iframe and window realms using platform brand checks rather
+than `instanceof`. This preserves multipart fields, request-size enforcement,
+Fetch half-duplex setup, XHR stream rejection, and the no-retry rule for
+one-shot streams. Objects that only spoof a native `Symbol.toStringTag` are not
+trusted as native bodies.
+
 ## Cancellation and limits
 
 | Option | Type | Default | Purpose |
 | --- | --- | --- | --- |
 | `timeout` | `number` | disabled | Abort after this many milliseconds (maximum `2_147_483_647`). `0` disables the timer. |
+| `totalTimeout` | `number` | disabled | Bound the complete lifecycle, including hooks, retries, delays, parsing, interceptors, and stream consumption. |
 | `signal` | `AbortSignal` | none | Cancel the request with the platform Abort API. |
 | `maxRequestSize` | `number` | `Infinity` | Maximum preflightable serialized request bytes. |
 | `maxResponseSize` | `number` | `Infinity` | Maximum parsed or streamed response bytes. |
+| `maxErrorResponseSize` | `number` | `10 MiB` | Maximum bytes parsed into a thrown `HTTP_ERROR.data`. |
 
-Timeout and external cancellation are composed. Retry delays are also
-abortable. `maxRequestSize` rejects oversized JSON, text, URLSearchParams,
+`timeout` applies independently to each transport attempt. `totalTimeout`
+starts when the client call begins and bounds hooks, retries, retry delays,
+body parsing, schema validation, response interceptors, and stream consumption.
+All timeout and external cancellation signals are composed, and retry delays
+are abortable. `maxRequestSize` rejects
+oversized JSON, text, URLSearchParams,
 Blob, ArrayBuffer, and typed-array bodies with `REQUEST_TOO_LARGE` before the
 built-in Fetch or XHR transport sends them. FormData and ReadableStream sizes
 cannot be determined without buffering and are not preflighted. Custom
@@ -96,17 +223,101 @@ failures use `RESPONSE_TOO_LARGE`; set an explicit limit when responses come
 from an untrusted service. Streaming SSE and NDJSON remain bounded while the
 caller consumes them.
 
+`maxErrorResponseSize` is a softer guard for buffered error responses. When a
+rejected HTTP response exceeds 10 MiB, the request still fails with
+`HTTP_ERROR`, but its `data` is `undefined`; status, headers, configuration,
+and native response metadata remain available. Fetch cancels an oversized raw
+body, so it cannot subsequently be consumed. XHR has already buffered its Blob
+before the status is processed, but skips the potentially larger text/JSON
+conversion. Set this option to `Infinity` to restore unlimited error parsing.
+An explicit, stricter `maxResponseSize` always takes priority and continues to
+fail with `RESPONSE_TOO_LARGE`. The guard is not applied when
+`throwHttpErrors: false` makes the response successful.
+
+Error-body reads and asynchronous `parseJson` callbacks are also time-bounded.
+An explicit `timeout` remains a hard `TIMEOUT_ERROR`; when per-attempt timeout
+is disabled, error-data processing gets a 10-second fallback and then preserves
+`HTTP_ERROR` with `data: undefined`. An expiring `totalTimeout` or external
+abort always takes priority. Successful responses are unchanged because their
+data cannot be silently omitted.
+
+If an error response is malformed for its detected or explicit response type,
+or a custom `parseJson` callback rejects it, the request still fails with
+`HTTP_ERROR` and `data: undefined`. This soft failure applies only when the
+status itself is being rejected. Successful responses and responses accepted
+through `throwHttpErrors: false` continue to surface `PARSER_ERROR`, while an
+explicit `maxResponseSize` remains a hard `RESPONSE_TOO_LARGE` failure.
+
 ## Response handling
 
 | Option | Type | Default | Purpose |
 | --- | --- | --- | --- |
-| `responseType` | `ResponseType` | detected | Parse as `json`, `text`, `blob`, `arrayBuffer`, `stream`, `sse`, or `ndjson`. |
+| `responseType` | `ResponseType` | detected | Parse as `json`, `text`, `blob`, `arrayBuffer`, `bytes`, `formData`, `stream`, `sse`, or `ndjson`. |
 | `schema` | `StandardSchemaV1` | none | Validate and optionally transform the parsed value. |
 | `validateStatus` | `(status: number) => boolean` | HTTP 2xx | Decide which HTTP statuses resolve successfully. |
+| `throwHttpErrors` | `boolean` | `true` | Set to `false` to resolve parsed HTTP error responses instead of throwing `HTTP_ERROR`. |
+
+Use `throwHttpErrors: false` when HTTP statuses are part of the endpoint's
+normal application protocol and should be inspected through `getResponse()`:
+
+```ts
+const response = await api.getResponse('/users/unknown', {
+  throwHttpErrors: false
+})
+
+if (response.status === 404) {
+  // Handle the parsed error response without a catch branch.
+}
+```
+
+Use `validateStatus` instead for a custom accepted-status range. The two
+options are mutually exclusive at the same configuration level. A policy
+declared by `extend()` or an individual request replaces the inherited policy,
+so a client default can be narrowed without manually clearing it. Network
+failures, timeouts, cancellation, parser failures, schema failures, and native
+`Response.error()` remain errors. Because a non-throwing HTTP response follows
+the successful lifecycle, retry and circuit-breaker plugins do not treat its
+status as a failure; cache admission rules still reject non-cacheable statuses.
+
+An explicit `responseType` supplies a matching `Accept` header when the caller
+has not already provided one:
+
+| Response type | Generated `Accept` |
+| --- | --- |
+| `json` | `application/json` |
+| `text` | `text/*` |
+| `formData` | `multipart/form-data` |
+| `sse` | `text/event-stream` |
+| `ndjson` | `application/x-ndjson, application/ndjson` |
+| `blob`, `arrayBuffer`, `bytes`, `stream` | `*/*` |
+
+Automatic content detection does not guess an `Accept` value, and a JSON
+request body sets only `Content-Type`; request and response representations may
+differ. Any case-insensitive caller-provided `Accept` value wins. The same
+behavior is used by Fetch and the XHR progress transport. Cache keys already
+separate response types and vary on custom `Accept`, so negotiated
+representations cannot be shared incorrectly.
 
 When `responseType` is omitted, content type is used to select JSON, text, SSE,
-or NDJSON parsing. A Standard Schema failure throws `SchemaValidationError`
-with code `SCHEMA_ERROR` and retains the response metadata.
+or NDJSON parsing. Set `formData` explicitly to parse a multipart or
+URL-encoded response with the runtime's native `Response.formData()` support.
+Set `bytes` to receive a `Uint8Array`; runtimes without `Response.bytes()` use
+an `arrayBuffer()` fallback. Bytes and FormData responses bypass cache
+persistence and in-flight sharing because the JSON WebStorage cache cannot
+round-trip their native types. A Standard Schema failure throws
+`SchemaValidationError` with code `SCHEMA_ERROR` and retains the response
+metadata.
+
+Native Fetch `opaque` and `opaqueredirect` responses expose status `0`, no
+headers, and no readable body. They resolve by default with `data: undefined`
+and remain available as `response.raw`; they are not parsed, cloned, cached, or
+shared through in-flight cache deduplication. Requests configured with
+`fetchOptions.mode: 'no-cors'` or `fetchOptions.redirect: 'manual'` bypass the
+cache before lookup so they cannot collide with readable responses for the
+same URL. An explicit `validateStatus` callback still receives status `0` and
+may reject it. A custom Fetch implementation that returns `Response.error()`
+continues to fail with `HTTP_ERROR` rather than being misclassified as a parser
+failure.
 
 ## Extension options
 
@@ -121,16 +332,28 @@ Type: `number | RetryOptions`. Requires `retryPlugin()`.
 | --- | --- | --- |
 | `retries` | `0` | Maximum retry count after the initial attempt. |
 | `methods` | `GET`, `HEAD`, `OPTIONS`, `PUT`, `DELETE` | Replayable methods allowed to retry. |
-| `delay` | `0` | Milliseconds or a callback producing the delay. |
-| `respectRetryAfter` | `true` | Honor a valid server `Retry-After` value. |
+| `statusCodes` | HTTP 408/425/429/5xx and timed 413 | Exact HTTP status codes allowed to retry. |
+| `retryOnTimeout` | `true` | Retry per-attempt timeout failures. |
+| `delay` | exponential 100–1000 ms | Milliseconds or a callback producing the delay. |
+| `respectRetryAfter` | `true` | Honor valid `Retry-After` and common rate-limit reset headers. |
 | `maxDelay` | `60000` | Upper bound for retry delay, capped at `2_147_483_647`. |
 | `jitter` | `false` | Randomize client-configured retry delays. |
 | `maxElapsedTime` | `Infinity` | Total retry time budget, including planned delays. |
-| `shouldRetry` | network errors, timeout, HTTP 408/425/429/5xx | Custom retry decision. |
+| `shouldRetry` | default policy | Override or defer to the default retry decision. |
 | `onRetry` | none | Observe a scheduled retry; callback errors are isolated. |
 
 `POST` and `PATCH` are not retried unless explicitly added to `methods`.
 Readable request streams are never retried because they cannot be replayed.
+An explicit `statusCodes` list replaces the default HTTP status policy but
+does not disable network-error retries. HTTP 413 still requires a valid retry
+timing header. Set `retryOnTimeout: false` when repeating a timed-out operation
+would be unsafe. A custom `shouldRetry` result of `true` or `false` overrides
+the built-in decision; return `undefined` to fall back to `statusCodes`,
+`retryOnTimeout`, and the network-error policy.
+`Retry-After` takes precedence over `RateLimit-Reset`,
+`X-RateLimit-Retry-After`, `X-RateLimit-Reset`, and
+`X-Rate-Limit-Reset`. Reset values accept delay seconds or current-era Unix
+timestamps. Server delays are capped by `maxDelay` and are never jittered.
 
 ### `extensions.cache`
 
@@ -155,6 +378,12 @@ headers may shorten the configured TTL. `no-store`, ambiguous `max-age`, and
 `no-cache` is not persisted. A `304` response refreshes cached metadata and the
 configured lifetime. Equivalent concurrent requests may still share their
 network operation.
+
+Because cached entries contain parsed values and generated keys assume stable
+query encoding, requests with `parseJson` or `querySerializer` bypass cache
+persistence and in-flight sharing unless `extensions.cache.key` is set. An
+explicit key declares that the application owns parser and serializer
+compatibility for that entry.
 
 Request headers also control the plugin. `Cache-Control: no-cache`,
 `Cache-Control: max-age=0`, and legacy `Pragma: no-cache` force validation or a

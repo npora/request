@@ -243,6 +243,21 @@ describe('MockAdapter', () => {
     })
   })
 
+  it('should return mock HTTP errors when throwing is disabled', async () => {
+    const adapter = new MockAdapter()
+
+    adapter.onGet('/missing').reply(404, { message: 'missing' })
+
+    await expect(adapter.request({
+      url: '/missing',
+      method: 'GET',
+      throwHttpErrors: false
+    })).resolves.toMatchObject({
+      status: 404,
+      data: { message: 'missing' }
+    })
+  })
+
   it('should simulate network and timeout errors', async () => {
     const adapter = new MockAdapter()
 

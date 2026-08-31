@@ -1,4 +1,4 @@
-import { RequestError } from '../errors'
+import { isRequestError, RequestError } from '../errors'
 import type { RequestContext } from '../core/RequestContext'
 import type { RequestConfig } from '../types'
 import type { Plugin } from './Plugin'
@@ -163,7 +163,7 @@ export function authPlugin(options: AuthPluginOptions = {}): Plugin {
           const signal = requestContext.config.signal
 
           if (signal?.aborted) {
-            if (error instanceof RequestError) {
+            if (isRequestError(error)) {
               throw error
             }
 
@@ -360,7 +360,7 @@ function setAuthorizationHeader(
 
 function defaultShouldRefresh(error: unknown): boolean {
   return (
-    error instanceof RequestError &&
+    isRequestError(error) &&
     error.code === 'HTTP_ERROR' &&
     error.status === 401
   )

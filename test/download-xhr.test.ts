@@ -9,6 +9,7 @@ import {
 import {
   createClient,
   downloadPlugin,
+  type JsonParserContext,
   type Plugin,
   RequestError,
   retryPlugin
@@ -105,6 +106,90 @@ afterEach(() => {
 })
 
 describe('downloadPlugin XMLHttpRequest fallback', () => {
+  it('should parse buffered XHR bytes as Uint8Array', async () => {
+    scenario = xhr => {
+      xhr.response = new Blob([new Uint8Array([1, 2, 3, 4])])
+      xhr.responseHeaders = 'content-type: application/octet-stream\r\n'
+      xhr.load()
+    }
+
+    const request = createClient().use(
+      downloadPlugin({ transport: 'xhr' })
+    )
+    const data = await request.get<Uint8Array>('/bytes', {
+      responseType: 'bytes',
+      extensions: {
+        download: { onProgress() {} }
+      }
+    })
+
+    expect(data).toBeInstanceOf(Uint8Array)
+    expect([...data]).toEqual([1, 2, 3, 4])
+    expect(FakeXMLHttpRequest.instances[0]?.requestHeaders.get('accept'))
+      .toBe('*/*')
+  })
+
+  it('should parse buffered XHR FormData responses', async () => {
+    const boundary = 'npora-xhr-boundary'
+
+    scenario = xhr => {
+      xhr.response = new Blob([
+        `--${boundary}\r\n` +
+        'Content-Disposition: form-data; name="name"\r\n\r\n' +
+        `Npora\r\n--${boundary}--\r\n`
+      ])
+      xhr.responseHeaders =
+        `content-type: multipart/form-data; boundary=${boundary}\r\n`
+      xhr.load()
+    }
+
+    const request = createClient().use(
+      downloadPlugin({ transport: 'xhr' })
+    )
+    const data = await request.get<FormData>('/form-data', {
+      responseType: 'formData',
+      extensions: {
+        download: { onProgress() {} }
+      }
+    })
+
+    expect([...data.entries()]).toEqual([['name', 'Npora']])
+  })
+
+  it('should custom-parse buffered JSON responses', async () => {
+    scenario = xhr => {
+      xhr.response = new Blob(['{"value":"npora"}'], {
+        type: 'application/json'
+      })
+      xhr.responseHeaders =
+        'content-type: application/json\r\nx-parser: xhr\r\n'
+      xhr.load()
+    }
+
+    const request = createClient().use(
+      downloadPlugin({ transport: 'xhr' })
+    )
+
+    let parserContext: JsonParserContext | undefined
+
+    await expect(request.get('/json', {
+      responseType: 'json',
+      parseJson: async (text, context) => {
+        parserContext = context
+
+        return {
+          value: JSON.parse(text).value.toUpperCase()
+        }
+      },
+      extensions: {
+        download: { onProgress() {} }
+      }
+    })).resolves.toEqual({ value: 'NPORA' })
+    expect(parserContext?.config.url).toBe('/json')
+    expect(parserContext?.response.status).toBe(200)
+    expect(parserContext?.response.headers.get('x-parser')).toBe('xhr')
+  })
+
   it('should retry failed XHR downloads through the normal retry lifecycle', async () => {
     scenario = xhr => {
       if (FakeXMLHttpRequest.instances.length === 1) {
@@ -270,6 +355,123 @@ describe('downloadPlugin XMLHttpRequest fallback', () => {
       request.get('/offline', config)
     ).rejects.toMatchObject({
       code: 'NETWORK_ERROR'
+    })
+  })
+
+  it('should omit oversized parsed XHR error data', async () => {
+    scenario = xhr => {
+      xhr.status = 500
+      xhr.statusText = 'Server Error'
+      xhr.response = new Blob(['oversized error'])
+      xhr.load()
+    }
+
+    const request = createClient().use(
+      downloadPlugin({ transport: 'xhr' })
+    )
+
+    await expect(request.get('/large-error', {
+      maxErrorResponseSize: 4,
+      extensions: {
+        download: {
+          onProgress: vi.fn()
+        }
+      }
+    })).rejects.toMatchObject({
+      code: 'HTTP_ERROR',
+      status: 500,
+      data: undefined,
+      response: {
+        data: undefined
+      }
+    })
+  })
+
+  it('should preserve HTTP_ERROR when XHR error JSON parsing fails', async () => {
+    scenario = xhr => {
+      xhr.status = 422
+      xhr.statusText = 'Unprocessable Content'
+      xhr.response = new Blob(['invalid-json'])
+      xhr.responseHeaders = 'content-type: application/json\r\n'
+      xhr.load()
+    }
+
+    const request = createClient().use(
+      downloadPlugin({ transport: 'xhr' })
+    )
+
+    await expect(request.get('/invalid-error-json', {
+      responseType: 'json',
+      extensions: {
+        download: {
+          onProgress: vi.fn()
+        }
+      }
+    })).rejects.toMatchObject({
+      code: 'HTTP_ERROR',
+      status: 422,
+      data: undefined,
+      response: {
+        data: undefined
+      }
+    })
+  })
+
+  it('should bound asynchronous XHR error parsing by default', async () => {
+    vi.useFakeTimers()
+    scenario = xhr => {
+      xhr.status = 503
+      xhr.statusText = 'Busy'
+      xhr.response = new Blob(['{"message":"busy"}'])
+      xhr.responseHeaders = 'content-type: application/json\r\n'
+      xhr.load()
+    }
+
+    const request = createClient().use(
+      downloadPlugin({ transport: 'xhr' })
+    )
+    const pending = request.get('/stalled-parser', {
+      responseType: 'json',
+      parseJson: () => new Promise(() => {}),
+      extensions: {
+        download: {
+          onProgress: vi.fn()
+        }
+      }
+    })
+    const assertion = expect(pending).rejects.toMatchObject({
+      code: 'HTTP_ERROR',
+      status: 503,
+      data: undefined
+    })
+
+    await vi.advanceTimersByTimeAsync(10_000)
+    await assertion
+  })
+
+  it('should return parsed XHR error responses when throwing is disabled', async () => {
+    scenario = xhr => {
+      xhr.status = 404
+      xhr.statusText = 'Not Found'
+      xhr.response = new Blob(['missing'])
+      xhr.load()
+    }
+
+    const request = createClient().use(
+      downloadPlugin({ transport: 'xhr' })
+    )
+
+    await expect(request.getResponse<string>('/missing', {
+      throwHttpErrors: false,
+      responseType: 'text',
+      extensions: {
+        download: {
+          onProgress: vi.fn()
+        }
+      }
+    })).resolves.toMatchObject({
+      status: 404,
+      data: 'missing'
     })
   })
 

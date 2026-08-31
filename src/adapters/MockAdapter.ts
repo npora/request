@@ -10,6 +10,9 @@ import { MAX_TIMER_DELAY } from '../utils/maxTimerDelay'
 import { isBodylessResponse } from '../utils/parseResponse'
 import { validateResponseStatus } from '../utils/validateResponseStatus'
 import { isURLSearchParams } from '../utils/isURLSearchParams'
+import { isArrayBuffer, isBlob } from '../utils/isBinaryBody'
+import { isFormData } from '../utils/isFormData'
+import { isReadableStream } from '../utils/isReadableStream'
 
 export type MockHandler<T = unknown> = (
   config: RequestConfig
@@ -224,7 +227,7 @@ export class MockAdapter implements Adapter {
       return validateMockResponse(response, config)
     }
 
-    const handler = this.handlers.get(config.url)
+    const handler = this.handlers.get(String(config.url))
 
     if (!handler) {
       throw new Error(
@@ -414,7 +417,7 @@ function matchesRequest(
   config: RequestConfig
 ): boolean {
   return (
-    matchesURL(matcher.url, config.url) &&
+    matchesURL(matcher.url, String(config.url)) &&
     matchesQuery(matcher.query, config.query) &&
     matchesSearchParams(matcher.searchParams, config.searchParams) &&
     matchesHeaders(matcher.headers, config.headers)
@@ -584,11 +587,11 @@ function createRawBody(
 
 function isBodyInit(value: unknown): value is BodyInit {
   return (
-    (typeof Blob !== 'undefined' && value instanceof Blob) ||
-    (typeof FormData !== 'undefined' && value instanceof FormData) ||
+    isBlob(value) ||
+    isFormData(value) ||
     isURLSearchParams(value) ||
-    (typeof ReadableStream !== 'undefined' && value instanceof ReadableStream) ||
-    value instanceof ArrayBuffer ||
+    isReadableStream(value) ||
+    isArrayBuffer(value) ||
     ArrayBuffer.isView(value)
   )
 }

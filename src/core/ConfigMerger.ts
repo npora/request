@@ -1,6 +1,7 @@
 import type { RequestConfig } from '../types'
 import { hasOwnProperty } from '../utils/hasOwnProperty'
 import { isURLSearchParams } from '../utils/isURLSearchParams'
+import { isHeaders } from '../utils/isHeaders'
 
 /**
  * Request configuration merger.
@@ -38,6 +39,18 @@ export class ConfigMerger {
       ...config
     }
 
+    if (
+      hasOwnProperty.call(config, 'validateStatus') &&
+      !hasOwnProperty.call(config, 'throwHttpErrors')
+    ) {
+      result.throwHttpErrors = undefined
+    } else if (
+      hasOwnProperty.call(config, 'throwHttpErrors') &&
+      !hasOwnProperty.call(config, 'validateStatus')
+    ) {
+      result.validateStatus = undefined
+    }
+
     if (defaults.fetchOptions || config.fetchOptions) {
       result.fetchOptions = this.mergeFetchOptions(
         defaults.fetchOptions,
@@ -45,10 +58,26 @@ export class ConfigMerger {
       )
     }
 
-    if (defaults.headers || config.headers) {
+    if (isContextObject(config.context)) {
+      result.context = {
+        ...(isContextObject(defaults.context) ? defaults.context : {}),
+        ...config.context
+      }
+    } else if (isContextObject(defaults.context)) {
+      result.context = { ...defaults.context }
+    }
+
+    if (
+      defaults.headers ||
+      config.headers ||
+      defaults.removeHeaders ||
+      config.removeHeaders
+    ) {
       result.headers = this.mergeHeaders(
         defaults.headers,
-        config.headers
+        config.headers,
+        defaults.removeHeaders,
+        config.removeHeaders
       )
     }
 
@@ -120,15 +149,23 @@ export class ConfigMerger {
    */
   private static mergeHeaders(
     defaults?: HeadersInit,
-    headers?: HeadersInit
+    headers?: HeadersInit,
+    defaultRemovals?: readonly string[],
+    removals?: readonly string[]
   ): HeadersInit {
     const result: Record<string, string> = {}
 
     if (defaults) {
       this.appendHeaders(result, defaults)
     }
+    if (Array.isArray(defaultRemovals)) {
+      this.removeHeaders(result, defaultRemovals)
+    }
     if (headers) {
       this.appendHeaders(result, headers)
+    }
+    if (Array.isArray(removals)) {
+      this.removeHeaders(result, removals)
     }
 
     return result
@@ -138,8 +175,8 @@ export class ConfigMerger {
     result: Record<string, string>,
     headers: HeadersInit
   ): void {
-    if (headers instanceof Headers) {
-      headers.forEach((value, key) => {
+    if (isHeaders(headers)) {
+      Headers.prototype.forEach.call(headers, (value, key) => {
         setHeader(result, key, value)
       })
 
@@ -167,6 +204,17 @@ export class ConfigMerger {
           key.toLowerCase(),
           String(headers[key])
         )
+      }
+    }
+  }
+
+  private static removeHeaders(
+    headers: Record<string, string>,
+    names: readonly unknown[]
+  ): void {
+    for (const name of names) {
+      if (typeof name === 'string') {
+        delete headers[name.toLowerCase()]
       }
     }
   }
@@ -252,6 +300,12 @@ function isPlainObject(
   value: unknown
 ): value is Record<string, unknown> {
   return Object.prototype.toString.call(value) === '[object Object]'
+}
+
+function isContextObject(
+  value: unknown
+): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
 function setHeader(

@@ -48,14 +48,25 @@ claims about every remote workload; commands and limitations are in the
 ## Features
 
 - Data-first and complete-response APIs with TypeScript inference.
+- Native `URL` inputs, including cross-realm values, with stable lifecycle
+  snapshots.
+- Query- and fragment-safe `baseURL` prefix composition.
 - Object query merging plus native ordered `URLSearchParams` through
   `searchParams`.
+- Native multipart and URL-encoded response parsing through `formData`.
+- Raw binary response parsing as a portable `Uint8Array` through `bytes`.
+- Response-type-driven `Accept` negotiation with custom-header precedence.
+- Standards-correct opaque and manual-redirect Fetch responses without false
+  HTTP or parser failures.
+- Optional non-throwing HTTP status handling with parsed response data and
+  complete metadata.
 - Standard Schema v1 validation and transformation for untrusted responses.
 - Incremental SSE and NDJSON async iterables with cancellation and size limits.
 - Progress-aware file download streams that preserve backpressure and avoid
   buffering the complete response in memory.
 - Unified errors across Fetch, XHR, parsing, validation, timeouts, and aborts.
 - Request/response/error interceptors with deterministic priority ordering.
+- Shallow-merged local request context for tracing and lifecycle policies.
 - Official retry, cache, circuit-breaker, concurrency, authentication, logger,
   upload, and download plugins.
 - Method-aware `MockAdapter` routing, matching, delays, failures, and history.
@@ -174,6 +185,24 @@ the loop cancels the response reader. `maxResponseSize` remains enforced while
 the stream is consumed. A response schema validates the parsed response value
 once; it does not validate individual SSE events or NDJSON records.
 
+Native `FormData`, `Blob`, `ArrayBuffer`, and `ReadableStream` request bodies
+also work when created by another same-origin window or iframe. Detection does
+not lock streams, and retry safety and request-size limits remain active.
+
+Buffered bodies attached to thrown HTTP errors are capped at 10 MiB by
+default. Override `maxErrorResponseSize`, or set it to `Infinity` for trusted
+services that require complete error payloads. This guard preserves
+`HTTP_ERROR`; a stricter `maxResponseSize` remains a hard
+`RESPONSE_TOO_LARGE` limit.
+
+Error-body reads and asynchronous JSON parsing are also bounded by `timeout`,
+or by a 10-second error-only fallback when timeout is disabled. The fallback
+keeps `HTTP_ERROR` and omits stalled data; explicit and total timeouts retain
+`TIMEOUT_ERROR`. Malformed or rejected error payloads likewise keep
+`HTTP_ERROR` with unavailable data, so parser failures cannot hide the server
+status. Successful and explicitly non-throwing responses retain strict parser
+errors.
+
 ## Request configuration
 
 ```ts
@@ -196,6 +225,7 @@ Query objects merge with client defaults. Native `searchParams` replace
 inherited query defaults while preserving repeated keys and order.
 
 The body options `body`, `json`, `form`, and `formData` are mutually exclusive.
+`json` accepts complete JSON root values, including primitives and `null`.
 `GET` and `HEAD` requests cannot contain a body. Invalid configuration throws a
 `RequestError` before the adapter sends a request.
 
@@ -613,12 +643,12 @@ const api = createClient({ adapter })
 ## Errors
 
 ```ts
-import { RequestError } from '@npora/request'
+import { isRequestError } from '@npora/request'
 
 try {
   await api.get('/users/missing')
 } catch (error) {
-  if (error instanceof RequestError) {
+  if (isRequestError(error)) {
     console.error(error.code)
     console.error(error.status)
     console.error(error.data)
@@ -643,6 +673,10 @@ Stable request error codes:
 `SchemaValidationError` extends `RequestError`, so applications can handle all
 request failures through the unified base class while still inspecting schema
 issues when `error.code === 'SCHEMA_ERROR'`.
+
+Prefer `isRequestError()` and `isSchemaValidationError()` when narrowing an
+unknown caught value. Their non-enumerable shared brands work across iframes
+and duplicated package instances, where `instanceof` can fail.
 
 ## Supply-chain verification
 

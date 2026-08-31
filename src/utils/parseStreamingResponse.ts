@@ -1,4 +1,4 @@
-import { RequestError } from '../errors'
+import { isRequestError, RequestError } from '../errors'
 import type {
   RequestConfig,
   ServerSentEvent
@@ -169,7 +169,7 @@ async function* decodeLines(
       yield lines.rest
     }
   } catch (error) {
-    if (error instanceof RequestError) {
+    if (isRequestError(error)) {
       throw error
     }
 

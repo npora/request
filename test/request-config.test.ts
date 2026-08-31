@@ -16,6 +16,144 @@ afterEach(() => {
 })
 
 describe('request config', () => {
+  it('should accept and snapshot a native URL input', async () => {
+    let releaseInterceptor: (() => void) | undefined
+    const interceptorReady = new Promise<void>(resolve => {
+      releaseInterceptor = resolve
+    })
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response('{"ok":true}', {
+        headers: { 'content-type': 'application/json' }
+      })
+    )
+    const input = new URL(
+      'https://api.example.com/users?existing=true#results'
+    )
+    const request = createClient()
+
+    request.interceptors.request.use(async config => {
+      await interceptorReady
+      return config
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const pending = request.get(input, {
+      query: { page: 2 }
+    })
+
+    input.pathname = '/mutated'
+    releaseInterceptor?.()
+    await pending
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://api.example.com/users?existing=true&page=2#results',
+      expect.any(Object)
+    )
+  })
+
+  it('should accept URL input in the direct request API', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response('ok'))
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    await createClient().request({
+      url: new URL('https://api.example.com/direct'),
+      responseType: 'text'
+    })
+
+    expect(fetchMock.mock.calls[0]?.[0])
+      .toBe('https://api.example.com/direct')
+  })
+
+  it('should enforce the absolute URL boundary for URL objects', async () => {
+    const fetchMock = vi.fn()
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(createClient({
+      baseURL: 'https://api.example.com',
+      allowAbsoluteUrls: false
+    }).get(new URL('https://other.example.com/users')))
+      .rejects.toMatchObject({
+        code: 'CONFIG_ERROR',
+        message: 'Absolute request URLs are not allowed with this baseURL'
+      })
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('should reject URL-shaped objects', async () => {
+    const fetchMock = vi.fn()
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(createClient().request({
+      url: {
+        href: 'https://api.example.com/spoofed',
+        toString() {
+          return this.href
+        }
+      } as never
+    })).rejects.toMatchObject({
+      code: 'CONFIG_ERROR',
+      message: 'Request url must be a string or URL'
+    })
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('should expose merged context without sending it', async () => {
+    const observed: Array<Record<string, unknown> | undefined> = []
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response('{"ok":true}', {
+        headers: { 'content-type': 'application/json' }
+      })
+    )
+    const plugin: Plugin = {
+      name: 'context-observer',
+      install({ hooks }) {
+        hooks.onRequest(requestContext => {
+          observed.push(requestContext.config.context)
+        })
+      }
+    }
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient({
+      context: {
+        traceId: 'trace-1',
+        nested: { source: 'default' }
+      }
+    }).use(plugin)
+    const response = await request.getResponse('/users', {
+      context: {
+        operation: 'load-users',
+        nested: { source: 'request' }
+      }
+    })
+
+    expect(observed).toEqual([{
+      traceId: 'trace-1',
+      operation: 'load-users',
+      nested: { source: 'request' }
+    }])
+    expect(response.config.context).toEqual(observed[0])
+    expect(fetchMock.mock.calls[0]?.[1]).not.toHaveProperty('context')
+  })
+
+  it.each([null, [], 'trace'])('should reject invalid context %j', async context => {
+    const fetchMock = vi.fn()
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(createClient().get('/users', {
+      context: context as never
+    })).rejects.toMatchObject({
+      code: 'CONFIG_ERROR',
+      message: 'Request context must be an object'
+    })
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
   it('should only materialize optional headers when needed', () => {
     expect(validateRequestConfig({
       url: '/users'
@@ -27,6 +165,103 @@ describe('request config', () => {
         accept: 'application/json'
       }
     }, false)).toBeInstanceOf(Headers)
+  })
+
+  it.each([
+    ['json', 'application/json'],
+    ['text', 'text/*'],
+    ['blob', '*/*'],
+    ['arrayBuffer', '*/*'],
+    ['bytes', '*/*'],
+    ['formData', 'multipart/form-data'],
+    ['stream', '*/*'],
+    ['sse', 'text/event-stream'],
+    ['ndjson', 'application/x-ndjson, application/ndjson']
+  ] as const)(
+    'should negotiate an explicit %s response',
+    (responseType, accept) => {
+      const request = buildRequest({
+        url: '/representation',
+        responseType
+      })
+
+      expect(new Headers(request.init.headers).get('accept'))
+        .toBe(accept)
+    }
+  )
+
+  it('should preserve a custom Accept header', () => {
+    const request = buildRequest({
+      url: '/problem',
+      responseType: 'json',
+      headers: {
+        Accept: 'application/problem+json'
+      }
+    })
+
+    expect(new Headers(request.init.headers).get('accept'))
+      .toBe('application/problem+json')
+  })
+
+  it('should not guess Accept without an explicit response type', () => {
+    const request = buildRequest({
+      url: '/representation',
+      json: { enabled: true },
+      method: 'POST'
+    })
+    const headers = new Headers(request.init.headers)
+
+    expect(headers.get('content-type')).toBe('application/json')
+    expect(headers.has('accept')).toBe(false)
+  })
+
+  it.each([
+    'authorization',
+    ['authorization', 42],
+    ['invalid header name']
+  ])('should reject invalid removeHeaders value %j', async removeHeaders => {
+    const fetchMock = vi.fn()
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(createClient().get('/public', {
+      removeHeaders: removeHeaders as never
+    })).rejects.toMatchObject({
+      code: 'CONFIG_ERROR'
+    })
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('should reject a non-function Fetch implementation', async () => {
+    const fetchMock = vi.fn()
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(createClient().get('/users', {
+      fetch: 'invalid' as never
+    })).rejects.toMatchObject({
+      code: 'CONFIG_ERROR',
+      message: 'Request fetch must be a function'
+    })
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    ['parseJson', 'Request parseJson must be a function'],
+    ['stringifyJson', 'Request stringifyJson must be a function'],
+    ['querySerializer', 'Request querySerializer must be a function']
+  ])('should reject an invalid %s callback', async (field, message) => {
+    const fetchMock = vi.fn()
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(createClient().get('/users', {
+      [field]: 'invalid'
+    } as never)).rejects.toMatchObject({
+      code: 'CONFIG_ERROR',
+      message
+    })
+    expect(fetchMock).not.toHaveBeenCalled()
   })
 
   it('should build url with baseURL and query', () => {
@@ -61,6 +296,52 @@ describe('request config', () => {
     )
   })
 
+  it('should merge baseURL query and fragment components safely', () => {
+    const { url } = buildRequest({
+      baseURL: 'https://api.example.com/v1/?tenant=npora#base',
+      url: '/users?active=true#results',
+      query: {
+        page: 1
+      }
+    })
+
+    expect(url).toBe(
+      'https://api.example.com/v1/users?tenant=npora&active=true&page=1#results'
+    )
+  })
+
+  it('should preserve a baseURL fragment when the request has none', () => {
+    const { url } = buildRequest({
+      baseURL: '/api?tenant=npora#base',
+      url: '/users'
+    })
+
+    expect(url).toBe('/api/users?tenant=npora#base')
+  })
+
+  it('should keep query delimiters inside fragments opaque', () => {
+    const { url } = buildRequest({
+      baseURL: 'https://api.example.com/v1#route?tab=base',
+      url: '/users#result?tab=request'
+    })
+
+    expect(url).toBe(
+      'https://api.example.com/v1/users#result?tab=request'
+    )
+  })
+
+  it.each([
+    ['?active=true', 'https://api.example.com/v1?active=true'],
+    ['#results', 'https://api.example.com/v1#results']
+  ])('should resolve a suffix-only request URL %s', (input, expected) => {
+    const { url } = buildRequest({
+      baseURL: 'https://api.example.com/v1',
+      url: input
+    })
+
+    expect(url).toBe(expected)
+  })
+
   it('should preserve query encoding and array order', () => {
     const inheritedQuery = Object.create({
       inherited: 'ignored'
@@ -83,6 +364,55 @@ describe('request config', () => {
     expect(url).toBe(
       'https://api.example.com/search?search=hello+world%7E&tags=first&tags=&tags=second#results'
     )
+  })
+
+  it('should serialize object query parameters with a custom callback', () => {
+    const querySerializer = vi.fn(query => {
+      const tags = query.tags as string[]
+
+      return `?tags[]=${tags.join('&tags[]=')}`
+    })
+    const { url } = buildRequest({
+      url: '/search?active=true#results',
+      query: { tags: ['first', 'second'] },
+      querySerializer
+    })
+
+    expect(url).toBe(
+      '/search?active=true&tags[]=first&tags[]=second#results'
+    )
+    expect(querySerializer).toHaveBeenCalledWith({
+      tags: ['first', 'second']
+    })
+  })
+
+  it.each([
+    {
+      querySerializer: () => 42,
+      message: 'Request querySerializer must return a string'
+    },
+    {
+      querySerializer: () => {
+        throw new Error('serializer failed')
+      },
+      message: 'Request query serialization failed'
+    }
+  ])('should reject invalid custom query serialization', async ({
+    querySerializer,
+    message
+  }) => {
+    const fetchMock = vi.fn()
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(createClient().get('/search', {
+      query: { page: 1 },
+      querySerializer: querySerializer as never
+    })).rejects.toMatchObject({
+      code: 'CONFIG_ERROR',
+      message
+    })
+    expect(fetchMock).not.toHaveBeenCalled()
   })
 
   it('should accept searchParams without losing repeated-key order', () => {
@@ -324,6 +654,63 @@ describe('request config', () => {
   })
 
   it.each([
+    { name: 'string', value: 'npora', serialized: '"npora"' },
+    { name: 'number', value: 42, serialized: '42' },
+    { name: 'boolean', value: false, serialized: 'false' },
+    { name: 'null', value: null, serialized: 'null' }
+  ])('should serialize a $name JSON value', ({ value, serialized }) => {
+    const { init } = buildRequest({
+      url: '/values',
+      method: 'POST',
+      json: value
+    })
+
+    expect((init.headers as Headers).get('content-type')).toBe(
+      'application/json'
+    )
+    expect(init.body).toBe(serialized)
+  })
+
+  it('should use a custom JSON stringifier for JSON body shortcuts', () => {
+    const stringifyJson = vi.fn(value => JSON.stringify({ wrapped: value }))
+    const jsonRequest = buildRequest({
+      url: '/json',
+      json: { name: 'Npora' },
+      stringifyJson
+    })
+    const objectRequest = buildRequest({
+      url: '/body',
+      body: { name: 'Npora' },
+      stringifyJson
+    })
+
+    expect(jsonRequest.init.body).toBe(
+      '{"wrapped":{"name":"Npora"}}'
+    )
+    expect(objectRequest.init.body).toBe(
+      '{"wrapped":{"name":"Npora"}}'
+    )
+    expect(stringifyJson).toHaveBeenCalledTimes(2)
+  })
+
+  it('should reject a JSON stringifier that returns a non-string', async () => {
+    const fetchMock = vi.fn()
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(createClient().post('/users', {
+      json: { name: 'Npora' },
+      stringifyJson: (() => undefined) as never
+    })).rejects.toMatchObject({
+      code: 'CONFIG_ERROR',
+      cause: expect.objectContaining({
+        message: 'Request JSON stringifier must return a string'
+      })
+    })
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it.each([
     {
       name: 'UTF-8 text',
       config: {
@@ -504,6 +891,8 @@ describe('request config', () => {
     ['maxRequestSize', 1.5],
     ['maxResponseSize', -1],
     ['maxResponseSize', 1.5],
+    ['maxErrorResponseSize', -1],
+    ['maxErrorResponseSize', 1.5],
     ['maxFormDataDepth', -1],
     ['maxFormDataDepth', 1.5]
   ] as const)(
@@ -548,6 +937,28 @@ describe('request config', () => {
       }
     })
 
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('should treat null JSON as an active body option', async () => {
+    const fetchMock = vi.fn()
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(createClient().post('/users', {
+      json: null,
+      form: { name: 'Npora' }
+    })).rejects.toMatchObject({
+      code: 'CONFIG_ERROR',
+      message: 'Request body options are mutually exclusive: json, form'
+    })
+
+    await expect(createClient().get('/users', {
+      json: null
+    })).rejects.toMatchObject({
+      code: 'CONFIG_ERROR',
+      message: 'GET requests cannot include a body'
+    })
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
@@ -664,6 +1075,24 @@ describe('request config', () => {
   })
 
   it.each([
+    Number.POSITIVE_INFINITY,
+    2_147_483_648,
+    -1
+  ])('should reject invalid totalTimeout value %s', async totalTimeout => {
+    const fetchMock = vi.fn()
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(createClient().get('/users', {
+      totalTimeout
+    })).rejects.toMatchObject({
+      code: 'CONFIG_ERROR',
+      message: 'Request totalTimeout is out of range'
+    })
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it.each([
     {
       query: {
         page: 1
@@ -707,6 +1136,20 @@ describe('request config', () => {
         validateStatus: null
       },
       message: 'Request validateStatus must be a function'
+    },
+    {
+      config: {
+        throwHttpErrors: 'no'
+      },
+      message: 'Request throwHttpErrors must be a boolean'
+    },
+    {
+      config: {
+        throwHttpErrors: false,
+        validateStatus: () => true
+      },
+      message:
+        'Request throwHttpErrors and validateStatus are mutually exclusive'
     }
   ])('should reject invalid response configuration before fetch', async ({
     config,

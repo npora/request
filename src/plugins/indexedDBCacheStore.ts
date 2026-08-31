@@ -1,5 +1,6 @@
 import { RequestError } from '../errors'
 import type { CacheEntry, CacheStore } from './cachePlugin'
+import { isArrayBuffer, isBlob } from '../utils/isBinaryBody'
 
 export interface IndexedDBCacheStoreOptions {
   /** Database shared by cache namespaces. @default @npora/request-cache */
@@ -961,11 +962,11 @@ function estimateStructuredCloneSize(
     return 8
   }
 
-  if (typeof Blob !== 'undefined' && value instanceof Blob) {
+  if (isBlob(value)) {
     return value.size
   }
 
-  if (value instanceof ArrayBuffer) {
+  if (isArrayBuffer(value)) {
     return value.byteLength
   }
 

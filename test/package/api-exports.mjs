@@ -36,6 +36,7 @@ const publicExports = [
   'DownloadTransport',
   'ErrorLogEntry',
   'FetchAdapter',
+  'FetchFunction',
   'FetchOptions',
   'HttpMethod',
   'IndexedDBCacheCompactionOptions',
@@ -47,6 +48,9 @@ const publicExports = [
   'Interceptor',
   'InterceptorManager',
   'InterceptorOptions',
+  'JsonParser',
+  'JsonParserContext',
+  'JsonStringifier',
   'LoggerOptions',
   'LoggerEntry',
   'MemoryCacheStore',
@@ -70,6 +74,7 @@ const publicExports = [
   'PluginHookManager',
   'PluginInterceptorManager',
   'QueryParams',
+  'QuerySerializer',
   'QueryValue',
   'RequestConfig',
   'RequestError',
@@ -78,6 +83,7 @@ const publicExports = [
   'RequestExtensions',
   'RequestLogEntry',
   'RequestLogger',
+  'RequestURL',
   'ResponseLogEntry',
   'ResponseType',
   'SchemaValidationError',
@@ -101,6 +107,8 @@ const publicExports = [
   'concurrencyPlugin',
   'createClient',
   'downloadPlugin',
+  'isRequestError',
+  'isSchemaValidationError',
   'loggerPlugin',
   'retryPlugin',
   'uploadPlugin'
@@ -124,6 +132,8 @@ const runtimeExports = [
   'concurrencyPlugin',
   'createClient',
   'downloadPlugin',
+  'isRequestError',
+  'isSchemaValidationError',
   'loggerPlugin',
   'retryPlugin',
   'uploadPlugin'
@@ -143,7 +153,9 @@ const subpathRuntimeExports = {
     'PluginError',
     'RequestError',
     'SchemaValidationError',
-    'createClient'
+    'createClient',
+    'isRequestError',
+    'isSchemaValidationError'
   ],
   plugins: [
     'IndexedDBCacheStore',

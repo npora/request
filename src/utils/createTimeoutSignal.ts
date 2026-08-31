@@ -7,7 +7,8 @@ export interface TimeoutSignalResult {
 
 export function createTimeoutSignal(
   signal?: AbortSignal,
-  timeout?: number
+  timeout?: number,
+  timeoutMessage = `Request timeout after ${timeout}ms`
 ): TimeoutSignalResult {
   if (!timeout || timeout <= 0 || signal?.aborted) {
     return {
@@ -60,6 +61,13 @@ export function createTimeoutSignal(
       throw error
     }
 
+    // AbortSignal does not replay an abort event to a listener registered
+    // after the signal has transitioned. Recheck the source after listener
+    // setup so an abort racing with registration cannot be missed.
+    if (signal.aborted && !controller.signal.aborted) {
+      onAbort()
+    }
+
     if (controller.signal.aborted) {
       return {
         signal: controller.signal,
@@ -72,7 +80,7 @@ export function createTimeoutSignal(
     timer = setTimeout(() => {
       clear()
       controller.abort(
-        new RequestError(`Request timeout after ${timeout}ms`, {
+        new RequestError(timeoutMessage, {
           code: 'TIMEOUT_ERROR'
         })
       )

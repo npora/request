@@ -21,6 +21,7 @@ import type {
   IndexedDBCacheStoreEvent,
   IndexedDBCacheStoreOptions,
   IndexedDBCacheUsage,
+  JsonParserContext,
   LoggerEntry,
   MemoryCacheStoreOptions,
   Plugin,
@@ -42,10 +43,23 @@ import {
   concurrencyPlugin,
   downloadPlugin,
   IndexedDBCacheStore,
+  isRequestError,
+  isSchemaValidationError,
   MemoryCacheStore,
   TieredCacheStore,
   WebStorageCacheStore
 } from '@npora/request'
+
+declare const caught: unknown
+
+if (isRequestError<{ message: string }>(caught)) {
+  void caught.data?.message
+}
+
+if (isSchemaValidationError(caught)) {
+  void caught.issues
+  void caught.schemaVendor
+}
 
 interface MetricsOptions {
   enabled?: boolean
@@ -61,11 +75,16 @@ declare module '@npora/request' {
 
 const retry: RetryOptions = {
   retries: 2,
+  statusCodes: [409, 429, 503],
+  retryOnTimeout: false,
   delay: 100,
   jitter(event) {
     return event.delay / 2
   },
   maxElapsedTime: 5000,
+  shouldRetry(error) {
+    return error instanceof TypeError ? true : undefined
+  },
   onRetry(event) {
     const retryEvent: RetryEvent = event
 
@@ -76,11 +95,31 @@ const retry: RetryOptions = {
 const config: RequestConfig = {
   url: '/user',
   allowAbsoluteUrls: false,
+  totalTimeout: 5000,
+  throwHttpErrors: false,
   maxRequestSize: 1024,
+  removeHeaders: ['authorization'],
+  context: {
+    traceId: 'trace-1',
+    operation: 'load-user'
+  },
+  fetch: globalThis.fetch,
+  parseJson: async (text, context) => {
+    const parserContext: JsonParserContext = context
+
+    void parserContext.config.url
+    void parserContext.response.status
+
+    return JSON.parse(text)
+  },
+  stringifyJson: value => JSON.stringify(value),
   searchParams: new URLSearchParams([
     ['tag', 'first'],
     ['tag', 'second']
   ]),
+  querySerializer: query => new URLSearchParams(
+    Object.entries(query).map(([key, value]) => [key, String(value)])
+  ).toString(),
   extensions: {
     retry,
     cache: {
@@ -100,7 +139,28 @@ const config: RequestConfig = {
   }
 }
 
+const urlConfig: RequestConfig = {
+  url: new URL('https://api.example.com/user')
+}
+
+void urlConfig
+
 void config
+
+const primitiveJsonConfigs: RequestConfig[] = [
+  { url: '/string', method: 'POST', json: 'npora' },
+  { url: '/number', method: 'POST', json: 42 },
+  { url: '/boolean', method: 'POST', json: false },
+  { url: '/null', method: 'POST', json: null },
+  {
+    url: '/bigint',
+    method: 'POST',
+    json: 42n,
+    stringifyJson: value => String(value)
+  }
+]
+
+void primitiveJsonConfigs
 
 type LegacyExtensionKey =
   | 'auth'
@@ -372,6 +432,20 @@ void cacheWrite
 void cacheUpdate
 void cacheStats.backgroundRefreshErrors
 void cacheStats.invalidations
+
+const formDataResponseConfig: RequestConfig = {
+  url: '/form-data',
+  responseType: 'formData'
+}
+
+void formDataResponseConfig
+
+const bytesResponseConfig: RequestConfig = {
+  url: '/bytes',
+  responseType: 'bytes'
+}
+
+void bytesResponseConfig
 
 const circuitOptions: CircuitBreakerPluginOptions = {
   failureThreshold: 3,

@@ -14,6 +14,35 @@ afterEach(() => {
 })
 
 describe('loggerPlugin', () => {
+  it('should redact credentials and query secrets from URL input', async () => {
+    const info = vi.fn<RequestLogger['info']>()
+    const error = vi.fn<RequestLogger['error']>()
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockRejectedValue(new Error('network down'))
+    )
+
+    const request = createClient().use(loggerPlugin({
+      logger: { info, error }
+    }))
+
+    await expect(request.get(new URL(
+      'https://user:password@api.example.com/users?token=secret'
+    ))).rejects.toMatchObject({ code: 'NETWORK_ERROR' })
+
+    const serialized = JSON.stringify({
+      request: info.mock.calls[0]?.[1],
+      error: error.mock.calls[0]?.[1]
+    })
+
+    expect(serialized).toContain(
+      'https://[REDACTED]@api.example.com/users?token=%5BREDACTED%5D'
+    )
+    expect(serialized).not.toContain('password')
+    expect(serialized).not.toContain('secret')
+  })
+
   it('should log request and response', async () => {
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
 

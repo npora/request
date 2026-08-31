@@ -3,6 +3,32 @@ import type { RequestConfig } from '../src'
 import { ConfigMerger } from '../src/core/ConfigMerger'
 
 describe('ConfigMerger', () => {
+  it('should shallow-merge and clone request context', () => {
+    const defaultContext = {
+      traceId: 'trace-1',
+      nested: { source: 'default' }
+    }
+    const requestContext = {
+      operation: 'load-user',
+      nested: { source: 'request' }
+    }
+    const config = ConfigMerger.merge(
+      { context: defaultContext },
+      {
+        url: '/user',
+        context: requestContext
+      }
+    )
+
+    expect(config.context).toEqual({
+      traceId: 'trace-1',
+      operation: 'load-user',
+      nested: { source: 'request' }
+    })
+    expect(config.context).not.toBe(defaultContext)
+    expect(config.context).not.toBe(requestContext)
+  })
+
   it('should merge headers case-insensitively', () => {
     const config = ConfigMerger.merge(
       {
@@ -23,6 +49,48 @@ describe('ConfigMerger', () => {
 
     expect(headers.get('authorization')).toBe('Bearer request')
     expect(headers.get('x-client')).toBe('npora')
+  })
+
+  it('should remove inherited headers case-insensitively', () => {
+    const config = ConfigMerger.merge(
+      {
+        headers: {
+          Authorization: 'Bearer secret',
+          'Content-Type': 'application/json',
+          'X-Client': 'npora'
+        }
+      },
+      {
+        url: '/public',
+        removeHeaders: ['authorization', 'CONTENT-TYPE']
+      }
+    )
+    const headers = new Headers(config.headers as HeadersInit)
+
+    expect(headers.get('authorization')).toBeNull()
+    expect(headers.get('content-type')).toBeNull()
+    expect(headers.get('x-client')).toBe('npora')
+  })
+
+  it('should allow request headers to replace default removals', () => {
+    const config = ConfigMerger.merge(
+      {
+        headers: {
+          authorization: 'Bearer parent'
+        },
+        removeHeaders: ['authorization']
+      },
+      {
+        url: '/private',
+        headers: {
+          authorization: 'Bearer request'
+        }
+      }
+    )
+
+    expect(new Headers(config.headers).get('authorization')).toBe(
+      'Bearer request'
+    )
   })
 
   it('should isolate merged headers without emitting absent fields', () => {
@@ -106,6 +174,46 @@ describe('ConfigMerger', () => {
       page: 2,
       keyword: 'request'
     })
+  })
+
+  it('should inherit and override the query serializer', () => {
+    const inherited = () => 'inherited=true'
+    const overridden = () => 'overridden=true'
+
+    expect(ConfigMerger.merge({ querySerializer: inherited }, {
+      url: '/inherited'
+    }).querySerializer).toBe(inherited)
+    expect(ConfigMerger.merge({ querySerializer: inherited }, {
+      url: '/overridden',
+      querySerializer: overridden
+    }).querySerializer).toBe(overridden)
+  })
+
+  it('should inherit and override totalTimeout', () => {
+    expect(ConfigMerger.merge({ totalTimeout: 1000 }, {
+      url: '/inherited'
+    }).totalTimeout).toBe(1000)
+    expect(ConfigMerger.merge({ totalTimeout: 1000 }, {
+      url: '/overridden',
+      totalTimeout: 250
+    }).totalTimeout).toBe(250)
+  })
+
+  it('should replace an inherited HTTP status policy', () => {
+    const validateStatus = (status: number) => status === 404
+    const precise = ConfigMerger.merge(
+      { throwHttpErrors: false },
+      { url: '/precise', validateStatus }
+    )
+    const nonThrowing = ConfigMerger.merge(
+      { validateStatus },
+      { url: '/non-throwing', throwHttpErrors: false }
+    )
+
+    expect(precise.validateStatus).toBe(validateStatus)
+    expect(precise.throwHttpErrors).toBeUndefined()
+    expect(nonThrowing.throwHttpErrors).toBe(false)
+    expect(nonThrowing.validateStatus).toBeUndefined()
   })
 
   it('should replace inherited query defaults with cloned URLSearchParams', () => {
@@ -287,6 +395,18 @@ describe('ConfigMerger', () => {
     expect(config.body).toBeUndefined()
     expect(config.form).toBeUndefined()
     expect(config.formData).toBeUndefined()
+  })
+
+  it('should preserve an inherited null JSON body', () => {
+    const config = ConfigMerger.merge(
+      { json: null },
+      {
+        url: '/submit',
+        method: 'POST'
+      }
+    )
+
+    expect(config.json).toBeNull()
   })
 
   it('should clear a default body mode when explicitly set to undefined', () => {

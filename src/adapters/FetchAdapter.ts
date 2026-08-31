@@ -1,4 +1,4 @@
-import { RequestError } from '../errors'
+import { isRequestError, RequestError } from '../errors'
 import type { Adapter, NporaResponse, RequestConfig } from '../types'
 import {
   type BuiltRequest,
@@ -16,6 +16,11 @@ import {
   throwIfAborted
 } from '../utils/createAbortError'
 import { validateResponseStatus } from '../utils/validateResponseStatus'
+import { resolveErrorResponseSizeLimit } from '../utils/errorResponseSize'
+import {
+  ERROR_RESPONSE_DATA_UNAVAILABLE,
+  withErrorResponseTimeout
+} from '../utils/errorResponseTimeout'
 
 export class FetchAdapter implements Adapter {
   async request<T = unknown>(
@@ -53,11 +58,21 @@ export class FetchAdapter implements Adapter {
       throwIfAborted(config)
 
       request = buildRequestWithHeaders(config, headers)
-      let response = await fetch(request.url, request.init)
-      const validStatus = validateResponseStatus(response.status, config)
+      const fetchImplementation = config.fetch ?? globalThis.fetch
+      let response = await fetchImplementation(request.url, request.init)
+      const filteredResponse =
+        response.type === 'opaque' ||
+        response.type === 'opaqueredirect'
+      const validStatus =
+        response.type === 'error'
+          ? false
+          : filteredResponse && config.validateStatus === undefined
+          ? true
+          : validateResponseStatus(response.status, config)
       const bodyless = isBodylessResponse(
         config.method,
-        response.status
+        response.status,
+        response.type
       )
 
       if (!bodyless && (preserveRaw || !validStatus)) {
@@ -68,6 +83,10 @@ export class FetchAdapter implements Adapter {
         ? undefined
         : resolveResponseType(response, config)
       const streaming = isStreamingResponseType(responseType)
+      const errorResponseSizeLimit =
+        !validStatus && !bodyless && !streaming
+          ? resolveErrorResponseSizeLimit(config)
+          : undefined
 
       if (streaming) {
         response = finalizeStreamingResponse(
@@ -79,18 +98,75 @@ export class FetchAdapter implements Adapter {
         deferCleanup = Boolean(response.body)
       }
 
+      const knownErrorBodyTooLarge =
+        errorResponseSizeLimit !== undefined &&
+        exceedsContentLength(response, errorResponseSizeLimit)
       const parseTarget =
         bodyless ||
+        knownErrorBodyTooLarge ||
         streaming ||
-        (
-          !preserveRaw &&
-          validStatus
-        )
+        (!preserveRaw && validStatus)
           ? response
           : response.clone()
-      const data = bodyless
-        ? undefined as T
-        : await parseResponse<T>(parseTarget, config, responseType)
+      let data: T
+
+      if (bodyless || knownErrorBodyTooLarge) {
+        data = undefined as T
+
+        if (knownErrorBodyTooLarge) {
+          cancelResponseBody(response)
+        }
+      } else {
+        try {
+          const parsed = !validStatus
+            ? await withErrorResponseTimeout(
+                config,
+                signal => parseResponse<T>(
+                  parseTarget,
+                  config,
+                  responseType,
+                  errorResponseSizeLimit ?? config.maxResponseSize,
+                  signal
+                ),
+                () => cancelResponseBody(response)
+              )
+            : await parseResponse<T>(
+                parseTarget,
+                config,
+                responseType
+              )
+
+          data = parsed === ERROR_RESPONSE_DATA_UNAVAILABLE
+            ? undefined as T
+            : parsed
+        } catch (error) {
+          if (config.signal?.aborted) {
+            throw createAbortError(config.signal.reason, config, error)
+          }
+
+          if (
+            !validStatus &&
+            request.init.signal?.aborted
+          ) {
+            throw createAbortError(
+              request.init.signal.reason,
+              config,
+              error
+            )
+          }
+
+          if (
+            errorResponseSizeLimit === undefined ||
+            !isRequestError(error) ||
+            error.code !== 'RESPONSE_TOO_LARGE'
+          ) {
+            throw error
+          }
+
+          data = undefined as T
+          cancelResponseBody(response)
+        }
+      }
       const nporaResponse: NporaResponse<T> = {
         data,
         status: response.status,
@@ -111,7 +187,7 @@ export class FetchAdapter implements Adapter {
 
       return nporaResponse
     } catch (error) {
-      if (error instanceof RequestError) {
+      if (isRequestError(error)) {
         throw error
       }
 
@@ -141,4 +217,16 @@ export class FetchAdapter implements Adapter {
       }
     }
   }
+}
+
+function exceedsContentLength(response: Response, limit: number): boolean {
+  const contentLength = Number(response.headers.get('content-length'))
+
+  return Number.isFinite(contentLength) && contentLength > limit
+}
+
+function cancelResponseBody(response: Response): void {
+  void response.body?.cancel().catch(() => {
+    // The HTTP error and its metadata remain authoritative.
+  })
 }

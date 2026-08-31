@@ -15,11 +15,17 @@ export type QueryValue = string | number | boolean | null | undefined
 
 export type QueryParams = Record<string, QueryValue | QueryValue[]>
 
+export type QuerySerializer = (query: QueryParams) => string
+
+export type RequestURL = string | URL
+
 export type ResponseType =
   | 'json'
   | 'text'
   | 'blob'
   | 'arrayBuffer'
+  | 'bytes'
+  | 'formData'
   | 'stream'
   | 'sse'
   | 'ndjson'
@@ -34,6 +40,23 @@ export type FetchOptions = Omit<
   RequestInit,
   'method' | 'headers' | 'body' | 'signal'
 >
+
+export type FetchFunction = typeof globalThis.fetch
+
+export interface JsonParserContext {
+  /** Final request configuration used for the response. */
+  readonly config: RequestConfig
+
+  /** Native response whose buffered JSON body is being parsed. */
+  readonly response: Response
+}
+
+export type JsonParser = (
+  text: string,
+  context: JsonParserContext
+) => unknown | Promise<unknown>
+
+export type JsonStringifier = (value: unknown) => string
 
 /**
  * Plugin-owned request configuration.
@@ -59,7 +82,7 @@ export interface RequestExtensions {
 }
 
 export interface RequestConfig {
-  url: string
+  url: RequestURL
 
   method?: HttpMethod
 
@@ -76,21 +99,60 @@ export interface RequestConfig {
 
   fetchOptions?: FetchOptions
 
+  /**
+   * Fetch-compatible transport function used by the built-in FetchAdapter.
+   *
+   * @default globalThis.fetch
+   */
+  fetch?: FetchFunction
+
+  /** Custom parser used for buffered JSON responses. */
+  parseJson?: JsonParser
+
+  /** Custom stringifier used for `json` and plain-object request bodies. */
+  stringifyJson?: JsonStringifier
+
+  /**
+   * Application metadata available throughout the request lifecycle.
+   *
+   * Context is shallow merged and is never sent over the network.
+   */
+  context?: Record<string, unknown>
+
   headers?: HeadersInit
 
+  /**
+   * Case-insensitive names of inherited headers to remove.
+   *
+   * @default []
+   */
+  removeHeaders?: readonly string[]
+
   query?: QueryParams
+
+  /** Custom serializer for object query parameters. */
+  querySerializer?: QuerySerializer
 
   searchParams?: URLSearchParams
 
   body?: BodyInit | Record<string, unknown> | null
 
-  json?: Record<string, unknown> | unknown[]
+  /** Any value accepted by the configured JSON stringifier. */
+  json?: unknown
 
   form?: URLSearchParams | Record<string, QueryValue | QueryValue[]>
 
   formData?: FormData | Record<string, unknown>
 
   timeout?: number
+
+  /**
+   * Maximum duration for the complete request lifecycle, including hooks,
+   * retries, retry delays, parsing, interceptors, and stream consumption.
+   *
+   * @default disabled
+   */
+  totalTimeout?: number
 
   signal?: AbortSignal
 
@@ -113,6 +175,15 @@ export interface RequestConfig {
   maxResponseSize?: number
 
   /**
+   * Maximum body size parsed into HTTP_ERROR.data. Larger error bodies are
+   * not parsed, while status, headers, and the raw response remain available.
+   * Set to Infinity to disable this error-body-specific guard.
+   *
+   * @default 10 MiB
+   */
+  maxErrorResponseSize?: number
+
+  /**
    * Maximum nested array depth accepted while building FormData.
    *
    * @default 32
@@ -129,6 +200,15 @@ export interface RequestConfig {
   schema?: StandardSchemaV1
 
   validateStatus?: (status: number) => boolean
+
+  /**
+   * Throw `HTTP_ERROR` for responses rejected by the default status policy.
+   *
+   * Use `validateStatus` instead when a custom status policy is required.
+   *
+   * @default true
+   */
+  throwHttpErrors?: boolean
 
   extensions?: RequestExtensions
 }

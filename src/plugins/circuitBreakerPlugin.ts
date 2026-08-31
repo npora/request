@@ -1,4 +1,4 @@
-import { RequestError } from '../errors'
+import { isRequestError, RequestError } from '../errors'
 import type {
   CircuitBreakerStateChange,
   CircuitState,
@@ -516,7 +516,7 @@ function createOpenError(
 }
 
 function defaultShouldCountFailure(error: unknown): boolean {
-  if (!(error instanceof RequestError)) {
+  if (!isRequestError(error)) {
     return true
   }
 

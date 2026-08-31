@@ -3,6 +3,26 @@ import { RequestError } from '../errors'
 import { createTimeoutSignal } from './createTimeoutSignal'
 import { hasOwnProperty } from './hasOwnProperty'
 import { isURLSearchParams } from './isURLSearchParams'
+import { isArrayBuffer, isBlob } from './isBinaryBody'
+import { isFormData } from './isFormData'
+import { isReadableStream } from './isReadableStream'
+
+const RESPONSE_ACCEPT = {
+  json: 'application/json',
+  text: 'text/*',
+  blob: '*/*',
+  arrayBuffer: '*/*',
+  bytes: '*/*',
+  formData: 'multipart/form-data',
+  stream: '*/*',
+  sse: 'text/event-stream',
+  ndjson: 'application/x-ndjson, application/ndjson'
+} satisfies Record<
+  NonNullable<RequestConfig['responseType']>,
+  string
+>
+
+const URL_REFERENCE = /^([^?#]*)(?:\?([^#]*))?(#.*)?$/
 
 export interface BuiltRequest {
   url: string
@@ -26,6 +46,7 @@ export function buildRequestWithHeaders(
   config: RequestConfig,
   headers: Headers
 ): BuiltRequest {
+  setAccept(headers, config.responseType)
   const body = buildBody(config, headers)
   validateRequestBodySize(body, config)
   const url = buildURL(config)
@@ -39,8 +60,7 @@ export function buildRequestWithHeaders(
 
   if (
     body &&
-    typeof ReadableStream !== 'undefined' &&
-    body instanceof ReadableStream
+    isReadableStream(body)
   ) {
     (init as RequestInit & { duplex: 'half' }).duplex = 'half'
   }
@@ -63,16 +83,25 @@ export function buildRequestWithHeaders(
   }
 }
 
+function setAccept(
+  headers: Headers,
+  responseType: RequestConfig['responseType']
+): void {
+  if (!responseType || headers.has('accept')) {
+    return
+  }
+
+  headers.set('accept', RESPONSE_ACCEPT[responseType])
+}
+
 function buildURL(config: RequestConfig): string {
-  const url = joinURL(config.baseURL, config.url)
+  const url = joinURL(config.baseURL, String(config.url))
 
   if (!config.query && !config.searchParams) {
     return url
   }
 
-  const query = config.searchParams
-    ? config.searchParams.toString()
-    : stringifyQuery(config.query as QueryParams)
+  const query = serializeQuery(config)
 
   if (!query) {
     return url
@@ -86,11 +115,78 @@ function buildURL(config: RequestConfig): string {
   return `${target}${separator}${query}${hash}`
 }
 
+export function serializeQuery(config: RequestConfig): string {
+  if (config.searchParams) {
+    return config.searchParams.toString()
+  }
+
+  const query = config.query as QueryParams
+
+  if (!config.querySerializer) {
+    return stringifyQuery(query)
+  }
+
+  let serialized: unknown
+
+  try {
+    serialized = config.querySerializer(query)
+  } catch (error) {
+    throw new RequestError('Request query serialization failed', {
+      code: 'CONFIG_ERROR',
+      config,
+      cause: error
+    })
+  }
+
+  if (typeof serialized !== 'string') {
+    throw new RequestError(
+      'Request querySerializer must return a string',
+      {
+        code: 'CONFIG_ERROR',
+        config
+      }
+    )
+  }
+
+  return serialized.startsWith('?')
+    ? serialized.slice(1)
+    : serialized
+}
+
 function joinURL(baseURL: string | undefined, url: string): string {
   if (!baseURL || isAbsoluteURL(url)) {
     return url
   }
 
+  if (!url) {
+    return baseURL
+  }
+
+  const baseHasSuffix = baseURL.includes('?') || baseURL.includes('#')
+  const firstInputCharacter = url.charCodeAt(0)
+
+  if (
+    !baseHasSuffix &&
+    firstInputCharacter !== 63 &&
+    firstInputCharacter !== 35
+  ) {
+    return joinURLPath(baseURL, url)
+  }
+
+  const base = URL_REFERENCE.exec(baseURL)!
+  const input = URL_REFERENCE.exec(url)!
+  const path = joinURLPath(base[1]!, input[1]!)
+  const baseQuery = base[2] ?? ''
+  const inputQuery = input[2] ?? ''
+  const query = baseQuery && inputQuery
+    ? `${baseQuery}&${inputQuery}`
+    : baseQuery || inputQuery
+  const hash = input[3] || base[3] || ''
+
+  return `${path}${query ? `?${query}` : ''}${hash}`
+}
+
+function joinURLPath(baseURL: string, url: string): string {
   if (!url) {
     return baseURL
   }
@@ -178,7 +274,7 @@ function buildBody(
 ): BodyInit | undefined {
   if (config.json !== undefined) {
     setContentType(headers, 'application/json')
-    return JSON.stringify(config.json)
+    return stringifyJson(config.json, config)
   }
 
   if (config.form !== undefined) {
@@ -203,10 +299,25 @@ function buildBody(
 
   if (isPlainObject(config.body)) {
     setContentType(headers, 'application/json')
-    return JSON.stringify(config.body)
+    return stringifyJson(config.body, config)
   }
 
   return config.body
+}
+
+function stringifyJson(
+  value: unknown,
+  config: RequestConfig
+): string {
+  const serialized = config.stringifyJson
+    ? config.stringifyJson(value)
+    : JSON.stringify(value)
+
+  if (typeof serialized !== 'string') {
+    throw new TypeError('Request JSON stringifier must return a string')
+  }
+
+  return serialized
 }
 
 function buildURLSearchParams(
@@ -233,7 +344,7 @@ function buildFormData(
   input: FormData | Record<string, unknown>,
   maxDepth = 32
 ): FormData {
-  if (input instanceof FormData) {
+  if (isFormData(input)) {
     return input
   }
 
@@ -305,7 +416,7 @@ function appendFormDataValue(
     return
   }
 
-  if (value instanceof Blob) {
+  if (isBlob(value)) {
     formData.append(key, value)
     return
   }
@@ -354,11 +465,11 @@ function getRequestBodySize(body: BodyInit): number | undefined {
     return utf8ByteLength(body.toString())
   }
 
-  if (typeof Blob !== 'undefined' && body instanceof Blob) {
+  if (isBlob(body)) {
     return body.size
   }
 
-  if (body instanceof ArrayBuffer) {
+  if (isArrayBuffer(body)) {
     return body.byteLength
   }
 

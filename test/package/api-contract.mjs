@@ -2,6 +2,8 @@ import assert from 'node:assert/strict'
 import {
   circuitBreakerPlugin,
   createClient,
+  isRequestError,
+  isSchemaValidationError,
   MockAdapter,
   RequestError,
   SchemaValidationError
@@ -62,6 +64,12 @@ assert.deepEqual(data, {
   url: '/data'
 })
 
+await client.get(new URL('https://api.example.com/native-url'))
+assert.equal(
+  requests.at(-1).url,
+  'https://api.example.com/native-url'
+)
+
 const response = await client.getResponse('/response')
 
 assert.equal(response.status, 201)
@@ -106,6 +114,8 @@ await assert.rejects(
   error => (
     error instanceof SchemaValidationError &&
     error instanceof RequestError &&
+    isRequestError(error) &&
+    isSchemaValidationError(error) &&
     error.code === 'SCHEMA_ERROR' &&
     error.issues[0].message === 'Rejected by package contract'
   )
@@ -332,6 +342,16 @@ assert.deepEqual(mockResponse.data, {
 })
 assert.equal(mockResponse.headers.get('x-mock-contract'), 'stable')
 assert.equal(mockAdapter.history.length, 2)
+
+mockAdapter.onGet('/soft-error-contract').reply(409, {
+  message: 'conflict'
+})
+const softErrorResponse = await mockClient.getResponse(
+  '/soft-error-contract',
+  { throwHttpErrors: false }
+)
+assert.equal(softErrorResponse.status, 409)
+assert.deepEqual(softErrorResponse.data, { message: 'conflict' })
 
 const breakerAdapter = new MockAdapter()
 const breaker = circuitBreakerPlugin({
