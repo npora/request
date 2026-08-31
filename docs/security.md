@@ -119,6 +119,8 @@ application.
   indefinitely: disabled per-attempt timeouts receive a 10-second fallback.
 - Malformed HTTP error payloads cannot obscure their status classification;
   they retain `HTTP_ERROR` without exposing partially parsed data.
+- Fetch HTTP errors consume one response stream without retaining an unread
+  cloned body; payload inspection uses the bounded `error.data` field.
 - The published package has zero runtime dependencies and an exact tarball
   allowlist.
 

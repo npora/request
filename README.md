@@ -201,7 +201,7 @@ keeps `HTTP_ERROR` and omits stalled data; explicit and total timeouts retain
 `TIMEOUT_ERROR`. Malformed or rejected error payloads likewise keep
 `HTTP_ERROR` with unavailable data, so parser failures cannot hide the server
 status. Successful and explicitly non-throwing responses retain strict parser
-errors.
+errors. Fetch consumes error bodies once; use `error.data` for their payload.
 
 ## Request configuration
 

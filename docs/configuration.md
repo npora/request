@@ -248,6 +248,12 @@ status itself is being rejected. Successful responses and responses accepted
 through `throwHttpErrors: false` continue to surface `PARSER_ERROR`, while an
 explicit `maxResponseSize` remains a hard `RESPONSE_TOO_LARGE` failure.
 
+Fetch error bodies are consumed directly rather than through `Response.clone()`
+so an ignored HTTP error cannot retain an unread stream branch. Treat
+`error.data` as the error payload and `error.response.raw` as native response
+metadata; its body has already been consumed. Successful complete responses
+continue to expose a separately readable raw body.
+
 ## Response handling
 
 | Option | Type | Default | Purpose |

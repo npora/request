@@ -105,7 +105,8 @@ export class FetchAdapter implements Adapter {
         bodyless ||
         knownErrorBodyTooLarge ||
         streaming ||
-        (!preserveRaw && validStatus)
+        !validStatus ||
+        !preserveRaw
           ? response
           : response.clone()
       let data: T

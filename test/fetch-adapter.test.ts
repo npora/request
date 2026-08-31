@@ -315,15 +315,16 @@ describe('FetchAdapter', () => {
   ])(
     'should preserve HTTP_ERROR when the %s rejects error data',
     async (_label, parseJson) => {
+      const nativeResponse = new Response('invalid-json', {
+        status: 422,
+        statusText: 'Unprocessable Content',
+        headers: { 'content-type': 'application/json' }
+      })
+      const clone = vi.spyOn(nativeResponse, 'clone')
+
       vi.stubGlobal(
         'fetch',
-        vi.fn().mockResolvedValue(
-          new Response('invalid-json', {
-            status: 422,
-            statusText: 'Unprocessable Content',
-            headers: { 'content-type': 'application/json' }
-          })
-        )
+        vi.fn().mockResolvedValue(nativeResponse)
       )
 
       let caught: unknown
@@ -349,7 +350,10 @@ describe('FetchAdapter', () => {
 
       const error = caught as RequestError
 
-      expect(await error.response?.raw.text()).toBe('invalid-json')
+      expect(clone).not.toHaveBeenCalled()
+      expect(error.response?.raw).toBe(nativeResponse)
+      expect(error.response?.raw.bodyUsed).toBe(true)
+      await expect(error.response?.raw.text()).rejects.toThrow()
     }
   )
 

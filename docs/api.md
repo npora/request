@@ -413,11 +413,12 @@ application-provided code and should be reviewed like interceptors and
 plugins.
 
 Data-only methods parse successful Fetch responses directly when no response
-hooks or interceptors are installed. Complete response methods, response
-lifecycle extensions and HTTP errors preserve a separately readable `raw`
-Response for buffered response types. Streaming response types deliberately do
-not clone the body because an unread clone could buffer an unbounded stream;
-their `raw` response refers to the same body consumed by the async iterable.
+hooks or interceptors are installed. Complete successful response methods and
+response lifecycle extensions preserve a separately readable `raw` Response
+for buffered response types. HTTP errors consume their raw body once and expose
+the parsed value through `error.data`, preventing an ignored error from retaining
+an unread clone. Streaming response types likewise do not clone the body; their
+`raw` response refers to the same body consumed by the async iterable.
 
 `stream` exposes the native `ReadableStream`. `sse` and `ndjson` return lazy
 `AsyncIterable` values that decode records without buffering the complete

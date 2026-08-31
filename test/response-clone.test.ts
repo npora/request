@@ -113,7 +113,7 @@ describe('Fetch response cloning', () => {
     expect(rawBodyUsed).toBe(false)
   })
 
-  it('should preserve raw body for HTTP errors', async () => {
+  it('should consume one response body for HTTP errors', async () => {
     const response = jsonResponse(
       {
         message: 'invalid'
@@ -136,14 +136,14 @@ describe('Fetch response cloning', () => {
       captured = error as RequestError
     }
 
-    expect(clone).toHaveBeenCalledTimes(1)
+    expect(clone).not.toHaveBeenCalled()
     expect(captured?.code).toBe('HTTP_ERROR')
-    expect(captured?.response?.raw.bodyUsed).toBe(false)
+    expect(captured?.data).toEqual({ message: 'invalid' })
+    expect(captured?.response?.raw).toBe(response)
+    expect(captured?.response?.raw.bodyUsed).toBe(true)
     await expect(
       captured?.response?.raw.json()
-    ).resolves.toEqual({
-      message: 'invalid'
-    })
+    ).rejects.toThrow()
   })
 
   it('should not clone an automatically detected streaming response', async () => {

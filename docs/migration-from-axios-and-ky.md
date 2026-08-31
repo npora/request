@@ -139,6 +139,12 @@ replacing `HTTP_ERROR`. Axios normally ignores automatic JSON parse failures;
 Npora keeps strict `PARSER_ERROR` behavior for successful or explicitly
 non-throwing responses instead of weakening parsing globally.
 
+Like current Ky, Fetch error bodies are consumed while populating `error.data`
+instead of cloning an additional readable stream. `error.response.raw` remains
+available for native status and header metadata, but its body is already used.
+This avoids retaining an unread `ReadableStream` branch when callers catch and
+ignore an HTTP failure.
+
 Explicit response types also negotiate `Accept`, following Ky's body-shortcut
 model. Unlike Axios's broad common default, Npora Request does not send an
 `Accept` header when response parsing is automatic. Unlike ofetch's JSON-body
