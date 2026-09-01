@@ -29,6 +29,20 @@ describe('ConfigMerger', () => {
     expect(config.context).not.toBe(requestContext)
   })
 
+  it('should preserve an invalid request context for validation', () => {
+    const config = ConfigMerger.merge(
+      {
+        context: { traceId: 'default' }
+      },
+      {
+        url: '/user',
+        context: 'invalid' as never
+      }
+    )
+
+    expect(config.context).toBe('invalid')
+  })
+
   it('should merge headers case-insensitively', () => {
     const config = ConfigMerger.merge(
       {

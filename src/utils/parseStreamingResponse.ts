@@ -1,8 +1,14 @@
-import { isRequestError, RequestError } from '../errors'
+import {
+  isRequestError,
+  RequestError
+} from '../errors'
 import type {
+  NporaResponse,
   RequestConfig,
-  ServerSentEvent
+  ServerSentEvent,
+  StreamingSchemaLocation
 } from '../types'
+import { validateStandardSchemaValue } from './validateStandardSchema'
 
 interface StreamingParserContext {
   config: RequestConfig
@@ -12,11 +18,11 @@ interface StreamingParserContext {
 /**
  * Decode a server-sent event response without buffering the complete body.
  */
-export function parseServerSentEvents(
+export function parseServerSentEvents<T = ServerSentEvent>(
   response: Response,
   config: RequestConfig
-): AsyncIterable<ServerSentEvent> {
-  return decodeServerSentEvents(response.body, {
+): AsyncIterable<T> {
+  return decodeServerSentEvents<T>(response.body, {
     config,
     response
   })
@@ -36,24 +42,32 @@ export function parseNdjson<T>(
   })
 }
 
-async function* decodeServerSentEvents(
+async function* decodeServerSentEvents<T>(
   stream: ReadableStream<Uint8Array> | null,
   context: StreamingParserContext
-): AsyncGenerator<ServerSentEvent> {
+): AsyncGenerator<T> {
   let data: string[] = []
   let event = ''
   let lastEventId = ''
   let retry: number | undefined
+  let itemIndex = 0
 
   for await (const line of decodeLines(stream, context)) {
     if (line === '') {
       if (data.length > 0) {
-        yield {
+        const item: ServerSentEvent = {
           data: data.join('\n'),
           event: event || 'message',
           id: lastEventId,
           ...(retry === undefined ? {} : { retry })
         }
+
+        yield await validateStreamingItem<T>(item, context, {
+          itemIndex,
+          event: item.event,
+          eventId: item.id
+        }, 'SSE')
+        itemIndex += 1
       }
 
       data = []
@@ -106,6 +120,7 @@ async function* decodeNdjson<T>(
   context: StreamingParserContext
 ): AsyncGenerator<T> {
   let lineNumber = 0
+  let itemIndex = 0
 
   for await (const line of decodeLines(stream, context)) {
     lineNumber += 1
@@ -115,8 +130,18 @@ async function* decodeNdjson<T>(
     }
 
     try {
-      yield JSON.parse(line) as T
+      const item = JSON.parse(line) as unknown
+
+      yield await validateStreamingItem<T>(item, context, {
+        itemIndex,
+        lineNumber
+      }, 'NDJSON')
+      itemIndex += 1
     } catch (error) {
+      if (isRequestError(error)) {
+        throw error
+      }
+
       throw parserError(
         `Failed to parse NDJSON at line ${lineNumber}`,
         context,
@@ -124,6 +149,43 @@ async function* decodeNdjson<T>(
       )
     }
   }
+}
+
+async function validateStreamingItem<T>(
+  item: unknown,
+  context: StreamingParserContext,
+  location: StreamingSchemaLocation,
+  kind: 'SSE' | 'NDJSON'
+): Promise<T> {
+  const schema = context.config.itemSchema
+
+  if (!schema) {
+    return item as T
+  }
+
+  const response: NporaResponse<unknown> = {
+    data: item,
+    status: context.response.status,
+    statusText: context.response.statusText,
+    headers: context.response.headers,
+    config: context.config,
+    raw: context.response
+  }
+  const locationText = kind === 'NDJSON'
+    ? `item ${location.itemIndex + 1} at line ${location.lineNumber}`
+    : `item ${location.itemIndex + 1}`
+
+  return await validateStandardSchemaValue(
+    schema,
+    item,
+    response,
+    {
+      failed: `${kind} ${locationText} schema validator failed`,
+      invalid: `${kind} ${locationText} schema validator returned an invalid result`,
+      rejected: `${kind} ${locationText} schema validation failed`,
+      location
+    }
+  ) as T
 }
 
 async function* decodeLines(

@@ -24,7 +24,8 @@ Tune the workload:
 pnpm benchmark -- \
   --operations 10000 \
   --concurrency 100 \
-  --warmup 500
+  --warmup 500 \
+  --samples 4096
 ```
 
 Run the bounded full-feature stress matrix (10,000,000 logical operations by
@@ -40,8 +41,15 @@ Run a separate real localhost HTTP concurrency test:
 pnpm benchmark:http -- \
   --operations 100000 \
   --concurrency 256 \
+  --samples 4096 \
   --output benchmark-results/http.json
 ```
+
+The core and localhost HTTP runners retain at most `--samples` evenly spaced
+latencies (4,096 by default), while throughput still covers every operation.
+This keeps multi-million-request runs from allocating and sorting a latency
+array for every request. Reports include the actual `latencySamples` count so
+percentiles cannot be mistaken for full-population measurements.
 
 The stress runner distributes an exact total across core dispatch,
 serialization, interceptors, cache hits, deduplication and clear races, immediate and
@@ -53,8 +61,10 @@ mixed plugin pipeline. Latencies are bounded samples rather than a ten-million
 element allocation. With `--expose-gc`, retained heap is measured after each
 scenario while peak RSS records transient runtime pressure.
 
-On 2026-08-25, Node.js 24.18.0 on Darwin arm64 completed the final matrix with
-256 workers in 19.84 seconds with zero unexpected failures. It included 1,200,000
+On 2026-09-01, Node.js 24.18.0 on Darwin arm64 completed the final matrix with
+256 workers in 36.17 seconds with zero unexpected failures. It included 200,000
+OpenTelemetry CLIENT spans with W3C trace-context injection, 200,000 immediately
+admitted rate-limited transport attempts, 1,200,000
 adapter attempts for 600,000 retrying requests, 4,655 adapter attempts for 400,000
 deduplicated cache requests, 100,000 cache-clear races covering 200,000 callers,
 100,000 asynchronous circuit-failure classifications, 100,000 shared auth
@@ -67,26 +77,33 @@ Key 256-worker in-memory results from that run:
 
 | Scenario | Operations | Throughput | Sampled p99 | Failures |
 | --- | ---: | ---: | ---: | ---: |
-| Bare core dispatch | 1,600,000 | 9,370,964 ops/s | 0.087 ms | 0 |
-| Immediately admitted concurrency | 700,000 | 2,396,071 ops/s | 0.200 ms | 0 |
-| Single-permit FIFO contention | 600,000 | 778,637 ops/s | 0.666 ms | 0 |
-| Cache miss deduplication | 400,000 | 455,677 ops/s | 1.401 ms | 0 |
-| Queue cancellation | 200,000 | 225,874 ops/s | 3.961 ms | 0 |
+| Bare core dispatch | 1,200,000 | 7,629,042 ops/s | 0.097 ms | 0 |
+| Immediately admitted rate limit | 200,000 | 2,728,465 ops/s | 0.257 ms | 0 |
+| Immediately admitted concurrency | 700,000 | 2,197,085 ops/s | 0.191 ms | 0 |
+| OpenTelemetry span and propagation | 200,000 | 458,852 ops/s | 1.044 ms | 0 |
+| Single-permit FIFO contention | 600,000 | 748,764 ops/s | 0.682 ms | 0 |
+| Cache miss deduplication | 400,000 | 440,460 ops/s | 1.523 ms | 0 |
+| Queue cancellation | 200,000 | 224,567 ops/s | 3.911 ms | 0 |
 
-The full run's maximum sampled scenario RSS was 388.42 MiB and its largest
-post-GC retained heap delta was 0.88 MiB. These values include Node, Fetch/XHR
+The full run's maximum sampled scenario RSS was 405.86 MiB and its largest
+post-GC retained heap delta was 2.08 MiB. The latter came from the intentionally
+retained 200,000-entry rolling rate window. These values include Node, Fetch/XHR
 test doubles, payload objects, latency samples, and runtime allocator behavior.
 
 The separate localhost run sent 100,000 actual HTTP requests through the
 native Node Fetch transport with concurrency 256. The server received every
-request; throughput was 21,029 requests/s, sampled p50 was 10.627 ms, p95 was
-15.808 ms, and p99 was 17.624 ms. This loopback result includes sockets, HTTP
+request; throughput was 11,665 requests/s, sampled p50 was 19.511 ms, p95 was
+27.362 ms, and p99 was 29.462 ms. This loopback result includes sockets, HTTP
 parsing, body streaming, and JSON parsing, but still does not predict remote
 service latency or production proxy/TLS behavior.
 
 ## Scenarios
 
 - `directAdapter`: adapter-only control measurement.
+- `bareRequestApi`: direct `client.request(config)` dispatch with no client
+  defaults, guarding the plain-config/native-Request detection path.
+- `bareRequestResponseApi`: complete-response variant of the same direct API
+  path.
 - `sequentialClient`: complete client pipeline, one request at a time.
 - `bareSequentialClient`: method shortcut without client defaults or request
   options, measuring the minimum validated Client path.
@@ -109,6 +126,11 @@ service latency or production proxy/TLS behavior.
   pairs detached from the cache generation before their adapters settle.
 - `concurrencyImmediateClient`: sequential requests admitted immediately by
   the concurrency plugin without queueing.
+- `rateLimitImmediate`: transport attempts admitted immediately by the
+  rolling-window rate limiter.
+- `openTelemetryImmediate`: CLIENT span creation, stable HTTP attributes,
+  sanitized URL processing, W3C-compatible header injection, response status,
+  and deterministic span cleanup against an in-memory adapter.
 - `concurrencyContendedClient`: concurrent requests serialized through one
   concurrency permit and its FIFO wait queue.
 - `circuitBreakerSuccessClient`: successful requests tracked by a closed
@@ -210,8 +232,21 @@ them. Header normalization writes directly into one case-insensitive result
 instead of building intermediate entry arrays and objects. Request-specific
 headers remain isolated from reusable client defaults. Nested merge helpers
 reuse their caller's presence checks, and single-sided headers skip the absent
-input entirely. Body-mode detection checks only the four own configuration
-fields, avoiding duplicate value and ownership probes on body-free requests.
+input entirely. Sanitized client defaults keep an internal own-field snapshot,
+so hot request merges do not repeat ownership probes or read mutable prototype
+state. The same snapshot records whether defaults contain a body mode, letting
+body-free plugin requests skip four request-field ownership checks. In the
+current 256-worker microbenchmarks, configured JSON serialization recovered
+from about 548,000 to 844,000 ops/s, while cache hits rose from about 366,000
+to 383,000 ops/s without weakening inherited-field isolation.
+
+Plain request configs are rejected from native `Request` detection by prototype
+before the branded native getter is attempted, avoiding an expected exception
+on every direct API call. On Node.js 24.18.0, a focused 300,000-operation
+sequential microbenchmark improved median `client.request(config)` throughput
+from about 196,000 to 3,048,000 ops/s and `requestResponse(config)` from about
+199,000 to 3,276,000 ops/s. Method-shortcut throughput remained within normal
+run-to-run variation.
 
 Method shortcuts without client defaults or request options reuse an internal
 empty configuration marker and construct only the final URL and method pair.

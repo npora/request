@@ -71,8 +71,9 @@ pnpm test:browser
 ```
 
 Playwright validates Chromium, Firefox, and WebKit, including native Fetch
-inputs, SSE and NDJSON streaming, Web Workers, plugin lifecycle,
-HEAD/OPTIONS/QUERY, and concurrent XHR upload/download progress.
+inputs, SSE and NDJSON streaming, W3C trace-context header injection, Web
+Workers, plugin lifecycle, HEAD/OPTIONS/QUERY, and concurrent XHR
+upload/download progress.
 
 ## Performance checks
 
@@ -87,9 +88,11 @@ Package size budgets are release-blocking.
 ## Release process
 
 Every user-visible change includes a Changesets entry. CI verifies Node.js 22,
-24, and 26 plus the quality and browser suites. Merging the generated version
-PR publishes to npm with trusted publishing, creates a Git tag, and creates a
-GitHub Release.
+24, and 26 plus the public type, quality, and browser suites. The release
+workflow runs only after the exact `main` commit completes that matrix
+successfully. Merging the generated version PR then publishes to npm with
+trusted publishing, creates a Git tag and GitHub Release, and immediately
+installs the exact published version for ESM and CommonJS smoke tests.
 
 The release workflow uses Changesets CLI v3 with an immutable-pinned
 Changesets Action v2. Run `pnpm test:release-workflow` after changing release

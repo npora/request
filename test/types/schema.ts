@@ -60,12 +60,28 @@ const inferredResponse: Promise<NporaResponse<User>> = request.getResponse(
   }
 )
 const explicitLegacyType: Promise<User> = request.get<User>('/legacy')
+const inferredNdjsonItems: Promise<AsyncIterable<User>> = request.ndjson(
+  '/users.ndjson',
+  { itemSchema: userSchema }
+)
+const inferredSseItems: Promise<AsyncIterable<User>> = request.sse(
+  '/users.events',
+  { itemSchema: userSchema }
+)
+const inferredNdjsonResponse: Promise<
+  NporaResponse<AsyncIterable<User>>
+> = request.ndjsonResponse('/users.ndjson', {
+  itemSchema: userSchema
+})
 
 // @ts-expect-error Response schemas are endpoint-specific, not client defaults.
 createClient({ schema: userSchema })
 
 // @ts-expect-error Response schemas are endpoint-specific, not child defaults.
 request.extend({ schema: userSchema })
+
+// @ts-expect-error Streaming item schemas are endpoint-specific defaults.
+createClient({ itemSchema: userSchema })
 
 void inferredUser
 void inferredPost
@@ -76,3 +92,6 @@ void inferredNativeRequest
 void nativeResponse
 void inferredResponse
 void explicitLegacyType
+void inferredNdjsonItems
+void inferredSseItems
+void inferredNdjsonResponse

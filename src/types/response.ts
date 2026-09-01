@@ -25,6 +25,21 @@ export interface ServerSentEvent {
   retry?: number
 }
 
+/** Location of an item that failed validation in a streaming response. */
+export interface StreamingSchemaLocation {
+  /** Zero-based index among emitted SSE events or non-empty NDJSON records. */
+  itemIndex: number
+
+  /** One-based physical NDJSON line number, including blank lines. */
+  lineNumber?: number
+
+  /** SSE event type. */
+  event?: string
+
+  /** SSE event identifier. */
+  eventId?: string
+}
+
 /**
  * Npora response.
  */

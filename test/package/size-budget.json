@@ -1,28 +1,28 @@
 {
   "files": {
     "dist/index.js": {
-      "bytes": 127700,
-      "gzipBytes": 42200,
+      "bytes": 140450,
+      "gzipBytes": 46700,
       "transitive": true
     },
     "dist/index.cjs": {
-      "bytes": 131650,
-      "gzipBytes": 43200,
+      "bytes": 144650,
+      "gzipBytes": 47750,
       "transitive": true
     },
     "dist/index.d.ts": {
-      "bytes": 55700,
-      "gzipBytes": 17100,
+      "bytes": 63000,
+      "gzipBytes": 19300,
       "transitive": true
     },
     "dist/index.d.cts": {
-      "bytes": 55700,
-      "gzipBytes": 17100,
+      "bytes": 63000,
+      "gzipBytes": 19300,
       "transitive": true
     },
     "dist/core.js": {
-      "bytes": 48250,
-      "gzipBytes": 16100,
+      "bytes": 52050,
+      "gzipBytes": 17150,
       "transitive": true
     },
     "dist/plugins/retry.js": {
@@ -31,18 +31,28 @@
       "transitive": true
     },
     "dist/plugins/cache.js": {
-      "bytes": 46150,
-      "gzipBytes": 13530,
+      "bytes": 46350,
+      "gzipBytes": 13600,
+      "transitive": true
+    },
+    "dist/plugins/rate-limit.js": {
+      "bytes": 6500,
+      "gzipBytes": 2800,
+      "transitive": true
+    },
+    "dist/plugins/opentelemetry.js": {
+      "bytes": 4550,
+      "gzipBytes": 2100,
       "transitive": true
     },
     "dist/testing.js": {
-      "bytes": 15700,
-      "gzipBytes": 6080,
+      "bytes": 17850,
+      "gzipBytes": 6850,
       "transitive": true
     }
   },
   "package": {
-    "bytes": 111400,
-    "unpackedBytes": 420000
+    "bytes": 122800,
+    "unpackedBytes": 466000
   }
 }

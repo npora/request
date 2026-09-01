@@ -93,6 +93,9 @@ jobs:
       - name: Typecheck
         run: pnpm typecheck
 
+      - name: Typecheck public API consumers
+        run: pnpm test:types
+
       - name: Typecheck examples
         run: pnpm test:examples
 

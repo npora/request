@@ -1,12 +1,14 @@
 name: Release
 
 on:
-  push:
-    branches:
-      - main
+  workflow_run:
+    workflows:
+      - CI
+    types:
+      - completed
 
 concurrency:
-  group: release-${{ github.ref }}
+  group: release-${{ github.event.workflow_run.head_branch }}
   cancel-in-progress: false
 
 permissions:
@@ -17,6 +19,10 @@ permissions:
 jobs:
   release:
     name: Release
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_branch == 'main' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
     runs-on: ubuntu-latest
 
     steps:
@@ -24,6 +30,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+          ref: ${{ github.event.workflow_run.head_sha }}
 
       - name: Setup pnpm
         uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
@@ -56,6 +63,9 @@ jobs:
       - name: Verify
         run: |
           pnpm typecheck
+          pnpm test:types
+          pnpm test:examples
+          pnpm benchmark:types
           pnpm test:docs
           pnpm test:release-workflow
           pnpm test:coverage
@@ -70,3 +80,9 @@ jobs:
           version-script: pnpm version-packages
           publish-script: pnpm release
           create-github-releases: true
+
+      - name: Verify the newly published package
+        if: steps.changesets.outputs.published == 'true'
+        run: node test/package/registry-install.mjs
+        env:
+          EXPECTED_PACKAGE_VERSION: ${{ fromJSON(steps.changesets.outputs['published-packages'])[0].version }}

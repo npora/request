@@ -11,6 +11,8 @@ export default defineConfig({
     'plugins/concurrency': 'src/plugins/concurrencyPlugin.ts',
     'plugins/download': 'src/plugins/downloadPlugin.ts',
     'plugins/logger': 'src/plugins/loggerPlugin.ts',
+    'plugins/opentelemetry': 'src/plugins/openTelemetryPlugin.ts',
+    'plugins/rate-limit': 'src/plugins/rateLimitPlugin.ts',
     'plugins/retry': 'src/plugins/retryPlugin.ts',
     'plugins/upload': 'src/plugins/uploadPlugin.ts',
     testing: 'src/adapters/MockAdapter.ts'

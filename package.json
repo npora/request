@@ -14,6 +14,8 @@
     "sse",
     "ndjson",
     "standard-schema",
+    "opentelemetry",
+    "trace-context",
     "circuit-breaker",
     "web-worker"
   ],
@@ -76,6 +78,16 @@
       "types": "./dist/plugins/logger.d.ts",
       "import": "./dist/plugins/logger.js",
       "require": "./dist/plugins/logger.cjs"
+    },
+    "./plugins/opentelemetry": {
+      "types": "./dist/plugins/opentelemetry.d.ts",
+      "import": "./dist/plugins/opentelemetry.js",
+      "require": "./dist/plugins/opentelemetry.cjs"
+    },
+    "./plugins/rate-limit": {
+      "types": "./dist/plugins/rate-limit.d.ts",
+      "import": "./dist/plugins/rate-limit.js",
+      "require": "./dist/plugins/rate-limit.cjs"
     },
     "./plugins/retry": {
       "types": "./dist/plugins/retry.d.ts",

@@ -192,6 +192,40 @@ export interface ConcurrencyOptions {
   queueTimeout?: number
 }
 
+export interface RateLimitOptions {
+  /** Enable request-rate limiting. @default true */
+  enabled?: boolean
+
+  /** Override the isolation key for this request. */
+  key?: string
+
+  /** Maximum time this transport attempt may wait for a permit. */
+  queueTimeout?: number
+}
+
+export type OpenTelemetryAttributeValue =
+  | string
+  | number
+  | boolean
+  | readonly string[]
+  | readonly number[]
+  | readonly boolean[]
+
+/** Per-request overrides for `openTelemetryPlugin()`. */
+export interface OpenTelemetryOptions {
+  /** Enable tracing for this request. @default true */
+  enabled?: boolean
+
+  /** Inject the active span context into request headers. @default true */
+  propagate?: boolean
+
+  /** Override the low-cardinality span name. */
+  spanName?: string
+
+  /** Additional span attributes. Values must not contain secrets. */
+  attributes?: Readonly<Record<string, OpenTelemetryAttributeValue>>
+}
+
 export interface AuthOptions {
   token?: string | (() => string | Promise<string>)
 

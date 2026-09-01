@@ -23,16 +23,30 @@ import {
   isRequest,
   rememberRequestBody
 } from '../utils/isRequest'
+import { hasOwnProperty } from '../utils/hasOwnProperty'
+import { trustDefaults } from '../core/trustedDefaults'
 
 type MethodConfig = Omit<RequestConfig, 'url' | 'method'>
 
-const EMPTY_METHOD_CONFIG: MethodConfig = {}
+const EMPTY_METHOD_CONFIG = trustDefaults({}) as MethodConfig
 
 type SchemaMethodConfig<Schema extends StandardSchemaV1> = Omit<
   MethodConfig,
   'schema'
 > & {
   schema: Schema
+}
+
+type StreamingMethodConfig = Omit<
+  RequestConfig,
+  'url' | 'method' | 'responseType' | 'schema'
+>
+
+type ItemSchemaMethodConfig<Schema extends StandardSchemaV1> = Omit<
+  StreamingMethodConfig,
+  'itemSchema'
+> & {
+  itemSchema: Schema
 }
 
 export class Client {
@@ -56,11 +70,19 @@ export class Client {
   private readonly pipeline: Pipeline
 
   constructor(options: ClientOptions = {}) {
-    const { adapter = new FetchAdapter(), ...defaults } = options
+    const adapter = hasOwnProperty.call(options, 'adapter') &&
+      options.adapter !== undefined
+      ? options.adapter
+      : new FetchAdapter()
+    const defaults = { ...options }
+
+    delete defaults.adapter
 
     this.defaults = Reflect.ownKeys(defaults).length === 0
       ? EMPTY_METHOD_CONFIG
-      : defaults
+      : trustDefaults(
+          ConfigMerger.mergeDefaults(EMPTY_METHOD_CONFIG, defaults)
+        )
     this.adapter = adapter
     this.pipeline = this.createPipeline(adapter)
   }
@@ -69,10 +91,13 @@ export class Client {
    * Create an isolated client that inherits this client's defaults.
    */
   extend(options: ClientOptions = {}): Client {
-    const {
-      adapter = this.adapter,
-      ...overrides
-    } = options
+    const adapter = hasOwnProperty.call(options, 'adapter') &&
+      options.adapter !== undefined
+      ? options.adapter
+      : this.adapter
+    const overrides = { ...options }
+
+    delete overrides.adapter
     const defaults = ConfigMerger.mergeDefaults(
       this.defaults,
       overrides
@@ -177,17 +202,20 @@ export class Client {
     config?: RequestInputConfig
   ): Promise<T>
 
-  async request<T = unknown>(
+  request<T = unknown>(
     input: RequestConfig | Request,
     config: RequestInputConfig = EMPTY_METHOD_CONFIG
   ): Promise<T> {
-    const mergedConfig = this.mergeRequestInput(input, config)
-    const response = await this.pipeline.execute<T>(
-      mergedConfig,
-      false
-    )
+    try {
+      const mergedConfig = this.mergeRequestInput(input, config)
 
-    return response.data
+      return this.pipeline.execute<T>(
+        mergedConfig,
+        false
+      ).then(readResponseData)
+    } catch (error) {
+      return Promise.reject(error)
+    }
   }
 
   requestResponse<Schema extends StandardSchemaV1>(
@@ -475,12 +503,19 @@ export class Client {
   /**
    * Consume a server-sent event response as a lazy async iterable.
    */
+  sse<Schema extends StandardSchemaV1>(
+    url: RequestURL,
+    config: ItemSchemaMethodConfig<Schema>
+  ): Promise<AsyncIterable<StandardSchemaV1.InferOutput<Schema>>>
+
   sse(
     url: RequestURL,
-    config: Omit<
-      RequestConfig,
-      'url' | 'method' | 'responseType' | 'schema'
-    > = {}
+    config?: StreamingMethodConfig
+  ): Promise<AsyncIterable<ServerSentEvent>>
+
+  sse(
+    url: RequestURL,
+    config: StreamingMethodConfig = {}
   ): Promise<AsyncIterable<ServerSentEvent>> {
     return this.get<AsyncIterable<ServerSentEvent>>(url, {
       ...config,
@@ -491,12 +526,21 @@ export class Client {
   /**
    * Consume a server-sent event response with complete response metadata.
    */
+  sseResponse<Schema extends StandardSchemaV1>(
+    url: RequestURL,
+    config: ItemSchemaMethodConfig<Schema>
+  ): Promise<NporaResponse<AsyncIterable<
+    StandardSchemaV1.InferOutput<Schema>
+  >>>
+
   sseResponse(
     url: RequestURL,
-    config: Omit<
-      RequestConfig,
-      'url' | 'method' | 'responseType' | 'schema'
-    > = {}
+    config?: StreamingMethodConfig
+  ): Promise<NporaResponse<AsyncIterable<ServerSentEvent>>>
+
+  sseResponse(
+    url: RequestURL,
+    config: StreamingMethodConfig = {}
   ): Promise<NporaResponse<AsyncIterable<ServerSentEvent>>> {
     return this.getResponse<AsyncIterable<ServerSentEvent>>(url, {
       ...config,
@@ -507,12 +551,19 @@ export class Client {
   /**
    * Consume newline-delimited JSON records as a lazy async iterable.
    */
+  ndjson<Schema extends StandardSchemaV1>(
+    url: RequestURL,
+    config: ItemSchemaMethodConfig<Schema>
+  ): Promise<AsyncIterable<StandardSchemaV1.InferOutput<Schema>>>
+
   ndjson<T = unknown>(
     url: RequestURL,
-    config: Omit<
-      RequestConfig,
-      'url' | 'method' | 'responseType' | 'schema'
-    > = {}
+    config?: StreamingMethodConfig
+  ): Promise<AsyncIterable<T>>
+
+  ndjson<T = unknown>(
+    url: RequestURL,
+    config: StreamingMethodConfig = {}
   ): Promise<AsyncIterable<T>> {
     return this.get<AsyncIterable<T>>(url, {
       ...config,
@@ -523,12 +574,21 @@ export class Client {
   /**
    * Consume newline-delimited JSON with complete response metadata.
    */
+  ndjsonResponse<Schema extends StandardSchemaV1>(
+    url: RequestURL,
+    config: ItemSchemaMethodConfig<Schema>
+  ): Promise<NporaResponse<AsyncIterable<
+    StandardSchemaV1.InferOutput<Schema>
+  >>>
+
   ndjsonResponse<T = unknown>(
     url: RequestURL,
-    config: Omit<
-      RequestConfig,
-      'url' | 'method' | 'responseType' | 'schema'
-    > = {}
+    config?: StreamingMethodConfig
+  ): Promise<NporaResponse<AsyncIterable<T>>>
+
+  ndjsonResponse<T = unknown>(
+    url: RequestURL,
+    config: StreamingMethodConfig = {}
   ): Promise<NporaResponse<AsyncIterable<T>>> {
     return this.getResponse<AsyncIterable<T>>(url, {
       ...config,

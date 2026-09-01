@@ -55,6 +55,10 @@ try {
     'dist/core.cjs',
     'dist/plugins/retry.js',
     'dist/plugins/retry.cjs',
+    'dist/plugins/rate-limit.js',
+    'dist/plugins/rate-limit.cjs',
+    'dist/plugins/opentelemetry.js',
+    'dist/plugins/opentelemetry.cjs',
     'dist/testing.js',
     'dist/testing.cjs'
   ]

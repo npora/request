@@ -19,6 +19,7 @@ export type RequestErrorCode =
   | 'RESPONSE_TOO_LARGE'
   | 'CIRCUIT_OPEN'
   | 'CONCURRENCY_LIMIT'
+  | 'RATE_LIMIT'
 
 export interface RequestErrorOptions<T = unknown> {
   /**
@@ -77,7 +78,9 @@ export class RequestError<T = unknown> extends Error {
     this.name = 'RequestError'
     this.code = options.code
     this.status = options.status ?? options.response?.status
-    this.data = options.data ?? options.response?.data
+    this.data = options.data === null
+      ? options.data
+      : options.data ?? options.response?.data
     this.response = options.response
     this.config = options.config ?? options.response?.config
     this.cause = options.cause

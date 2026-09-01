@@ -4,6 +4,8 @@
 
 For option types, defaults, merge behavior, runtime support, and plugin-owned
 request fields, see the [configuration reference](configuration.md).
+For Node.js proxy, pooling, mTLS, and DNS setup, see the
+[Undici integration guide](undici.md).
 
 ## Core guarantees
 
@@ -34,11 +36,13 @@ Applications may use subpaths to load a smaller runtime surface:
 ```ts
 import { createClient } from '@npora/request/core'
 import { cachePlugin } from '@npora/request/plugins/cache'
+import { openTelemetryPlugin } from '@npora/request/plugins/opentelemetry'
 import { retryPlugin } from '@npora/request/plugins/retry'
 ```
 
 Official plugin entrypoints are `auth`, `cache`, `circuit-breaker`,
-`concurrency`, `download`, `logger`, `retry`, and `upload` under
+`concurrency`, `download`, `logger`, `opentelemetry`, `rate-limit`, `retry`,
+and `upload` under
 `@npora/request/plugins/`. The aggregate plugin entrypoint remains available
 at `@npora/request/plugins`. Import `MockAdapter` from
 `@npora/request/testing` or its alias `@npora/request/adapters/mock`.
@@ -175,9 +179,9 @@ response body. Use `headResponse()` to inspect status and headers.
 `query()` implements the safe, idempotent, content-bearing HTTP QUERY method
 defined by RFC 10008. Include a media type by using `json`, `form`, `formData`,
 or an explicit `content-type` header with `body`. QUERY is retryable by default
-when the body is replayable. The built-in cache excludes QUERY because its
-current cache keys intentionally do not inspect request content; do not add it
-to `cachePlugin({ methods })`.
+when the body is replayable. The built-in cache excludes QUERY by default. If
+it is enabled through `cachePlugin({ methods })`, a body-bearing request still
+requires an explicit body-aware cache key.
 
 ---
 
@@ -370,6 +374,7 @@ the result remains `HTTP_ERROR` with undefined data. Explicit timeout,
     | 'sse'
     | 'ndjson'
   schema?: StandardSchemaV1
+  itemSchema?: StandardSchemaV1
   validateStatus?: (status: number) => boolean
   throwHttpErrors?: boolean
 }
@@ -451,10 +456,10 @@ parsed data, and response metadata. If the validator throws, its error is
 preserved as `cause`. Schemas run only for successful HTTP responses; HTTP
 error bodies continue to use `HTTP_ERROR` without invoking the success schema.
 
-The schema validates the parsed response value once. It does not validate each
-record inside SSE or NDJSON async iterables. Schema validators are
-application-provided code and should be reviewed like interceptors and
-plugins.
+The response `schema` validates the parsed response value once. For SSE and
+NDJSON, `itemSchema` instead validates and may transform each item lazily,
+immediately before it is yielded. Schema validators are application-provided
+code and should be reviewed like interceptors and plugins.
 
 Data-only methods parse successful Fetch responses directly when no response
 hooks or interceptors are installed. Complete successful response methods and
@@ -485,6 +490,28 @@ for await (const user of records) {
   console.log(user)
 }
 ```
+
+Infer and validate each NDJSON record with a Standard Schema validator:
+
+```ts
+import { z } from 'zod'
+
+const userSchema = z.object({
+  id: z.number(),
+  name: z.string()
+})
+
+const records = await request.ndjson('/users.ndjson', {
+  itemSchema: userSchema
+})
+```
+
+Synchronous and asynchronous item schemas are supported. Transformations are
+yielded to the consumer. A failure rejects the next iterator operation with a
+`SchemaValidationError`; `itemIndex` is zero-based. NDJSON errors additionally
+expose the one-based physical `lineNumber`, while SSE errors expose `event`
+and `eventId`. The failing item is available as `error.data`, and iteration
+failure cancels the underlying reader.
 
 SSE parsing follows the event-stream field rules: repeated `data` fields are
 joined with newlines, event identifiers and valid retry delays persist, comment
@@ -663,6 +690,8 @@ retryPlugin()
 cachePlugin()
 circuitBreakerPlugin()
 concurrencyPlugin()
+rateLimitPlugin()
+openTelemetryPlugin()
 authPlugin()
 loggerPlugin()
 uploadPlugin()
@@ -1076,6 +1105,118 @@ The plugin retains at most `maxKeys` inactive key records using LRU eviction.
 Records with active or queued requests are never evicted, so a burst of unique
 concurrent keys may temporarily exceed the configured bound; records are
 trimmed as requests settle.
+
+## Request Rate Limiting
+
+```ts
+const limiter = rateLimitPlugin({
+  maxRequests: 100,
+  interval: 1000,
+  maxQueue: 500,
+  queueTimeout: 5000,
+  maxKeys: 1000
+})
+
+const request = createClient().use(limiter)
+```
+
+The plugin enforces a strict rolling-window limit for each isolation key.
+Unlike `concurrencyPlugin`, it limits transport attempts over time rather than
+simultaneously active logical requests. Retry attempts consume permits, while
+cache hits that skip transport do not. Waiting attempts remain FIFO and
+abortable. Queue overflow or timeout rejects before transport with
+`RequestError.code === 'RATE_LIMIT'`.
+
+Keys use the resolved request origin by default. Relative URLs without an
+absolute `baseURL` share `default`. Per-request overrides are available under
+`extensions.rateLimit`:
+
+```ts
+await request.get('/inventory', {
+  extensions: {
+    rateLimit: {
+      key: 'inventory-primary',
+      queueTimeout: 1000
+    }
+  }
+})
+```
+
+`limiter.getState(key)` returns the remaining permits, queued count, and next
+rolling reset timestamp. At most `maxKeys` inactive states are retained;
+recently admitted or queued keys can temporarily exceed the bound until their
+window expires.
+
+## OpenTelemetry and Trace Context
+
+`openTelemetryPlugin()` accepts structural OpenTelemetry APIs instead of
+importing `@opentelemetry/api`, keeping the request package dependency-free and
+allowing the application to own SDK initialization and exporters:
+
+```ts
+import { context, propagation, trace } from '@opentelemetry/api'
+import {
+  createClient,
+  openTelemetryPlugin
+} from '@npora/request'
+
+const request = createClient().use(openTelemetryPlugin({
+  tracer: trace.getTracer('@npora/request'),
+  context,
+  trace,
+  propagation,
+  attributes: {
+    'service.namespace': 'checkout'
+  }
+}))
+```
+
+The plugin creates one `SpanKind.CLIENT` span for each outbound attempt. Retry
+spans include `http.request.resend_count`; cache hits and requests rejected by
+earlier cache, circuit, or concurrency admission hooks do not create HTTP
+spans. The first span starts after those request hooks so trace headers enter
+the validated Fetch fast path; consequently it includes any rate-limit wait.
+Retry spans start after rate-limit admission. It injects the new span context
+through the application's configured propagator, so W3C
+`traceparent`, `tracestate`, and baggage behavior remains controlled by the
+OpenTelemetry SDK. Do not enable this plugin together with another Fetch or
+Undici auto-instrumentation unless duplicate client spans are intentional.
+
+Stable HTTP semantic-convention attributes include `http.request.method`,
+`http.response.status_code`, `server.address`, `server.port`, `url.scheme`,
+`url.full`, `error.type`, and `http.request.resend_count`. Span names default
+to the low-cardinality HTTP method. The default `url.full` removes credentials,
+query, and fragment; use `sanitizeUrl` to enforce an application policy or
+return `undefined` to omit it.
+
+HTTP and transport failures mark the span as error. Intentional cancellation
+keeps status unset and records only `npora.request.cancelled`. Exception events
+are disabled by default because messages and stack traces may contain secrets;
+set `recordException: true` only after reviewing that exposure.
+
+Per-request control belongs under `extensions.openTelemetry`:
+
+```ts
+await request.get('/health', {
+  extensions: {
+    openTelemetry: {
+      spanName: 'GET health',
+      propagate: false,
+      attributes: {
+        'app.operation': 'health-check'
+      }
+    }
+  }
+})
+```
+
+Use plugin-level `shouldTrace(config)` to exclude untrusted destinations.
+Telemetry SDK, propagator, exporter, attribute, and cleanup failures are
+isolated from the request lifecycle. Removing the plugin ends active spans.
+
+Official references: [OpenTelemetry JavaScript propagation](https://opentelemetry.io/docs/languages/js/propagation/),
+[Tracer API](https://open-telemetry.github.io/opentelemetry-js/interfaces/_opentelemetry_sdk-node._opentelemetry_api.Tracer.html),
+and [HTTP span semantic conventions](https://opentelemetry.io/docs/specs/semconv/http/http-spans/).
 
 ## Cache
 
@@ -1597,6 +1738,12 @@ cachePlugin({
   methods: ['GET', 'HEAD', 'POST']
 })
 ```
+
+Requests with a body bypass automatic cache keys and in-flight sharing even
+when their method is enabled. Set an explicit `extensions.cache.key` only when
+the application has incorporated the serialized body and its representation
+headers into that key. This prevents distinct `POST` or `QUERY` payloads sent
+to the same URL from sharing a cached response.
 
 Passing a custom `extensions.cache.key` bypasses automatic key generation, so the
 application is responsible for including any user or authorization scope.

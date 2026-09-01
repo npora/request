@@ -134,18 +134,21 @@ function headersEqual(
   right: HeadersInit | undefined
 ): boolean {
   const expected = new Headers(right)
-
-  if ([...left].length !== [...expected].length) {
-    return false
-  }
+  let count = 0
 
   for (const [key, value] of left) {
     if (expected.get(key) !== value) {
       return false
     }
+
+    count += 1
   }
 
-  return true
+  for (const _ of expected) {
+    count -= 1
+  }
+
+  return count === 0
 }
 
 function resolveNativeRequestInput(
@@ -188,7 +191,12 @@ function buildURL(config: RequestConfig): string {
   const hashIndex = url.indexOf('#')
   const target = hashIndex === -1 ? url : url.slice(0, hashIndex)
   const hash = hashIndex === -1 ? '' : url.slice(hashIndex)
-  const separator = target.includes('?') ? '&' : '?'
+  const lastCharacter = target.charCodeAt(target.length - 1)
+  const separator = !target.includes('?')
+    ? '?'
+    : lastCharacter === 63 || lastCharacter === 38
+    ? ''
+    : '&'
 
   return `${target}${separator}${query}${hash}`
 }

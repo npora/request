@@ -2015,6 +2015,7 @@ function isCacheableRequest(
 ): boolean {
   return (
     methods.has(config.method ?? 'GET') &&
+    (!hasRequestBody(config) || Boolean(cache.key)) &&
     (!config.parseJson || Boolean(cache.key)) &&
     (!config.querySerializer || Boolean(cache.key)) &&
     config.responseType !== 'stream' &&
@@ -2025,6 +2026,13 @@ function isCacheableRequest(
     config.fetchOptions?.mode !== 'no-cors' &&
     config.fetchOptions?.redirect !== 'manual'
   )
+}
+
+function hasRequestBody(config: RequestConfig): boolean {
+  return config.body != null ||
+    config.json !== undefined ||
+    config.form != null ||
+    config.formData != null
 }
 
 function isAsyncIterable(value: unknown): value is AsyncIterable<unknown> {

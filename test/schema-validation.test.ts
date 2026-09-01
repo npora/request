@@ -346,6 +346,28 @@ describe('response schema validation', () => {
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
+  it('should reject invalid or non-streaming item schema configuration', async () => {
+    const fetchMock = vi.fn()
+    const validSchema = createUserSchema()
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(createClient().ndjson('/invalid-item-schema', {
+      itemSchema: {} as StandardSchemaV1
+    })).rejects.toMatchObject({
+      code: 'CONFIG_ERROR',
+      message: 'Request itemSchema must implement Standard Schema v1'
+    })
+    await expect(createClient().get('/invalid-item-response', {
+      responseType: 'json',
+      itemSchema: validSchema
+    })).rejects.toMatchObject({
+      code: 'CONFIG_ERROR',
+      message: 'Request itemSchema requires an SSE or NDJSON response'
+    })
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
   it('should preserve HTTP errors without running the success schema', async () => {
     vi.stubGlobal(
       'fetch',

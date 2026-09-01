@@ -206,6 +206,119 @@ describe('security boundaries', () => {
     expect(requests).toHaveLength(0)
   })
 
+  it('should not promote inherited nested request fields during merge', async () => {
+    const requests: RequestConfig[] = []
+    const request = createClient({
+      adapter: createAdapter(requests)
+    })
+    const config = Object.assign(
+      Object.create({
+        headers: {
+          authorization: 'Bearer inherited-secret'
+        },
+        extensions: {
+          retry: 10
+        }
+      }),
+      {
+        timeout: 1000
+      }
+    ) as RequestConfig
+
+    await request.get('/safe', config)
+
+    expect(requests).toHaveLength(1)
+    expect(requests[0]?.headers).toBeUndefined()
+    expect(requests[0]?.extensions).toBeUndefined()
+  })
+
+  it('should not merge inherited default plugin options into overrides', async () => {
+    const requests: RequestConfig[] = []
+    const extensions = Object.assign(
+      Object.create({
+        retry: {
+          retries: 9,
+          delay: 60000
+        }
+      }),
+      {
+        logger: false
+      }
+    ) as RequestExtensions
+    const request = createClient({
+      adapter: createAdapter(requests),
+      extensions
+    })
+
+    await request.get('/safe', {
+      extensions: {
+        retry: { retries: 1 }
+      }
+    })
+
+    expect(requests[0]?.extensions?.retry).toEqual({
+      retries: 1
+    })
+  })
+
+  it('should isolate normalized defaults from later prototype changes', async () => {
+    const requests: RequestConfig[] = []
+    const request = createClient({
+      adapter: createAdapter(requests),
+      timeout: 1000
+    })
+
+    Object.defineProperty(Object.prototype, 'headers', {
+      value: {
+        authorization: 'Bearer late-inherited-secret'
+      },
+      configurable: true
+    })
+
+    try {
+      await request.get('/safe', {
+        headers: { 'x-safe': 'true' }
+      })
+
+      const headers = new Headers(requests[0]?.headers)
+
+      expect(headers.get('x-safe')).toBe('true')
+      expect(headers.has('authorization')).toBe(false)
+    } finally {
+      delete (Object.prototype as Record<string, unknown>).headers
+    }
+  })
+
+  it('should ignore inherited client adapters', async () => {
+    const inheritedRequests: RequestConfig[] = []
+    const fetchMock = vi.fn().mockImplementation(() => Promise.resolve(
+      new Response('{"ok":true}', {
+        headers: { 'content-type': 'application/json' }
+      })
+    ))
+    const options = Object.assign(
+      Object.create({
+        adapter: createAdapter(inheritedRequests)
+      }),
+      {
+        timeout: 1000
+      }
+    )
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const parent = createClient(options)
+    const child = parent.extend(Object.create({
+      adapter: createAdapter(inheritedRequests)
+    }))
+
+    await parent.get('/parent')
+    await child.get('/child')
+
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    expect(inheritedRequests).toHaveLength(0)
+  })
+
   it('should redact URL credentials and repeated secret query values', async () => {
     const logSpy = vi
       .spyOn(console, 'log')

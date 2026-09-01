@@ -219,7 +219,9 @@ for await (const event of events) {
   console.log(event.event, event.data, event.id)
 }
 
-const records = await api.ndjson<User>('/users/export')
+const records = await api.ndjson('/users/export', {
+  itemSchema: userSchema
+})
 
 for await (const user of records) {
   console.log(user.name)
@@ -228,8 +230,9 @@ for await (const user of records) {
 
 Iteration is lazy and does not buffer the complete response. Breaking out of
 the loop cancels the response reader. `maxResponseSize` remains enforced while
-the stream is consumed. A response schema validates the parsed response value
-once; it does not validate individual SSE events or NDJSON records.
+the stream is consumed. `itemSchema` validates and may transform each item
+immediately before it is yielded, without buffering the rest of the stream.
+Failures expose the item index and NDJSON line or SSE event metadata.
 
 Native `FormData`, `Blob`, `ArrayBuffer`, and `ReadableStream` request bodies
 also work when created by another same-origin window or iframe. Detection does
@@ -349,6 +352,7 @@ import {
   circuitBreakerPlugin,
   concurrencyPlugin,
   createClient,
+  rateLimitPlugin,
   retryPlugin
 } from '@npora/request'
 
@@ -362,6 +366,7 @@ const request = createClient()
   }))
   .use(circuitBreakerPlugin())
   .use(concurrencyPlugin({ maxConcurrent: 20 }))
+  .use(rateLimitPlugin({ maxRequests: 100, interval: 1000 }))
   .use(cache)
   .use(authPlugin({
     token: () => accessToken,
@@ -599,6 +604,8 @@ Built-in plugins:
 - `cachePlugin()`
 - `circuitBreakerPlugin()`
 - `concurrencyPlugin()`
+- `rateLimitPlugin()`
+- `openTelemetryPlugin()`
 - `authPlugin()`
 - `loggerPlugin()`
 - `uploadPlugin()`
@@ -641,6 +648,41 @@ const request = createClient().use(concurrency)
 Limits are isolated by resolved request origin. Queued requests are admitted
 in FIFO order and remain abortable through their request signal. Full queues
 and expired queue waits reject with the stable `CONCURRENCY_LIMIT` error code.
+
+Limit actual transport attempts over a rolling time window independently from
+the number of active logical requests:
+
+```ts
+const limiter = rateLimitPlugin({
+  maxRequests: 100,
+  interval: 1000,
+  maxQueue: 500,
+  queueTimeout: 5000
+})
+
+const request = createClient().use(limiter)
+```
+
+Retry attempts consume permits, while cache hits do not. Full queues and
+expired waits reject with the stable `RATE_LIMIT` error code.
+
+Trace actual transport attempts without adding an OpenTelemetry runtime
+dependency to this package:
+
+```ts
+import { context, propagation, trace } from '@opentelemetry/api'
+
+const request = createClient().use(openTelemetryPlugin({
+  tracer: trace.getTracer('@npora/request'),
+  context,
+  trace,
+  propagation
+}))
+```
+
+Each retry receives its own CLIENT span and propagated trace context. Cache
+hits do not create transport spans. URLs omit credentials, query strings, and
+fragments by default, and exception events are opt-in.
 
 Inject a structured logger when request correlation and timing are needed:
 

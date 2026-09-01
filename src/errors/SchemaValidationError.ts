@@ -1,6 +1,7 @@
 import type {
   NporaResponse,
-  StandardSchemaV1
+  StandardSchemaV1,
+  StreamingSchemaLocation
 } from '../types'
 import { RequestError } from './RequestError'
 
@@ -16,12 +17,25 @@ export class SchemaValidationError<T = unknown> extends RequestError<T> {
 
   readonly schemaVendor: string
 
+  /** Zero-based streaming item index when `itemSchema` failed. */
+  readonly itemIndex?: number
+
+  /** One-based physical NDJSON line number when available. */
+  readonly lineNumber?: number
+
+  /** SSE event type when available. */
+  readonly event?: string
+
+  /** SSE event identifier when available. */
+  readonly eventId?: string
+
   constructor(
     message: string,
     response: NporaResponse<T>,
     schemaVendor: string,
     issues: ReadonlyArray<StandardSchemaV1.Issue> = [],
-    cause?: unknown
+    cause?: unknown,
+    location?: StreamingSchemaLocation
   ) {
     super(message, {
       code: 'SCHEMA_ERROR',
@@ -35,6 +49,10 @@ export class SchemaValidationError<T = unknown> extends RequestError<T> {
     this.name = 'SchemaValidationError'
     this.issues = issues
     this.schemaVendor = schemaVendor
+    this.itemIndex = location?.itemIndex
+    this.lineNumber = location?.lineNumber
+    this.event = location?.event
+    this.eventId = location?.eventId
     Object.setPrototypeOf(this, new.target.prototype)
   }
 }

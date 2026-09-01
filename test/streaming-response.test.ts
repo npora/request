@@ -7,7 +7,8 @@ import {
 } from 'vitest'
 import {
   createClient,
-  type ServerSentEvent
+  type ServerSentEvent,
+  type StandardSchemaV1
 } from '../src'
 
 afterEach(() => {
@@ -164,6 +165,208 @@ describe('streaming response parsing', () => {
       code: 'PARSER_ERROR',
       message: 'Failed to parse NDJSON at line 2',
       status: 200
+    })
+  })
+
+  it('should validate and transform each NDJSON record lazily', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        chunkedResponse(
+          '{"id":"1"}\n\n{"id":"2"}\n',
+          'application/x-ndjson'
+        )
+      )
+    )
+    const schema: StandardSchemaV1<unknown, number> = {
+      '~standard': {
+        version: 1,
+        vendor: 'stream-test',
+        async validate(value) {
+          return {
+            value: Number((value as { id: string }).id)
+          }
+        }
+      }
+    }
+
+    const records = await createClient().ndjson('/records', {
+      itemSchema: schema
+    })
+
+    await expect(collect(records)).resolves.toEqual([1, 2])
+  })
+
+  it('should expose NDJSON item and line locations and cancel on failure', async () => {
+    const cancel = vi.fn()
+    let sent = false
+    const body = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        if (!sent) {
+          sent = true
+          controller.enqueue(new TextEncoder().encode(
+            '{"id":1}\n\n{"id":"invalid"}\n'
+          ))
+        }
+      },
+      cancel
+    })
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(new Response(body, {
+        headers: {
+          'content-type': 'application/x-ndjson'
+        }
+      }))
+    )
+    const schema: StandardSchemaV1 = {
+      '~standard': {
+        version: 1,
+        vendor: 'stream-test',
+        validate(value) {
+          return typeof (value as { id?: unknown }).id === 'number'
+            ? { value }
+            : {
+                issues: [{
+                  message: 'Expected a numeric id',
+                  path: ['id']
+                }]
+              }
+        }
+      }
+    }
+    const records = await createClient().ndjson('/records', {
+      itemSchema: schema
+    })
+    const iterator = records[Symbol.asyncIterator]()
+
+    await expect(iterator.next()).resolves.toMatchObject({
+      value: { id: 1 },
+      done: false
+    })
+    await expect(iterator.next()).rejects.toMatchObject({
+      name: 'SchemaValidationError',
+      code: 'SCHEMA_ERROR',
+      message: 'NDJSON item 2 at line 3 schema validation failed',
+      schemaVendor: 'stream-test',
+      itemIndex: 1,
+      lineNumber: 3,
+      data: { id: 'invalid' },
+      issues: [{ message: 'Expected a numeric id' }]
+    })
+    expect(cancel).toHaveBeenCalledTimes(1)
+  })
+
+  it('should validate SSE events with event metadata', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(chunkedResponse(
+        'id: 42\nevent: user\ndata: invalid\n\n',
+        'text/event-stream'
+      ))
+    )
+    const schema: StandardSchemaV1 = {
+      '~standard': {
+        version: 1,
+        vendor: 'stream-test',
+        validate() {
+          return {
+            issues: [{ message: 'Invalid event data' }]
+          }
+        }
+      }
+    }
+    const events = await createClient().sse('/events', {
+      itemSchema: schema
+    })
+
+    await expect(collect(events)).rejects.toMatchObject({
+      code: 'SCHEMA_ERROR',
+      message: 'SSE item 1 schema validation failed',
+      itemIndex: 0,
+      event: 'user',
+      eventId: '42',
+      data: {
+        data: 'invalid',
+        event: 'user',
+        id: '42'
+      }
+    })
+  })
+
+  it('should preserve an item schema validator failure as the cause', async () => {
+    const failure = new Error('validator unavailable')
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(chunkedResponse(
+        '{"id":1}\n',
+        'application/x-ndjson'
+      ))
+    )
+    const records = await createClient().ndjson('/records', {
+      itemSchema: {
+        '~standard': {
+          version: 1,
+          vendor: 'stream-test',
+          validate() {
+            throw failure
+          }
+        }
+      }
+    })
+
+    await expect(collect(records)).rejects.toMatchObject({
+      code: 'SCHEMA_ERROR',
+      message: 'NDJSON item 1 at line 1 schema validator failed',
+      itemIndex: 0,
+      lineNumber: 1,
+      cause: failure
+    })
+  })
+
+  it.each([
+    {
+      name: 'non-object result',
+      result: undefined,
+      cause: 'Expected a Standard Schema result'
+    },
+    {
+      name: 'non-array issues',
+      result: { issues: 'invalid' },
+      cause: 'Expected Standard Schema issues to be an array'
+    },
+    {
+      name: 'missing value',
+      result: {},
+      cause: 'Expected a Standard Schema value'
+    }
+  ])('should reject a $name from an item schema', async ({ result, cause }) => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(chunkedResponse(
+        '{"id":1}\n',
+        'application/x-ndjson'
+      ))
+    )
+    const records = await createClient().ndjson('/records', {
+      itemSchema: {
+        '~standard': {
+          version: 1,
+          vendor: 'stream-test',
+          validate: (() => result) as StandardSchemaV1[
+            '~standard'
+          ]['validate']
+        }
+      }
+    })
+
+    await expect(collect(records)).rejects.toMatchObject({
+      code: 'SCHEMA_ERROR',
+      message: expect.stringContaining(
+        'schema validator returned an invalid result'
+      ),
+      cause: expect.objectContaining({ message: cause })
     })
   })
 

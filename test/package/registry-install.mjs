@@ -20,6 +20,10 @@ const packageManifest = JSON.parse(
   )
 )
 const packageName = packageManifest.name
+const expectedVersion = process.env.EXPECTED_PACKAGE_VERSION
+const packageSpec = expectedVersion
+  ? `${packageName}@${expectedVersion}`
+  : `${packageName}@latest`
 const temporaryDirectory = mkdtempSync(
   join(tmpdir(), 'npora-request-registry-')
 )
@@ -37,7 +41,7 @@ try {
     'npm',
     [
       'install',
-      `${packageName}@latest`,
+      packageSpec,
       '--ignore-scripts',
       '--no-audit',
       '--no-fund'
@@ -94,6 +98,9 @@ try {
   )
 
   assert.equal(installedManifest.name, packageName)
+  if (expectedVersion) {
+    assert.equal(installedManifest.version, expectedVersion)
+  }
   console.log(
     `Registry smoke test passed for ${packageName}@${installedManifest.version} ` +
       `on ${process.version}.`

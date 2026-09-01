@@ -23,11 +23,20 @@ interface LatencySummary {
 
 export interface ScenarioResult {
   operations: number
+  latencySamples: number
   durationMs: number
   operationsPerSecond: number
   heapDeltaBytes: number
   latencyMs: LatencySummary
 }
+
+const BENCHMARK_OPTIONS = new Set([
+  '--operations',
+  '--concurrency',
+  '--warmup',
+  '--samples',
+  '--output'
+])
 
 export function parseBenchmarkOptions(
   args: string[],
@@ -41,25 +50,35 @@ export function parseBenchmarkOptions(
   for (let index = 0; index < args.length; index += 1) {
     const argument = args[index]
 
-    if (
-      argument === '--' ||
-      !argument?.startsWith('--')
-    ) {
+    if (argument === '--') {
+      if (index === 0) {
+        continue
+      }
+
+      break
+    }
+
+    if (!argument?.startsWith('--')) {
       continue
     }
 
-    const [name, inlineValue] = argument.split('=', 2)
-    const value =
-      inlineValue ??
-      args[index + 1]
+    const [name = argument, inlineValue] = argument.split('=', 2)
+
+    if (!BENCHMARK_OPTIONS.has(name)) {
+      throw new Error(`Unknown benchmark option ${name}`)
+    }
+
+    const value = inlineValue ?? args[index + 1]
 
     if (inlineValue === undefined) {
       index += 1
     }
 
-    if (value !== undefined) {
-      values.set(name, value)
+    if (value === undefined || value.startsWith('--')) {
+      throw new Error(`Missing value for ${name}`)
     }
+
+    values.set(name, value)
   }
 
   const options: BenchmarkOptions = {
@@ -97,17 +116,28 @@ export function parseBenchmarkOptions(
 
 export async function runSequential(
   operations: number,
-  operation: () => Promise<unknown>
+  operation: () => Promise<unknown>,
+  sampleLimit = 4096
 ): Promise<ScenarioResult> {
-  const latencies = new Array<number>(operations)
+  const sampler = createLatencySampler(
+    operations,
+    sampleLimit
+  )
   const heapBefore = process.memoryUsage().heapUsed
   const startedAt = performance.now()
 
   for (let index = 0; index < operations; index += 1) {
+    const sampleIndex = sampler.claim(index)
+
+    if (sampleIndex === undefined) {
+      await operation()
+      continue
+    }
+
     const operationStartedAt = performance.now()
 
     await operation()
-    latencies[index] =
+    sampler.latencies[sampleIndex] =
       performance.now() - operationStartedAt
   }
 
@@ -115,16 +145,20 @@ export async function runSequential(
     operations,
     performance.now() - startedAt,
     process.memoryUsage().heapUsed - heapBefore,
-    latencies
+    sampler.latencies
   )
 }
 
 export async function runConcurrent(
   operations: number,
   concurrency: number,
-  operation: () => Promise<unknown>
+  operation: () => Promise<unknown>,
+  sampleLimit = 4096
 ): Promise<ScenarioResult> {
-  const latencies = new Array<number>(operations)
+  const sampler = createLatencySampler(
+    operations,
+    sampleLimit
+  )
   const heapBefore = process.memoryUsage().heapUsed
   const startedAt = performance.now()
   let nextOperation = 0
@@ -143,10 +177,17 @@ export async function runConcurrent(
           return
         }
 
+        const sampleIndex = sampler.claim(index)
+
+        if (sampleIndex === undefined) {
+          await operation()
+          continue
+        }
+
         const operationStartedAt = performance.now()
 
         await operation()
-        latencies[index] =
+        sampler.latencies[sampleIndex] =
           performance.now() - operationStartedAt
       }
     }
@@ -158,7 +199,7 @@ export async function runConcurrent(
     operations,
     performance.now() - startedAt,
     process.memoryUsage().heapUsed - heapBefore,
-    latencies
+    sampler.latencies
   )
 }
 
@@ -172,6 +213,7 @@ export function printBenchmarkReport(
           name,
           {
             operations: result.operations,
+            latencySamples: result.latencySamples,
             durationMs:
               result.durationMs.toFixed(2),
             operationsPerSecond:
@@ -224,6 +266,7 @@ function createResult(
 ): ScenarioResult {
   return {
     operations,
+    latencySamples: latencies.length,
     durationMs,
     operationsPerSecond:
       operations / (durationMs / 1000),
@@ -235,7 +278,7 @@ function createResult(
 function summarizeLatencies(
   latencies: number[]
 ): LatencySummary {
-  const sorted = [...latencies].sort(
+  const sorted = latencies.sort(
     (left, right) => left - right
   )
   const total = sorted.reduce(
@@ -249,6 +292,40 @@ function summarizeLatencies(
     p95: percentile(sorted, 0.95),
     p99: percentile(sorted, 0.99),
     max: sorted[sorted.length - 1] ?? 0
+  }
+}
+
+function createLatencySampler(
+  operations: number,
+  sampleLimit: number
+): {
+  claim: (operationIndex: number) => number | undefined
+  latencies: number[]
+} {
+  const sampleCount = Math.min(operations, sampleLimit)
+  const latencies = new Array<number>(sampleCount)
+  let nextSample = 0
+  let nextOperation = 0
+
+  return {
+    claim(operationIndex) {
+      if (operationIndex !== nextOperation) {
+        return undefined
+      }
+
+      const sampleIndex = nextSample
+
+      nextSample += 1
+      nextOperation = sampleCount <= 1
+        ? operations
+        : Math.floor(
+            nextSample * (operations - 1) /
+              (sampleCount - 1)
+          )
+
+      return sampleIndex
+    },
+    latencies
   }
 }
 

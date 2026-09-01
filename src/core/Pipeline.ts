@@ -5,13 +5,13 @@ import type { PluginHooks } from '../interceptors/PluginHooks'
 import type { Adapter, NporaResponse, RequestConfig } from '../types'
 import {
   isRequestError,
-  RequestError,
-  SchemaValidationError
+  RequestError
 } from '../errors'
 import {
   finalizeStreamingResponse,
   validateRequestConfig
 } from '../utils'
+import { validateStandardSchemaValue } from '../utils/validateStandardSchema'
 import { createTimeoutSignal } from '../utils/createTimeoutSignal'
 import { throwIfAborted } from '../utils/createAbortError'
 import { isPromiseLike } from '../utils/isPromiseLike'
@@ -399,71 +399,20 @@ export class Pipeline {
       return
     }
 
-    let result: Awaited<ReturnType<typeof schema['~standard']['validate']>>
-    let schemaVendor = 'unknown'
-
-    try {
-      const standard = schema['~standard']
-
-      schemaVendor = standard.vendor
-      result = await standard.validate(response.data)
-    } catch (error) {
-      throw new SchemaValidationError(
-        'Response schema validator failed',
-        response,
-        schemaVendor,
-        [],
-        error
-      )
-    }
-
-    if (
-      typeof result !== 'object' ||
-      result === null
-    ) {
-      throw new SchemaValidationError(
-        'Response schema validator returned an invalid result',
-        response,
-        schemaVendor,
-        [],
-        new TypeError('Expected a Standard Schema result')
-      )
-    }
-
-    const issues = 'issues' in result ? result.issues : undefined
-
-    if (issues !== undefined) {
-      if (!Array.isArray(issues)) {
-        throw new SchemaValidationError(
-          'Response schema validator returned an invalid result',
-          response,
-          schemaVendor,
-          [],
-          new TypeError('Expected Standard Schema issues to be an array')
-        )
+    const value = await validateStandardSchemaValue(
+      schema,
+      response.data,
+      response,
+      {
+        failed: 'Response schema validator failed',
+        invalid: 'Response schema validator returned an invalid result',
+        rejected: 'Response schema validation failed'
       }
-
-      throw new SchemaValidationError(
-        'Response schema validation failed',
-        response,
-        schemaVendor,
-        issues
-      )
-    }
-
-    if (!('value' in result)) {
-      throw new SchemaValidationError(
-        'Response schema validator returned an invalid result',
-        response,
-        schemaVendor,
-        [],
-        new TypeError('Expected a Standard Schema value')
-      )
-    }
+    )
 
     context.response = {
       ...response,
-      data: result.value as T
+      data: value as T
     }
   }
 

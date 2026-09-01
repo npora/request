@@ -65,6 +65,15 @@ const publicExports = [
   'MockRoute',
   'MockURLMatcher',
   'NporaResponse',
+  'OpenTelemetryAttributeValue',
+  'OpenTelemetryContextApi',
+  'OpenTelemetryHeaderSetter',
+  'OpenTelemetryOptions',
+  'OpenTelemetryPluginOptions',
+  'OpenTelemetryPropagationApi',
+  'OpenTelemetrySpan',
+  'OpenTelemetryTraceApi',
+  'OpenTelemetryTracer',
   'Plugin',
   'PluginCleanup',
   'PluginContext',
@@ -76,6 +85,10 @@ const publicExports = [
   'QueryParams',
   'QuerySerializer',
   'QueryValue',
+  'RateLimitOptions',
+  'RateLimitPlugin',
+  'RateLimitPluginOptions',
+  'RateLimitState',
   'RequestConfig',
   'RequestError',
   'RequestErrorCode',
@@ -90,6 +103,7 @@ const publicExports = [
   'SchemaValidationError',
   'ServerSentEvent',
   'StandardSchemaV1',
+  'StreamingSchemaLocation',
   'TieredCacheStore',
   'TieredCacheBroadcastOptions',
   'TieredCacheCoordinationOptions',
@@ -111,6 +125,8 @@ const publicExports = [
   'isRequestError',
   'isSchemaValidationError',
   'loggerPlugin',
+  'openTelemetryPlugin',
+  'rateLimitPlugin',
   'retryPlugin',
   'uploadPlugin'
 ].sort()
@@ -136,6 +152,8 @@ const runtimeExports = [
   'isRequestError',
   'isSchemaValidationError',
   'loggerPlugin',
+  'openTelemetryPlugin',
+  'rateLimitPlugin',
   'retryPlugin',
   'uploadPlugin'
 ].sort()
@@ -170,6 +188,8 @@ const subpathRuntimeExports = {
     'concurrencyPlugin',
     'downloadPlugin',
     'loggerPlugin',
+    'openTelemetryPlugin',
+    'rateLimitPlugin',
     'retryPlugin',
     'uploadPlugin'
   ],
@@ -181,6 +201,8 @@ const subpathRuntimeExports = {
     'cachePlugin'
   ],
   'plugins/retry': ['retryPlugin'],
+  'plugins/rate-limit': ['rateLimitPlugin'],
+  'plugins/opentelemetry': ['openTelemetryPlugin'],
   testing: ['MockAdapter']
 }
 

@@ -15,8 +15,8 @@ import {
 import {
   parseBenchmarkOptions,
   printBenchmarkReport,
-  runConcurrent,
-  runSequential,
+  runConcurrent as runConcurrentHarness,
+  runSequential as runSequentialHarness,
   writeBenchmarkReport
 } from './harness'
 
@@ -25,8 +25,27 @@ const options = parseBenchmarkOptions(
   {
     operations: 5000,
     concurrency: 50,
-    warmup: 250
+    warmup: 250,
+    samples: 4096
   }
+)
+const runSequential = (
+  operations: number,
+  operation: () => Promise<unknown>
+) => runSequentialHarness(
+  operations,
+  operation,
+  options.samples
+)
+const runConcurrent = (
+  operations: number,
+  concurrency: number,
+  operation: () => Promise<unknown>
+) => runConcurrentHarness(
+  operations,
+  concurrency,
+  operation,
+  options.samples
 )
 const adapter = createBenchmarkAdapter()
 const requestConfig: RequestConfig = {
@@ -182,6 +201,14 @@ await warmUp(options.warmup)
 const direct = await runSequential(
   options.operations,
   () => adapter.request(requestConfig)
+)
+const bareRequestApi = await runSequential(
+  options.operations,
+  () => bareClient.request(bareRequestConfig)
+)
+const bareRequestResponseApi = await runSequential(
+  options.operations,
+  () => bareClient.requestResponse(bareRequestConfig)
 )
 const sequential = await runSequential(
   options.operations,
@@ -342,10 +369,13 @@ const report = {
   configuration: {
     operations: options.operations,
     concurrency: options.concurrency,
-    warmup: options.warmup
+    warmup: options.warmup,
+    samples: options.samples
   },
   scenarios: {
     directAdapter: direct,
+    bareRequestApi,
+    bareRequestResponseApi,
     sequentialClient: sequential,
     bareSequentialClient: bareSequential,
     jsonBodySequentialClient: jsonBodySequential,

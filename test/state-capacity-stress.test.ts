@@ -1,9 +1,10 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import {
   circuitBreakerPlugin,
   createClient,
   MemoryCacheStore,
-  MockAdapter
+  MockAdapter,
+  rateLimitPlugin
 } from '../src'
 
 describe('bounded plugin state under high-cardinality input', () => {
@@ -64,5 +65,47 @@ describe('bounded plugin state under high-cardinality input', () => {
     expect(breaker.getState('1899')).toBe('closed')
     expect(breaker.getState('1900')).toBe('open')
     expect(breaker.getState('1999')).toBe('open')
+  })
+
+  it('should evict expired rate-limit state across many keys', async () => {
+    const deleteState = vi.spyOn(Map.prototype, 'delete')
+    let now = 0
+    const clock = vi.spyOn(Date, 'now').mockImplementation(() => now)
+    const adapter = new MockAdapter()
+    const limiter = rateLimitPlugin({
+      maxRequests: 1,
+      interval: 1,
+      maxKeys: 100
+    })
+    const request = createClient({ adapter }).use(limiter)
+
+    adapter.onGet('/stress').reply(200)
+
+    try {
+      for (let index = 0; index < 2000; index += 1) {
+        await request.get('/stress', {
+          extensions: {
+            rateLimit: { key: String(index) }
+          }
+        })
+        now += 2
+      }
+
+      await request.get('/stress', {
+        extensions: {
+          rateLimit: { key: 'final' }
+        }
+      })
+
+      expect(limiter.getState('0')).toEqual({
+        remaining: 1,
+        queued: 0
+      })
+      expect(limiter.getState('final').remaining).toBe(0)
+      expect(deleteState).toHaveBeenCalledWith('0')
+    } finally {
+      clock.mockRestore()
+      deleteState.mockRestore()
+    }
   })
 })

@@ -8,6 +8,7 @@ import {
 import type { Plugin } from '../src'
 import { createClient, MockAdapter } from '../src'
 import { buildRequest } from '../src/utils/buildRequest'
+import { isRequest } from '../src/utils/isRequest'
 import { validateRequestConfig } from '../src/utils/validateRequestConfig'
 
 afterEach(() => {
@@ -16,6 +17,24 @@ afterEach(() => {
 })
 
 describe('request config', () => {
+  it('should reject plain configs without invoking the native Request getter', () => {
+    const getDescriptor = vi.spyOn(
+      Object,
+      'getOwnPropertyDescriptor'
+    )
+
+    expect(isRequest({ url: '/plain' })).toBe(false)
+    expect(isRequest(Object.create(null))).toBe(false)
+    expect(getDescriptor).not.toHaveBeenCalled()
+
+    expect(isRequest(Object.create({ url: '/shaped' }))).toBe(false)
+    expect(isRequest(new Proxy({}, {
+      getPrototypeOf() {
+        throw new Error('hostile prototype')
+      }
+    }))).toBe(false)
+  })
+
   it('should preserve an unchanged native Request as the fetch input', async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       new Response('ok', {
@@ -245,6 +264,24 @@ describe('request config', () => {
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
+  it('should reject invalid context instead of restoring a client default', async () => {
+    const fetchMock = vi.fn()
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient({
+      context: { traceId: 'default' }
+    })
+
+    await expect(request.get('/users', {
+      context: 'invalid' as never
+    })).rejects.toMatchObject({
+      code: 'CONFIG_ERROR',
+      message: 'Request context must be an object'
+    })
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
   it('should only materialize optional headers when needed', () => {
     expect(validateRequestConfig({
       url: '/users'
@@ -355,6 +392,30 @@ describe('request config', () => {
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
+  it.each([
+    ['query', null, 'Request query must be an object'],
+    ['fetchOptions', 'reload', 'Request fetchOptions must be an object'],
+    ['extensions', [], 'Request extensions must be an object'],
+    ['form', 42, 'Request form must be an object'],
+    ['formData', 'invalid', 'Request formData must be an object']
+  ])('should reject an invalid structured %s value', async (
+    field,
+    value,
+    message
+  ) => {
+    const fetchMock = vi.fn()
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(createClient().post('/users', {
+      [field]: value
+    } as never)).rejects.toMatchObject({
+      code: 'CONFIG_ERROR',
+      message
+    })
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
   it('should build url with baseURL and query', () => {
     const { url } = buildRequest({
       baseURL: 'https://api.example.com',
@@ -385,6 +446,16 @@ describe('request config', () => {
     expect(url).toBe(
       'https://api.example.com/v1/users?active=true&page=1#results'
     )
+  })
+
+  it.each([
+    ['/users?', '/users?page=1'],
+    ['/users?active=true&', '/users?active=true&page=1']
+  ])('should reuse a trailing query delimiter in %s', (url, expected) => {
+    expect(buildRequest({
+      url,
+      query: { page: 1 }
+    }).url).toBe(expected)
   })
 
   it('should merge baseURL query and fragment components safely', () => {
