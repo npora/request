@@ -5,6 +5,8 @@ import {
   concurrencyPlugin,
   createClient,
   loggerPlugin,
+  openTelemetryMetricsPlugin,
+  rateLimitPlugin,
   RequestError,
   retryPlugin,
   type Adapter,
@@ -103,6 +105,22 @@ const cacheDedupeClient = createClient({
 const concurrencyClient = createClient({
   adapter
 }).use(concurrencyPlugin())
+const rateLimitClient = createClient({
+  adapter
+}).use(rateLimitPlugin({ maxRequests: 1_000_000 }))
+const noopMetricInstrument = {
+  add() {},
+  record() {}
+}
+const openTelemetryMetricsClient = createClient({ adapter }).use(
+  openTelemetryMetricsPlugin({
+    meter: {
+      createCounter: () => noopMetricInstrument,
+      createUpDownCounter: () => noopMetricInstrument,
+      createHistogram: () => noopMetricInstrument
+    }
+  })
+)
 const concurrencyContendedClient = createClient({
   adapter
 }).use(concurrencyPlugin({
@@ -264,6 +282,14 @@ const concurrencyImmediateClient = await runSequential(
   options.operations,
   () => concurrencyClient.get('/benchmark', requestConfig)
 )
+const rateLimitImmediateClient = await runSequential(
+  options.operations,
+  () => rateLimitClient.get('/benchmark')
+)
+const openTelemetryMetricsImmediateClient = await runSequential(
+  options.operations,
+  () => openTelemetryMetricsClient.get('/benchmark')
+)
 const concurrencyContendedClientResult = await runConcurrent(
   options.operations,
   options.concurrency,
@@ -388,6 +414,8 @@ const report = {
     cacheMissClient: cacheMissClientResult,
     cacheDedupeClient: cacheDedupeClientResult,
     concurrencyImmediateClient,
+    rateLimitImmediateClient,
+    openTelemetryMetricsImmediateClient,
     concurrencyContendedClient: concurrencyContendedClientResult,
     circuitBreakerSuccessClient,
     concurrencyBaseClient: concurrencyBaseClientResult,
@@ -439,6 +467,8 @@ async function warmUp(iterations: number): Promise<void> {
       )
     ])
     await concurrencyClient.get('/benchmark', requestConfig)
+    await rateLimitClient.get('/benchmark')
+    await openTelemetryMetricsClient.get('/benchmark')
     await concurrencyContendedClient.get('/benchmark', requestConfig)
     await circuitBreakerClient.get('/benchmark', requestConfig)
     await concurrencyBaseClient.get('/benchmark', requestConfig)

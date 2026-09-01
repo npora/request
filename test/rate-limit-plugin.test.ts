@@ -6,6 +6,7 @@ import type {
 } from '../src'
 import {
   createClient,
+  MockAdapter,
   rateLimitPlugin,
   RequestError,
   retryPlugin
@@ -209,6 +210,162 @@ describe('rateLimitPlugin', () => {
     await vi.advanceTimersByTimeAsync(1000)
     await expect(result).resolves.toBe('recovered')
     expect(attempts).toBe(2)
+  })
+
+  it('should share 429 Retry-After cooldowns by key', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(0)
+
+    let attempts = 0
+    const adapter: Adapter = {
+      request<T = unknown>(config: RequestConfig) {
+        attempts += 1
+
+        if (attempts === 1) {
+          const response: NporaResponse = {
+            data: { message: 'slow down' },
+            status: 429,
+            statusText: 'Too Many Requests',
+            headers: new Headers({ 'retry-after': '2' }),
+            config,
+            raw: new Response(null, { status: 429 })
+          }
+
+          return Promise.reject(new RequestError('rate limited', {
+            code: 'HTTP_ERROR',
+            status: 429,
+            config,
+            response
+          }))
+        }
+
+        return Promise.resolve({
+          data: 'ok' as T,
+          status: 200,
+          statusText: 'OK',
+          headers: new Headers(),
+          config,
+          raw: new Response()
+        })
+      }
+    }
+    const limiter = rateLimitPlugin({
+      maxRequests: 100,
+      interval: 1000
+    })
+    const client = createClient({
+      adapter,
+      baseURL: 'https://api.example.com'
+    }).use(limiter)
+
+    const first = expect(client.get('/limited')).rejects.toMatchObject({
+      status: 429
+    })
+
+    await flush()
+    await first
+
+    const second = client.get('/after-429')
+
+    await flush()
+    expect(attempts).toBe(1)
+    expect(limiter.getState('https://api.example.com')).toMatchObject({
+      remaining: 0,
+      queued: 1,
+      resetAt: 2000,
+      cooldownUntil: 2000
+    })
+
+    await vi.advanceTimersByTimeAsync(1999)
+    expect(attempts).toBe(1)
+
+    await vi.advanceTimersByTimeAsync(1)
+    await expect(second).resolves.toBe('ok')
+    expect(attempts).toBe(2)
+  })
+
+  it('should clamp shared Retry-After cooldowns', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(0)
+
+    let attempts = 0
+    const adapter: Adapter = {
+      request<T = unknown>(config: RequestConfig) {
+        attempts += 1
+
+        if (attempts === 1) {
+          const response: NporaResponse = {
+            data: undefined,
+            status: 429,
+            statusText: 'Too Many Requests',
+            headers: new Headers({ 'retry-after': '60' }),
+            config,
+            raw: new Response(null, { status: 429 })
+          }
+
+          return Promise.reject(new RequestError('rate limited', {
+            code: 'HTTP_ERROR',
+            status: 429,
+            config,
+            response
+          }))
+        }
+
+        return Promise.resolve({
+          data: 'ok' as T,
+          status: 200,
+          statusText: 'OK',
+          headers: new Headers(),
+          config,
+          raw: new Response()
+        })
+      }
+    }
+    const limiter = rateLimitPlugin({
+      maxRequests: 100,
+      maxRetryAfter: 500
+    })
+    const client = createClient({ adapter }).use(limiter)
+
+    await expect(client.get('/limited')).rejects.toMatchObject({ status: 429 })
+    expect(limiter.getState('default').cooldownUntil).toBe(500)
+
+    const queued = client.get('/queued')
+
+    await flush()
+    expect(attempts).toBe(1)
+
+    await vi.advanceTimersByTimeAsync(500)
+    await expect(queued).resolves.toBe('ok')
+  })
+
+  it('should learn cooldowns from non-throwing 429 responses', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(0)
+    const adapter = new MockAdapter()
+    const limiter = rateLimitPlugin({ maxRequests: 100 })
+    const client = createClient({ adapter }).use(limiter)
+
+    adapter
+      .onGet('/limited')
+      .replyOnce(429, { limited: true }, {
+        headers: { 'retry-after': '1' }
+      })
+      .onGet('/limited')
+      .reply(200, { ok: true })
+
+    await expect(client.get('/limited', {
+      throwHttpErrors: false
+    })).resolves.toEqual({ limited: true })
+
+    const queued = client.get('/limited')
+
+    await flush()
+    expect(adapter.history).toHaveLength(1)
+
+    await vi.advanceTimersByTimeAsync(1000)
+    await expect(queued).resolves.toEqual({ ok: true })
+    expect(adapter.history).toHaveLength(2)
   })
 })
 

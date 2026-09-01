@@ -319,3 +319,12 @@ plus narrow headroom; declarations and unrelated plugin subpaths remain fixed.
 `pnpm test:package` includes the size check, so release verification cannot
 publish a package that exceeds the checked-in budgets. CI also stores the JSON
 report for comparing changes over time.
+
+Origin-shared 429 cooldowns add bounded Retry-After state and timer handling to
+the existing rate-limit subpath. OpenTelemetry metrics use a separate
+`plugins/opentelemetry-metrics` entry point and structural Meter API, so no SDK
+or exporter dependency is bundled. Root, declaration, rate-limit, tarball, and
+unpacked budgets track the measured public API; the metrics subpath has its own
+narrow transitive budget. Full stream-consumption measurement adds isolated
+ReadableStream and async-iterable wrappers to that optional subpath; updated
+budgets include their measured cost without adding a runtime dependency.

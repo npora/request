@@ -2902,6 +2902,68 @@ test(
 )
 
 test(
+  'should record OpenTelemetry metrics in the browser',
+  async ({ page }) => {
+    await openFixture(page)
+
+    const result = await page.evaluate(async () => {
+      const module = await import('/dist/index.js')
+      const records: Record<string, Array<{
+        value: number
+        attributes?: Record<string, unknown>
+      }>> = {}
+      const instrument = (name: string) => ({
+        add(value: number, attributes?: Record<string, unknown>) {
+          ;(records[name] ??= []).push({ value, attributes })
+        },
+        record(value: number, attributes?: Record<string, unknown>) {
+          ;(records[name] ??= []).push({ value, attributes })
+        }
+      })
+      const request = module.createClient({ baseURL: '/api' }).use(
+        module.openTelemetryMetricsPlugin({
+          meter: {
+            createCounter: instrument,
+            createUpDownCounter: instrument,
+            createHistogram: instrument
+          }
+        })
+      )
+
+      await request.get('/user')
+      const stream = await request.ndjson('/records')
+
+      for await (const _ of stream) {
+        // Complete the browser stream so consumption metrics settle.
+      }
+
+      return records
+    })
+
+    expect(
+      result['npora.client.active_requests']?.map(record => record.value)
+    ).toEqual([1, -1, 1, -1])
+    expect(result['npora.client.request.duration']).toHaveLength(2)
+    expect(
+      result['npora.client.request.duration']?.[0]?.attributes
+    ).toMatchObject({
+      'http.request.method': 'GET',
+      'http.response.status_code': 200,
+      'request.outcome': 'success'
+    })
+    expect(
+      result['npora.client.active_streams']?.map(record => record.value)
+    ).toEqual([1, -1])
+    expect(
+      result['npora.client.stream.duration']?.[0]?.attributes
+    ).toMatchObject({
+      'stream.type': 'ndjson',
+      'stream.outcome': 'complete'
+    })
+  }
+)
+
+test(
   'should send HEAD, OPTIONS, and QUERY requests in the browser',
   async ({ page }) => {
     await openFixture(page)

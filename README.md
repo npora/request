@@ -606,6 +606,7 @@ Built-in plugins:
 - `concurrencyPlugin()`
 - `rateLimitPlugin()`
 - `openTelemetryPlugin()`
+- `openTelemetryMetricsPlugin()`
 - `authPlugin()`
 - `loggerPlugin()`
 - `uploadPlugin()`
@@ -657,14 +658,18 @@ const limiter = rateLimitPlugin({
   maxRequests: 100,
   interval: 1000,
   maxQueue: 500,
-  queueTimeout: 5000
+  queueTimeout: 5000,
+  sharedRetryAfter: true,
+  maxRetryAfter: 60000
 })
 
 const request = createClient().use(limiter)
 ```
 
 Retry attempts consume permits, while cache hits do not. Full queues and
-expired waits reject with the stable `RATE_LIMIT` error code.
+expired waits reject with the stable `RATE_LIMIT` error code. A 429 response
+with `Retry-After` pauses the shared origin queue, so concurrent callers do not
+independently retry into the same overloaded upstream.
 
 Trace actual transport attempts without adding an OpenTelemetry runtime
 dependency to this package:
@@ -683,6 +688,22 @@ const request = createClient().use(openTelemetryPlugin({
 Each retry receives its own CLIENT span and propagated trace context. Cache
 hits do not create transport spans. URLs omit credentials, query strings, and
 fragments by default, and exception events are opt-in.
+
+Record low-cardinality OpenTelemetry metrics through a separate optional
+plugin:
+
+```ts
+import { metrics } from '@opentelemetry/api'
+
+const request = createClient().use(openTelemetryMetricsPlugin({
+  meter: metrics.getMeter('@npora/request'),
+  attributes: { 'service.namespace': 'checkout' }
+}))
+```
+
+The plugin records request duration, active requests, retries, cache hit/miss,
+rate-limit waits, and complete ReadableStream/NDJSON/SSE consumption duration.
+It does not bundle an SDK or exporter.
 
 Inject a structured logger when request correlation and timing are needed:
 

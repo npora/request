@@ -523,9 +523,11 @@ Requires `rateLimitPlugin()`.
 | `enabled` | `true` | Apply the transport-attempt rate limit. |
 | `key` | resolved request origin | Override rolling-window isolation. |
 | `queueTimeout` | plugin-level value | Maximum time waiting for a permit, capped at `2_147_483_647`. |
+| `sharedRetryAfter` | `true` | Allow this request's 429 response to update its key's shared cooldown. |
 
 Queue overflow and queue timeout fail with `RATE_LIMIT`. Retry attempts consume
-permits; cache hits that never enter transport do not.
+permits; cache hits that never enter transport do not. Plugin options
+`sharedRetryAfter` and `maxRetryAfter` default to `true` and 60 seconds.
 
 ### `extensions.openTelemetry`
 
@@ -542,6 +544,19 @@ Retry attempts receive separate spans and resend counts. Cache hits and earlier
 request-admission rejections do not create spans; the first span includes a
 later rate-limit wait. URL query strings and exception events are excluded by
 default.
+
+### `extensions.openTelemetryMetrics`
+
+Requires `openTelemetryMetricsPlugin()`.
+
+| Field | Default | Purpose |
+| --- | --- | --- |
+| `enabled` | `true` | Record metrics for this request. |
+| `measureStreamConsumption` | `true` | Measure returned ReadableStream, NDJSON, and SSE consumption through completion, error, or cancellation. |
+| `attributes` | `{}` | Add privacy-reviewed, low-cardinality attributes. |
+
+Request URLs, headers, payloads, and rate-limit keys are not exported
+automatically.
 
 ### `extensions.auth`
 

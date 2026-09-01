@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "requestRatios": {
+    "bareSequentialClient/directAdapter": 0.40,
+    "jsonBodySequentialClient/bareSequentialClient": 0.65,
+    "sequentialPluginPipeline/bareSequentialClient": 0.10,
+    "cachePrimitiveHitClient/bareSequentialClient": 0.14,
+    "rateLimitImmediateClient/bareSequentialClient": 0.35,
+    "openTelemetryMetricsImmediateClient/bareSequentialClient": 0.25
+  },
+  "streaming": {
+    "minimumRecordsPerFormat": 1000000,
+    "minimumSlowConsumerYields": 100,
+    "maximumRetainedHeapDeltaBytes": 16777216,
+    "maximumPreCollectionHeapDeltaBytes": 134217728,
+    "minimumRecordsPerSecond": {
+      "ndjson": 100000,
+      "sse": 75000
+    },
+    "requiredValidationFailures": 2,
+    "requiredCancellationPropagations": 2
+  }
+}

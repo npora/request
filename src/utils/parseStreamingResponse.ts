@@ -212,23 +212,59 @@ async function* decodeLines(
       }
 
       buffer += decoder.decode(result.value, { stream: true })
-      const lines = takeCompleteLines(buffer, false)
+      let start = 0
 
-      buffer = lines.rest
+      for (let index = 0; index < buffer.length; index += 1) {
+        const character = buffer[index]
 
-      for (const line of lines.values) {
-        yield line
+        if (character === '\n') {
+          yield buffer.slice(start, index)
+          start = index + 1
+          continue
+        }
+
+        if (character !== '\r') {
+          continue
+        }
+
+        // Preserve a trailing CR until the next chunk so a split CRLF is
+        // emitted as one line ending.
+        if (index + 1 === buffer.length) {
+          break
+        }
+
+        yield buffer.slice(start, index)
+
+        if (buffer[index + 1] === '\n') {
+          index += 1
+        }
+
+        start = index + 1
       }
+
+      buffer = buffer.slice(start)
     }
 
-    const lines = takeCompleteLines(buffer, true)
+    let start = 0
 
-    for (const line of lines.values) {
-      yield line
+    for (let index = 0; index < buffer.length; index += 1) {
+      const character = buffer[index]
+
+      if (character !== '\n' && character !== '\r') {
+        continue
+      }
+
+      yield buffer.slice(start, index)
+
+      if (character === '\r' && buffer[index + 1] === '\n') {
+        index += 1
+      }
+
+      start = index + 1
     }
 
-    if (lines.rest !== '') {
-      yield lines.rest
+    if (start < buffer.length) {
+      yield buffer.slice(start)
     }
   } catch (error) {
     if (isRequestError(error)) {
@@ -250,45 +286,6 @@ async function* decodeLines(
     } finally {
       reader.releaseLock()
     }
-  }
-}
-
-function takeCompleteLines(
-  input: string,
-  ended: boolean
-): { values: string[]; rest: string } {
-  const values: string[] = []
-  let start = 0
-
-  for (let index = 0; index < input.length; index += 1) {
-    const character = input[index]
-
-    if (character === '\n') {
-      values.push(input.slice(start, index))
-      start = index + 1
-      continue
-    }
-
-    if (character !== '\r') {
-      continue
-    }
-
-    if (index + 1 === input.length && !ended) {
-      break
-    }
-
-    values.push(input.slice(start, index))
-
-    if (input[index + 1] === '\n') {
-      index += 1
-    }
-
-    start = index + 1
-  }
-
-  return {
-    values,
-    rest: input.slice(start)
   }
 }
 

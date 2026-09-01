@@ -128,13 +128,23 @@ jobs:
           retention-days: 30
 
       - name: Run performance benchmarks
-        run: pnpm benchmark -- --output benchmark-results/request.json
+        run: pnpm benchmark -- --operations 50000 --warmup 2000 --samples 4096 --output benchmark-results/request.json
+
+      - name: Run million-item streaming schema benchmark
+        run: pnpm benchmark:streaming -- --operations 1000000 --warmup 1000 --output benchmark-results/streaming-schema.json
+
+      - name: Enforce stable relative performance budgets
+        run: >-
+          pnpm benchmark:check --
+          --budget benchmark/performance-budget.json
+          --request benchmark-results/request.json
+          --streaming benchmark-results/streaming-schema.json
 
       - name: Upload performance report
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: request-benchmark
-          path: benchmark-results/request.json
+          path: benchmark-results/
           retention-days: 30
 
   browser:

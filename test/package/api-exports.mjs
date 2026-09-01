@@ -69,6 +69,12 @@ const publicExports = [
   'OpenTelemetryContextApi',
   'OpenTelemetryHeaderSetter',
   'OpenTelemetryOptions',
+  'OpenTelemetryMetricsOptions',
+  'OpenTelemetryMetricAttributes',
+  'OpenTelemetryCounter',
+  'OpenTelemetryHistogram',
+  'OpenTelemetryMeter',
+  'OpenTelemetryMetricsPluginOptions',
   'OpenTelemetryPluginOptions',
   'OpenTelemetryPropagationApi',
   'OpenTelemetrySpan',
@@ -126,6 +132,7 @@ const publicExports = [
   'isSchemaValidationError',
   'loggerPlugin',
   'openTelemetryPlugin',
+  'openTelemetryMetricsPlugin',
   'rateLimitPlugin',
   'retryPlugin',
   'uploadPlugin'
@@ -153,6 +160,7 @@ const runtimeExports = [
   'isSchemaValidationError',
   'loggerPlugin',
   'openTelemetryPlugin',
+  'openTelemetryMetricsPlugin',
   'rateLimitPlugin',
   'retryPlugin',
   'uploadPlugin'
@@ -189,6 +197,7 @@ const subpathRuntimeExports = {
     'downloadPlugin',
     'loggerPlugin',
     'openTelemetryPlugin',
+    'openTelemetryMetricsPlugin',
     'rateLimitPlugin',
     'retryPlugin',
     'uploadPlugin'
@@ -203,6 +212,7 @@ const subpathRuntimeExports = {
   'plugins/retry': ['retryPlugin'],
   'plugins/rate-limit': ['rateLimitPlugin'],
   'plugins/opentelemetry': ['openTelemetryPlugin'],
+  'plugins/opentelemetry-metrics': ['openTelemetryMetricsPlugin'],
   testing: ['MockAdapter']
 }
 

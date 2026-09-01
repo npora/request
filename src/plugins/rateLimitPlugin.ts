@@ -1,9 +1,11 @@
-import { RequestError } from '../errors'
+import { isRequestError, RequestError } from '../errors'
 import type { RequestConfig } from '../types'
+import type { RequestContext } from '../core/RequestContext'
 import { MAX_TIMER_DELAY } from '../utils/maxTimerDelay'
 import type { Plugin } from './Plugin'
 import { resolveExtensionConfig } from './resolveExtensionConfig'
 import { resolveRequestOrigin } from '../utils/resolveRequestOrigin'
+import { parseRetryAfter } from '../utils/parseRetryAfter'
 
 export interface RateLimitPluginOptions {
   /** Maximum transport attempts admitted during each rolling interval. */
@@ -23,12 +25,20 @@ export interface RateLimitPluginOptions {
 
   /** @default the resolved request origin or "default" */
   createKey?: (config: RequestConfig) => string
+
+  /** Share 429 Retry-After cooldowns between requests with the same key. @default true */
+  sharedRetryAfter?: boolean
+
+  /** Maximum shared Retry-After cooldown in milliseconds. @default 60000 */
+  maxRetryAfter?: number
 }
 
 export interface RateLimitState {
   remaining: number
   queued: number
   resetAt?: number
+
+  cooldownUntil?: number
 }
 
 export interface RateLimitPlugin extends Plugin {
@@ -43,6 +53,7 @@ interface RateLimitRecord {
   tail?: QueueEntry
   size: number
   timer?: ReturnType<typeof setTimeout>
+  cooldownUntil?: number
 }
 
 interface QueueEntry {
@@ -61,6 +72,8 @@ interface NormalizedOptions {
   queueTimeout: number
   maxKeys: number
   createKey: (config: RequestConfig) => string
+  sharedRetryAfter: boolean
+  maxRetryAfter: number
 }
 
 export function rateLimitPlugin(
@@ -115,9 +128,11 @@ export function rateLimitPlugin(
         )
 
         pruneTimestamps(record, now, normalized.interval)
+        requestContext.rateLimitApplied = true
 
         if (
           record.size === 0 &&
+          (record.cooldownUntil ?? 0) <= now &&
           activeCount(record) < normalized.maxRequests
         ) {
           record.timestamps.push(now)
@@ -143,14 +158,82 @@ export function rateLimitPlugin(
           normalized.queueTimeout
         )
 
+        const startedAt = Date.now()
+
         return enqueue(record, requestContext.config, timeout, () => {
           schedule(record, records, normalized, active)
         }).then(() => {
+          requestContext.rateLimitWaitTime += Math.max(
+            0,
+            Date.now() - startedAt
+          )
+
           if (!active) {
             throw createRemovedError(requestContext.config)
           }
         })
       })
+
+      const observeRetryAfter = (
+        requestContext: RequestContext<unknown>
+      ) => {
+        if (!normalized.sharedRetryAfter) {
+          return
+        }
+
+        const requestOptions = resolveExtensionConfig(
+          requestContext.config,
+          'rateLimit'
+        )
+
+        if (
+          requestOptions?.enabled === false ||
+          requestOptions?.sharedRetryAfter === false ||
+          !isRateLimitError(requestContext)
+        ) {
+          return
+        }
+
+        const response = requestContext.response ?? (
+          isRequestError(requestContext.error)
+            ? requestContext.error.response
+            : undefined
+        )
+        const delay = parseRetryAfter(response?.headers)
+
+        if (delay === undefined) {
+          return
+        }
+
+        const key = normalizeKey(
+          requestOptions?.key ?? normalized.createKey(requestContext.config)
+        )
+        const now = Date.now()
+        const record = getRecord(
+          records,
+          key,
+          normalized.maxKeys,
+          now,
+          normalized.interval
+        )
+        const cooldownUntil = now + Math.min(
+          delay,
+          normalized.maxRetryAfter
+        )
+
+        if ((record.cooldownUntil ?? 0) >= cooldownUntil) {
+          return
+        }
+
+        record.cooldownUntil = cooldownUntil
+        clearRecordTimer(record)
+        schedule(record, records, normalized, active)
+      }
+
+      context.hooks.onResponse(observeRetryAfter, {
+        requiresRawResponse: false
+      })
+      context.hooks.onError(observeRetryAfter)
 
       return () => {
         active = false
@@ -169,6 +252,16 @@ export function rateLimitPlugin(
       }
     }
   }
+}
+
+function isRateLimitError(requestContext: {
+  response?: { status: number }
+  error?: unknown
+}): boolean {
+  return requestContext.response?.status === 429 || (
+    isRequestError(requestContext.error) &&
+    requestContext.error.status === 429
+  )
 }
 
 function enqueue(
@@ -287,6 +380,24 @@ function schedule(
 
   pruneTimestamps(record, now, options.interval)
 
+  if (
+    record.cooldownUntil !== undefined &&
+    record.cooldownUntil > now
+  ) {
+    const delay = Math.min(
+      record.cooldownUntil - now,
+      MAX_TIMER_DELAY
+    )
+
+    record.timer = setTimeout(() => {
+      record.timer = undefined
+      drain(record, records, options, active, Date.now())
+    }, delay)
+    return
+  }
+
+  record.cooldownUntil = undefined
+
   if (activeCount(record) < options.maxRequests) {
     drain(record, records, options, active, now)
     return
@@ -314,6 +425,16 @@ function drain(
   }
 
   pruneTimestamps(record, now, options.interval)
+
+  if (
+    record.cooldownUntil !== undefined &&
+    record.cooldownUntil > now
+  ) {
+    schedule(record, records, options, active)
+    return
+  }
+
+  record.cooldownUntil = undefined
 
   while (
     record.size > 0 &&
@@ -364,15 +485,31 @@ function createState(
   options: NormalizedOptions,
   now: number
 ): RateLimitState {
+  if ((record.cooldownUntil ?? 0) <= now) {
+    record.cooldownUntil = undefined
+  }
+
   const count = activeCount(record)
   const resetAt = count > 0
     ? (record.timestamps[record.timestampHead] ?? now) + options.interval
     : undefined
 
   return {
-    remaining: Math.max(0, options.maxRequests - count),
+    remaining: record.cooldownUntil !== undefined && record.cooldownUntil > now
+      ? 0
+      : Math.max(0, options.maxRequests - count),
     queued: record.size,
-    ...(resetAt === undefined ? {} : { resetAt })
+    ...(resetAt === undefined && record.cooldownUntil === undefined
+      ? {}
+      : {
+          resetAt: Math.max(
+            resetAt ?? 0,
+            record.cooldownUntil ?? 0
+          )
+        }),
+    ...(record.cooldownUntil === undefined
+      ? {}
+      : { cooldownUntil: record.cooldownUntil })
   }
 }
 
@@ -415,7 +552,11 @@ function trimRecords(
 
     pruneTimestamps(record, now, interval)
 
-    if (record.size === 0 && activeCount(record) === 0) {
+    if (
+      record.size === 0 &&
+      activeCount(record) === 0 &&
+      (record.cooldownUntil ?? 0) <= now
+    ) {
       clearRecordTimer(record)
       records.delete(key)
     }
@@ -490,7 +631,9 @@ function normalizeOptions(options: RateLimitPluginOptions): NormalizedOptions {
     maxQueue: normalizeNonNegativeInteger(options.maxQueue, 1000),
     queueTimeout: normalizeDuration(options.queueTimeout, 30000),
     maxKeys: normalizePositiveInteger(options.maxKeys, 1000),
-    createKey: options.createKey ?? resolveRequestOrigin
+    createKey: options.createKey ?? resolveRequestOrigin,
+    sharedRetryAfter: options.sharedRetryAfter ?? true,
+    maxRetryAfter: normalizePositiveDuration(options.maxRetryAfter, 60000)
   }
 }
 

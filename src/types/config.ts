@@ -8,6 +8,7 @@ import type {
   DownloadOptions,
   LoggerOptions,
   OpenTelemetryOptions,
+  OpenTelemetryMetricsOptions,
   RateLimitOptions,
   RetryOptions,
   UploadOptions
@@ -79,6 +80,8 @@ export interface RequestExtensions {
   logger?: LoggerOptions
 
   openTelemetry?: OpenTelemetryOptions
+
+  openTelemetryMetrics?: OpenTelemetryMetricsOptions
 
   rateLimit?: RateLimitOptions
 

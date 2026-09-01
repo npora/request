@@ -9,6 +9,7 @@ import { isRequestError, RequestError } from '../errors'
 import { isURLSearchParams } from '../utils/isURLSearchParams'
 import { isPromiseLike } from '../utils/isPromiseLike'
 import { waitForSignal } from '../utils/waitForSignal'
+import type { RequestContext } from '../core/RequestContext'
 import type { Plugin, PluginContext } from './Plugin'
 import { resolveExtensionConfig } from './resolveExtensionConfig'
 
@@ -1035,6 +1036,7 @@ export function cachePlugin(
         ) {
           recordEvent('stale-if-error')
           cacheHits.add(requestContext)
+          requestContext.cacheHit = true
 
           if (leaders.get(requestContext)?.owner === requestContext) {
             uncacheableLeaders.add(requestContext)
@@ -1206,13 +1208,7 @@ export function cachePlugin(
       }, { requiresRawResponse: false })
 
       function handleCacheRecord(
-        requestContext: {
-          config: RequestConfig
-          response?: NporaResponse
-          readonly preserveRaw: boolean
-          readonly background: boolean
-          readonly initialConfig: RequestConfig
-        },
+        requestContext: RequestContext<unknown>,
         cache: CacheOptions,
         key: string,
         record: CacheEntry | undefined,
@@ -1252,6 +1248,7 @@ export function cachePlugin(
               recordEvent('hit')
               requestContext.response = cachedResponse
               cacheHits.add(requestContext)
+              requestContext.cacheHit = true
               return
             }
 
@@ -1279,6 +1276,7 @@ export function cachePlugin(
               recordEvent('stale-while-revalidate')
               requestContext.response = cachedResponse
               cacheHits.add(requestContext)
+              requestContext.cacheHit = true
               startBackgroundRefresh(
                 context,
                 backgroundRefreshes,
@@ -1367,13 +1365,7 @@ export function cachePlugin(
       }
 
       function prepareCacheMiss(
-        requestContext: {
-          config: RequestConfig
-          response?: NporaResponse
-          readonly preserveRaw: boolean
-          readonly background: boolean
-          readonly initialConfig: RequestConfig
-        },
+        requestContext: RequestContext<unknown>,
         cache: CacheOptions,
         key: string,
         requestGeneration: CacheGeneration,
@@ -1417,6 +1409,7 @@ export function cachePlugin(
               requestContext.config
             )
             cacheHits.add(requestContext)
+            requestContext.cacheHit = true
           })
         }
 

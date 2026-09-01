@@ -37,11 +37,13 @@ Applications may use subpaths to load a smaller runtime surface:
 import { createClient } from '@npora/request/core'
 import { cachePlugin } from '@npora/request/plugins/cache'
 import { openTelemetryPlugin } from '@npora/request/plugins/opentelemetry'
+import { openTelemetryMetricsPlugin } from '@npora/request/plugins/opentelemetry-metrics'
 import { retryPlugin } from '@npora/request/plugins/retry'
 ```
 
 Official plugin entrypoints are `auth`, `cache`, `circuit-breaker`,
-`concurrency`, `download`, `logger`, `opentelemetry`, `rate-limit`, `retry`,
+`concurrency`, `download`, `logger`, `opentelemetry`,
+`opentelemetry-metrics`, `rate-limit`, `retry`,
 and `upload` under
 `@npora/request/plugins/`. The aggregate plugin entrypoint remains available
 at `@npora/request/plugins`. Import `MockAdapter` from
@@ -1114,7 +1116,9 @@ const limiter = rateLimitPlugin({
   interval: 1000,
   maxQueue: 500,
   queueTimeout: 5000,
-  maxKeys: 1000
+  maxKeys: 1000,
+  sharedRetryAfter: true,
+  maxRetryAfter: 60000
 })
 
 const request = createClient().use(limiter)
@@ -1143,7 +1147,14 @@ await request.get('/inventory', {
 ```
 
 `limiter.getState(key)` returns the remaining permits, queued count, and next
-rolling reset timestamp. At most `maxKeys` inactive states are retained;
+rolling reset timestamp. HTTP 429 responses with a valid standard
+`Retry-After` header install a shared cooldown for that key. New requests and
+retry attempts join the same abortable FIFO queue until the cooldown expires,
+then resume under the rolling-window limit. Later cooldowns extend an earlier
+one, while `maxRetryAfter` bounds server-controlled delay. Set
+`sharedRetryAfter: false` globally or for the response-producing request to
+disable learning a cooldown. `getState()` exposes `cooldownUntil` while one is
+active. At most `maxKeys` inactive states are retained;
 recently admitted or queued keys can temporarily exceed the bound until their
 window expires.
 
@@ -1213,6 +1224,47 @@ await request.get('/health', {
 Use plugin-level `shouldTrace(config)` to exclude untrusted destinations.
 Telemetry SDK, propagator, exporter, attribute, and cleanup failures are
 isolated from the request lifecycle. Removing the plugin ends active spans.
+
+## OpenTelemetry Metrics
+
+`openTelemetryMetricsPlugin()` is a separate tree-shakeable structural adapter
+for the OpenTelemetry Metrics API. The application owns its MeterProvider,
+readers, views, and exporters:
+
+```ts
+import { metrics } from '@opentelemetry/api'
+import {
+  createClient,
+  openTelemetryMetricsPlugin
+} from '@npora/request'
+
+const request = createClient().use(openTelemetryMetricsPlugin({
+  meter: metrics.getMeter('@npora/request'),
+  attributes: { 'service.namespace': 'checkout' }
+}))
+```
+
+| Instrument | Type | Unit | Meaning |
+| --- | --- | --- | --- |
+| `npora.client.request.duration` | Histogram | `ms` | Time until the request promise settles. |
+| `npora.client.active_requests` | UpDownCounter | `{request}` | Currently active measured requests. |
+| `npora.client.retry.attempts` | Counter | `{attempt}` | Additional attempts that reached the transport pipeline. |
+| `npora.client.cache.requests` | Counter | `{request}` | Cache-enabled requests using the cache plugin's exact `cache.result=hit|miss`. |
+| `npora.client.rate_limit.wait.duration` | Histogram | `ms` | Exact accumulated rate-limit queue wait. |
+| `npora.client.stream.duration` | Histogram | `ms` | Time from returning a stream until complete, cancelled, or errored consumption. |
+| `npora.client.active_streams` | UpDownCounter | `{stream}` | Returned byte, NDJSON, or SSE streams awaiting settlement. |
+
+Default attributes contain only method, bounded outcome/status/error
+classification, and cache result. URLs, headers, keys, trace identifiers, and
+request data are never added automatically. Keep custom attributes
+low-cardinality and free of secrets. Background cache refreshes are excluded
+unless `includeBackground: true`. Request duration ends when a stream is
+returned; the separate stream duration continues until consumption completes,
+fails, or is cancelled, with `stream.type` and `stream.outcome` classifications.
+Set `measureStreamConsumption: false` globally or per request to avoid wrapping
+returned streams. Meter/exporter failures are isolated. Use
+`shouldRecord(config)` or `extensions.openTelemetryMetrics.enabled` for
+filtering.
 
 Official references: [OpenTelemetry JavaScript propagation](https://opentelemetry.io/docs/languages/js/propagation/),
 [Tracer API](https://open-telemetry.github.io/opentelemetry-js/interfaces/_opentelemetry_sdk-node._opentelemetry_api.Tracer.html),

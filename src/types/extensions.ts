@@ -201,6 +201,9 @@ export interface RateLimitOptions {
 
   /** Maximum time this transport attempt may wait for a permit. */
   queueTimeout?: number
+
+  /** Participate in shared 429 Retry-After cooldowns. @default true */
+  sharedRetryAfter?: boolean
 }
 
 export type OpenTelemetryAttributeValue =
@@ -223,6 +226,18 @@ export interface OpenTelemetryOptions {
   spanName?: string
 
   /** Additional span attributes. Values must not contain secrets. */
+  attributes?: Readonly<Record<string, OpenTelemetryAttributeValue>>
+}
+
+/** Per-request overrides for `openTelemetryMetricsPlugin()`. */
+export interface OpenTelemetryMetricsOptions {
+  /** Enable metrics for this request. @default true */
+  enabled?: boolean
+
+  /** Measure returned stream consumption until completion or cancellation. @default true */
+  measureStreamConsumption?: boolean
+
+  /** Additional low-cardinality attributes. Values must not contain secrets. */
   attributes?: Readonly<Record<string, OpenTelemetryAttributeValue>>
 }
 

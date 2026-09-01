@@ -7,6 +7,7 @@ import {
   createClient,
   downloadPlugin,
   loggerPlugin,
+  openTelemetryMetricsPlugin,
   openTelemetryPlugin,
   rateLimitPlugin,
   RequestError,
@@ -35,6 +36,7 @@ let authRefreshCalls = 0
 let authTokenCancellationCalls = 0
 let cacheReadCancellationCalls = 0
 let telemetryInjections = 0
+let telemetryMetricMeasurements = 0
 const options = parseBenchmarkOptions(process.argv.slice(2), {
   operations: DEFAULT_OPERATIONS,
   concurrency: 64,
@@ -162,6 +164,19 @@ const telemetryOptions = {
 }
 const telemetryImmediateClient = createClient({ adapter: stableAdapter })
   .use(openTelemetryPlugin(telemetryOptions))
+const metricInstrument = {
+  add() { telemetryMetricMeasurements += 1 },
+  record() { telemetryMetricMeasurements += 1 }
+}
+const metricMeter = {
+  createCounter: () => metricInstrument,
+  createUpDownCounter: () => metricInstrument,
+  createHistogram: () => metricInstrument
+}
+const telemetryMetricsImmediateClient = createClient({ adapter: stableAdapter })
+  .use(openTelemetryMetricsPlugin({
+    meter: metricMeter
+  }))
 const concurrencyContendedClient = createClient({ adapter: stableAdapter })
   .use(concurrencyPlugin({ maxConcurrent: 1, queueTimeout: Infinity }))
 const queueCancellationClient = createClient({
@@ -284,12 +299,14 @@ const downloadFetchClient = createClient().use(
 const downloadXhrClient = createClient().use(
   downloadPlugin({ transport: 'xhr' })
 )
-const streamingClient = createClient()
+const streamingClient = createClient().use(openTelemetryMetricsPlugin({
+  meter: metricMeter
+}))
 
 const scenarios: StressScenario[] = [
   {
     name: 'coreBare',
-    weight: 1_200_000,
+    weight: 1_000_000,
     operation: () => bareClient.get('/core')
   },
   {
@@ -369,6 +386,19 @@ const scenarios: StressScenario[] = [
     ),
     verify() {
       assert(telemetryInjections > 0, 'Trace context was not injected')
+    }
+  },
+  {
+    name: 'openTelemetryMetricsImmediate',
+    weight: 200_000,
+    operation: () => telemetryMetricsImmediateClient.get(
+      'https://stress.example.com/metrics'
+    ),
+    verify() {
+      assert(
+        telemetryMetricMeasurements > 0,
+        'OpenTelemetry metrics were not recorded'
+      )
     }
   },
   {
@@ -697,6 +727,7 @@ const report = {
       downloadXhr: downloadXhrProgress
     },
     traceContextInjections: telemetryInjections,
+    telemetryMetricMeasurements,
     streamRecords
   },
   scenarios: results
@@ -715,6 +746,9 @@ async function warmUp(): Promise<void> {
     await concurrencyImmediateClient.get('/warmup')
     await rateLimitImmediateClient.get('/warmup')
     await telemetryImmediateClient.get(
+      'https://stress.example.com/warmup'
+    )
+    await telemetryMetricsImmediateClient.get(
       'https://stress.example.com/warmup'
     )
     await circuitSuccessClient.get('/warmup')

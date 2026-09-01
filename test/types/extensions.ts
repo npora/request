@@ -25,6 +25,7 @@ import type {
   LoggerEntry,
   MemoryCacheStoreOptions,
   OpenTelemetryPluginOptions,
+  OpenTelemetryMetricsPluginOptions,
   Plugin,
   RateLimitPlugin,
   RateLimitPluginOptions,
@@ -52,6 +53,7 @@ import {
   MemoryCacheStore,
   rateLimitPlugin,
   openTelemetryPlugin,
+  openTelemetryMetricsPlugin,
   TieredCacheStore,
   WebStorageCacheStore
 } from '@npora/request'
@@ -149,6 +151,12 @@ const config: RequestConfig = {
         'app.operation': 'load-user'
       }
     },
+    openTelemetryMetrics: {
+      measureStreamConsumption: true,
+      attributes: {
+        'app.operation': 'load-user'
+      }
+    },
     metrics: {
       enabled: true,
       sampleRate: 0.5
@@ -174,7 +182,17 @@ const telemetryOptions: OpenTelemetryPluginOptions = {
 
 const telemetryPlugin: Plugin = openTelemetryPlugin(telemetryOptions)
 
+const metricsPlugin: Plugin = openTelemetryMetricsPlugin({
+  measureStreamConsumption: true,
+  meter: {
+    createCounter() { return { add() {} } },
+    createUpDownCounter() { return { add() {} } },
+    createHistogram() { return { record() {} } }
+  }
+} satisfies OpenTelemetryMetricsPluginOptions)
+
 void telemetryPlugin
+void metricsPlugin
 
 const urlConfig: RequestConfig = {
   url: new URL('https://api.example.com/user')
@@ -221,7 +239,9 @@ const rateLimitOptions: RateLimitPluginOptions = {
   interval: 1000,
   maxQueue: 500,
   queueTimeout: 5000,
-  maxKeys: 1000
+  maxKeys: 1000,
+  sharedRetryAfter: true,
+  maxRetryAfter: 60000
 }
 const rateLimiter: RateLimitPlugin = rateLimitPlugin(rateLimitOptions)
 const rateLimitState: Readonly<RateLimitState> = rateLimiter.getState(
@@ -229,6 +249,7 @@ const rateLimitState: Readonly<RateLimitState> = rateLimiter.getState(
 )
 
 void rateLimitState.remaining
+void rateLimitState.cooldownUntil
 
 const plugin: Plugin = {
   name: 'metrics',

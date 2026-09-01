@@ -59,6 +59,8 @@ try {
     'dist/plugins/rate-limit.cjs',
     'dist/plugins/opentelemetry.js',
     'dist/plugins/opentelemetry.cjs',
+    'dist/plugins/opentelemetry-metrics.js',
+    'dist/plugins/opentelemetry-metrics.cjs',
     'dist/testing.js',
     'dist/testing.cjs'
   ]

@@ -1,6 +1,6 @@
 {
   "name": "@npora/request",
-  "version": "1.17.0",
+  "version": "1.17.1",
   "description": "A modern, TypeScript-first HTTP client powered by the Fetch API.",
   "keywords": [
     "npora",
@@ -15,6 +15,7 @@
     "ndjson",
     "standard-schema",
     "opentelemetry",
+    "metrics",
     "trace-context",
     "circuit-breaker",
     "web-worker"
@@ -84,6 +85,11 @@
       "import": "./dist/plugins/opentelemetry.js",
       "require": "./dist/plugins/opentelemetry.cjs"
     },
+    "./plugins/opentelemetry-metrics": {
+      "types": "./dist/plugins/opentelemetry-metrics.d.ts",
+      "import": "./dist/plugins/opentelemetry-metrics.js",
+      "require": "./dist/plugins/opentelemetry-metrics.cjs"
+    },
     "./plugins/rate-limit": {
       "types": "./dist/plugins/rate-limit.d.ts",
       "import": "./dist/plugins/rate-limit.js",
@@ -150,6 +156,8 @@
     "audit:signatures": "pnpm audit signatures",
     "benchmark": "tsx benchmark/request.ts",
     "benchmark:http": "tsx benchmark/http-concurrency.ts",
+    "benchmark:streaming": "node --expose-gc --import tsx benchmark/streaming-schema.ts",
+    "benchmark:check": "node benchmark/check-performance.mjs",
     "benchmark:libraries": "npm --prefix benchmark/competitors run benchmark",
     "benchmark:libraries:install": "npm install --prefix benchmark/competitors --ignore-scripts --no-audit --no-fund",
     "stress": "node --expose-gc --import tsx benchmark/stress.ts",

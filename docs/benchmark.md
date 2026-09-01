@@ -331,3 +331,30 @@ Request construction avoids success-path body-field arrays and iterates query,
 form and FormData records without intermediate entry arrays. URL joining uses
 relative-path fast paths while query encoding remains delegated to
 `URLSearchParams`.
+
+## Streaming schema and regression gates
+
+`pnpm benchmark:streaming` generates response bodies lazily under Web Stream
+backpressure rather than allocating the complete payload. Its default run
+validates one million NDJSON records and one million SSE events with Standard
+Schema. Both formats cross chunk boundaries and yield 100 times to simulate a
+slow consumer; separate probes assert that schema failures and early consumer
+termination cancel the source reader.
+
+On Node.js 24.18.0 (arm64), the 2026-09-01 reference run produced:
+
+| Scenario | Records | Records/s | Chunks | Retained heap after GC |
+| --- | ---: | ---: | ---: | ---: |
+| NDJSON + itemSchema | 1,000,000 | 1,261,832 | 258 | 0.19 MiB |
+| SSE + itemSchema | 1,000,000 | 801,289 | 562 | 0.04 MiB |
+
+CI runs this exact two-million-item workload and checks
+`benchmark/performance-budget.json`. Request-path limits are ratios against a
+same-process baseline for GET, JSON, plugin pipeline, primitive cache hit,
+rate-limit admission, and OpenTelemetry Metrics, avoiding hardware-specific
+absolute thresholds. The
+streaming gate additionally requires exact record counts, multi-chunk parsing,
+ordered checksums, 100 slow-consumer yields, bounded pre/post-GC heap growth,
+two validation-failure cancellations, two consumer cancellations, and
+conservative throughput floors. The parser emits lines directly from decoded
+chunks instead of allocating an intermediate array for every chunk.

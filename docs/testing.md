@@ -12,6 +12,7 @@ pnpm test:coverage
 pnpm test:types
 pnpm test:examples
 pnpm benchmark:types
+pnpm benchmark:streaming
 ```
 
 Coverage thresholds are:
@@ -79,11 +80,27 @@ upload/download progress.
 
 ```sh
 pnpm benchmark
+pnpm benchmark:streaming
+pnpm benchmark:check -- \
+  --budget benchmark/performance-budget.json \
+  --request benchmark-results/request.json \
+  --streaming benchmark-results/streaming-schema.json
 pnpm test:size
 ```
 
-Benchmarks are trend reports rather than fixed pass/fail throughput thresholds.
-Package size budgets are release-blocking.
+The request benchmark measures GET, JSON body construction, plugin pipelines,
+cache hits, rate limiting, and the non-streaming OpenTelemetry Metrics fast
+path. The streaming benchmark lazily validates one million NDJSON items and
+one million SSE items, forces records across chunk
+boundaries, yields to a slow consumer, and verifies schema-failure and consumer
+cancellation propagation.
+
+CI enforces conservative ratios against same-process baselines instead of
+hardware-specific absolute request throughput. Streaming has low absolute
+floors plus exact record, ordered checksum, slow-consumer, bounded heap-growth,
+and cancellation contracts. Budgets live in
+`benchmark/performance-budget.json`; reports remain CI artifacts for trend
+analysis. Package size and performance budgets are release-blocking.
 
 ## Release process
 
