@@ -1240,12 +1240,18 @@ import {
 
 const request = createClient().use(openTelemetryMetricsPlugin({
   meter: metrics.getMeter('@npora/request'),
+  semconv: 'both',
   attributes: { 'service.namespace': 'checkout' }
 }))
 ```
 
+`semconv` accepts `npora`, `stable`, or `both`. It defaults to `npora` throughout
+1.x so existing dashboards remain unchanged. `stable` emits only the stable
+HTTP metric, while `both` supports a staged dashboard migration.
+
 | Instrument | Type | Unit | Meaning |
 | --- | --- | --- | --- |
+| `http.client.request.duration` | Histogram | `s` | Stable HTTP semantic-convention duration for each transport attempt. |
 | `npora.client.request.duration` | Histogram | `ms` | Time until the request promise settles. |
 | `npora.client.active_requests` | UpDownCounter | `{request}` | Currently active measured requests. |
 | `npora.client.retry.attempts` | Counter | `{attempt}` | Additional attempts that reached the transport pipeline. |
@@ -1254,11 +1260,15 @@ const request = createClient().use(openTelemetryMetricsPlugin({
 | `npora.client.stream.duration` | Histogram | `ms` | Time from returning a stream until complete, cancelled, or errored consumption. |
 | `npora.client.active_streams` | UpDownCounter | `{stream}` | Returned byte, NDJSON, or SSE streams awaiting settlement. |
 
-Default attributes contain only method, bounded outcome/status/error
-classification, and cache result. URLs, headers, keys, trace identifiers, and
-request data are never added automatically. Keep custom attributes
-low-cardinality and free of secrets. Background cache refreshes are excluded
-unless `includeBackground: true`. Request duration ends when a stream is
+The `npora.*` instruments contain only method, bounded outcome/status/error
+classification, and cache result by default. Stable HTTP measurements use
+`http.request.method`, `server.address`, optional `server.port`, status, and
+error type; they omit credentials, path, query, and fragment.
+Headers, keys, trace identifiers, and request data are never added
+automatically. Keep custom attributes low-cardinality and free of secrets.
+Background cache refreshes are excluded unless `includeBackground: true`.
+Stable duration is per actual transport attempt, including retries, and cache
+hits do not create it. The npora request duration ends when a stream is
 returned; the separate stream duration continues until consumption completes,
 fails, or is cancelled, with `stream.type` and `stream.outcome` classifications.
 Set `measureStreamConsumption: false` globally or per request to avoid wrapping
@@ -1267,7 +1277,7 @@ returned streams. Meter/exporter failures are isolated. Use
 filtering.
 
 Official references: [OpenTelemetry JavaScript propagation](https://opentelemetry.io/docs/languages/js/propagation/),
-[Tracer API](https://open-telemetry.github.io/opentelemetry-js/interfaces/_opentelemetry_sdk-node._opentelemetry_api.Tracer.html),
+[HTTP metric semantic conventions](https://opentelemetry.io/docs/specs/semconv/http/http-metrics/),
 and [HTTP span semantic conventions](https://opentelemetry.io/docs/specs/semconv/http/http-spans/).
 
 ## Cache

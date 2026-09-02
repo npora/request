@@ -120,11 +120,13 @@ application.
   `traceparent`, `tracestate`, or baggage headers, so applications should use
   `shouldTrace` or per-request propagation controls for untrusted destinations
   and review the configured propagator's baggage policy.
-- OpenTelemetry metrics emit only method, bounded outcome/status/error and
-  stream type/outcome classes, cache hit/miss, durations, and
-  application-supplied attributes. URLs,
-  headers, payloads, cache keys, and rate-limit keys are omitted. Applications
-  must keep custom metric attributes low-cardinality and free of secrets.
+- OpenTelemetry `npora.*` metrics emit only method, bounded
+  outcome/status/error and stream type/outcome classes, cache hit/miss,
+  durations, and application-supplied attributes. Stable HTTP metrics also
+  emit the resolved server address and optional port, but omit
+  credentials, path, query, and fragment. Headers, payloads, cache keys, and
+  rate-limit keys are omitted. Applications must keep custom metric attributes
+  low-cardinality and free of secrets.
 - Shared 429 cooldowns accept only the standard `Retry-After` header and clamp
   it to `maxRetryAfter` (60 seconds by default), preventing an upstream from
   retaining an origin queue indefinitely.

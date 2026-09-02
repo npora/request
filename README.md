@@ -697,13 +697,18 @@ import { metrics } from '@opentelemetry/api'
 
 const request = createClient().use(openTelemetryMetricsPlugin({
   meter: metrics.getMeter('@npora/request'),
+  semconv: 'both',
   attributes: { 'service.namespace': 'checkout' }
 }))
 ```
 
-The plugin records request duration, active requests, retries, cache hit/miss,
-rate-limit waits, and complete ReadableStream/NDJSON/SSE consumption duration.
-It does not bundle an SDK or exporter.
+The 1.x default, `semconv: 'npora'`, preserves existing dashboards for request
+duration, active requests, retries, cache hit/miss, rate-limit waits, and
+complete ReadableStream/NDJSON/SSE consumption duration. Use `stable` for the
+OpenTelemetry `http.client.request.duration` metric, or `both` while migrating.
+Stable duration is recorded in seconds for every actual transport attempt, so
+cache hits and background SWR do not create an HTTP measurement. The plugin
+does not bundle an SDK or exporter.
 
 Inject a structured logger when request correlation and timing are needed:
 

@@ -184,6 +184,7 @@ const telemetryPlugin: Plugin = openTelemetryPlugin(telemetryOptions)
 
 const metricsPlugin: Plugin = openTelemetryMetricsPlugin({
   measureStreamConsumption: true,
+  semconv: 'both',
   meter: {
     createCounter() { return { add() {} } },
     createUpDownCounter() { return { add() {} } },

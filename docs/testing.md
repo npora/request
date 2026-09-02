@@ -102,6 +102,14 @@ and cancellation contracts. Budgets live in
 `benchmark/performance-budget.json`; reports remain CI artifacts for trend
 analysis. Package size and performance budgets are release-blocking.
 
+The Node suite also runs pairwise composition scenarios across cache, auth,
+rate limiting, concurrency, retry, circuit breaking, and telemetry. A separate
+integration test uses the official OpenTelemetry API and SDK exporters so the
+structural adapters are not validated only against duck-typed test doubles.
+`pnpm test:complexity` blocks production-file, function-complexity, and nesting
+growth; the package contract and size suites continue to gate public API and
+root-entry transitive gzip growth.
+
 ## Release process
 
 Every user-visible change includes a Changesets entry. CI verifies Node.js 22,

@@ -326,12 +326,81 @@ describe('OpenTelemetry metrics plugin', () => {
     expect(values(telemetry, 'npora.client.stream.duration')).toHaveLength(2)
   })
 
+  it('should emit stable HTTP duration per transport attempt in seconds', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(0)
+    const telemetry = createMeter()
+    const adapter = new MockAdapter({ delay: 100 })
+
+    adapter
+      .onGet('/retry')
+      .replyOnce(503, { busy: true })
+      .onGet('/retry')
+      .reply(200, { ok: true })
+
+    const client = createClient({
+      adapter,
+      baseURL: 'https://api.example.com'
+    })
+      .use(retryPlugin({ retries: 1, delay: 0 }))
+      .use(openTelemetryMetricsPlugin({
+        meter: telemetry.meter,
+        semconv: 'stable'
+      }))
+    const pending = client.get('/retry')
+
+    await vi.advanceTimersByTimeAsync(200)
+    await expect(pending).resolves.toEqual({ ok: true })
+
+    expect(values(telemetry, 'http.client.request.duration')).toEqual([
+      0.1, 0.1
+    ])
+    expect(
+      telemetry.records['http.client.request.duration']?.map(record => (
+        record.attributes
+      ))
+    ).toEqual([
+      expect.objectContaining({
+        'http.request.method': 'GET',
+        'server.address': 'api.example.com',
+        'http.response.status_code': 503,
+        'error.type': '503'
+      }),
+      expect.objectContaining({
+        'http.request.method': 'GET',
+        'http.response.status_code': 200
+      })
+    ])
+    expect(telemetry.records['npora.client.request.duration']).toBeUndefined()
+  })
+
+  it('should emit both conventions and skip stable metrics for cache hits', async () => {
+    const telemetry = createMeter()
+    const adapter = new MockAdapter()
+
+    adapter.onGet('/cached').reply(200, { ok: true })
+    const client = createClient({ adapter })
+      .use(cachePlugin())
+      .use(openTelemetryMetricsPlugin({
+        meter: telemetry.meter,
+        semconv: 'both'
+      }))
+    const config = {
+      extensions: { cache: { enabled: true, ttl: Infinity } }
+    } as const
+
+    await client.get('/cached', config)
+    await client.get('/cached', config)
+
+    expect(values(telemetry, 'http.client.request.duration')).toHaveLength(1)
+    expect(values(telemetry, 'npora.client.request.duration')).toHaveLength(2)
+    expect(values(telemetry, 'npora.client.cache.requests')).toHaveLength(2)
+  })
+
   it('should reject a missing meter API', () => {
     expect(() => openTelemetryMetricsPlugin({
       meter: {}
-    } as OpenTelemetryMetricsPluginOptions)).toThrow(
-      'openTelemetryMetricsPlugin requires an OpenTelemetry meter API'
-    )
+    } as OpenTelemetryMetricsPluginOptions)).toThrow(TypeError)
   })
 })
 

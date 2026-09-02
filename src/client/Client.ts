@@ -20,11 +20,11 @@ import type {
   StandardSchemaV1
 } from '../types'
 import {
-  isRequest,
-  rememberRequestBody
+  isRequest
 } from '../utils/isRequest'
 import { hasOwnProperty } from '../utils/hasOwnProperty'
 import { trustDefaults } from '../core/trustedDefaults'
+import { requestToConfig } from './requestInput'
 
 type MethodConfig = Omit<RequestConfig, 'url' | 'method'>
 
@@ -743,33 +743,6 @@ export class Client {
 
     return undefined
   }
-}
-
-function requestToConfig(
-  input: Request,
-  body: ReadableStream<Uint8Array> | null = input.body
-): RequestConfig {
-  const config: RequestConfig = {
-    url: input.url,
-    method: input.method as HttpMethod,
-    headers: input.headers,
-    body,
-    signal: input.signal,
-    fetchOptions: {
-      cache: input.cache,
-      credentials: input.credentials,
-      integrity: input.integrity,
-      keepalive: input.keepalive,
-      mode: input.mode,
-      redirect: input.redirect,
-      referrer: input.referrer,
-      referrerPolicy: input.referrerPolicy
-    }
-  }
-
-  rememberRequestBody(config, input, body)
-
-  return config
 }
 
 interface InstalledPlugin {

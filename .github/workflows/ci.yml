@@ -93,6 +93,9 @@ jobs:
       - name: Typecheck
         run: pnpm typecheck
 
+      - name: Typecheck with next TypeScript
+        run: pnpm typecheck:next
+
       - name: Typecheck public API consumers
         run: pnpm test:types
 
@@ -104,6 +107,9 @@ jobs:
 
       - name: Check documentation links
         run: pnpm test:docs
+
+      - name: Enforce source complexity budgets
+        run: pnpm test:complexity
 
       - name: Verify release workflow contract
         run: pnpm test:release-workflow

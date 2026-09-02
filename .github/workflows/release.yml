@@ -63,10 +63,12 @@ jobs:
       - name: Verify
         run: |
           pnpm typecheck
+          pnpm typecheck:next
           pnpm test:types
           pnpm test:examples
           pnpm benchmark:types
           pnpm test:docs
+          pnpm test:complexity
           pnpm test:release-workflow
           pnpm test:coverage
           pnpm build

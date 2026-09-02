@@ -12,6 +12,13 @@ import { waitForSignal } from '../utils/waitForSignal'
 import type { RequestContext } from '../core/RequestContext'
 import type { Plugin, PluginContext } from './Plugin'
 import { resolveExtensionConfig } from './resolveExtensionConfig'
+import {
+  hasCacheControlDirective,
+  resolveRequestCachePolicy,
+  resolveResponseCachePolicy,
+  resolveStaleIfErrorWindow,
+  resolveStaleWhileRevalidateWindow
+} from './cachePolicy'
 
 export {
   IndexedDBCacheStore
@@ -441,6 +448,20 @@ const DEFAULT_VARY_HEADERS = [
 const EMPTY_QUERY: ReadonlyArray<[string, string]> = []
 const MAX_CACHE_TAGS = 32
 const MAX_CACHE_TAG_LENGTH = 128
+const CACHE_STAT_KEYS: Record<CacheEventType, keyof CacheStats> = {
+  hit: 'hits',
+  miss: 'misses',
+  bypass: 'bypasses',
+  invalidated: 'invalidations',
+  'invalidation-error': 'invalidationErrors',
+  deduplicated: 'deduplicated',
+  revalidated: 'revalidations',
+  'stale-if-error': 'staleIfError',
+  'stale-while-revalidate': 'staleWhileRevalidate',
+  'background-refresh': 'backgroundRefreshes',
+  'background-refresh-success': 'backgroundRefreshSuccesses',
+  'background-refresh-error': 'backgroundRefreshErrors'
+}
 
 function createCacheStats(): CacheStats {
   return {
@@ -493,29 +514,7 @@ function incrementCacheStat(
   stats: CacheStats,
   type: CacheEventType
 ): void {
-  const key: keyof CacheStats = type === 'hit'
-    ? 'hits'
-    : type === 'miss'
-      ? 'misses'
-      : type === 'bypass'
-        ? 'bypasses'
-        : type === 'invalidated'
-          ? 'invalidations'
-          : type === 'invalidation-error'
-            ? 'invalidationErrors'
-            : type === 'deduplicated'
-            ? 'deduplicated'
-            : type === 'revalidated'
-              ? 'revalidations'
-              : type === 'stale-if-error'
-                ? 'staleIfError'
-                : type === 'stale-while-revalidate'
-                  ? 'staleWhileRevalidate'
-                  : type === 'background-refresh'
-                    ? 'backgroundRefreshes'
-                    : type === 'background-refresh-success'
-                      ? 'backgroundRefreshSuccesses'
-                      : 'backgroundRefreshErrors'
+  const key = CACHE_STAT_KEYS[type]
 
   stats[key] = Math.min(
     Number.MAX_SAFE_INTEGER,
@@ -2038,178 +2037,6 @@ function isSchemaValidationFailure(error: unknown): boolean {
   return isRequestError(error) && error.code === 'SCHEMA_ERROR'
 }
 
-interface ResponseCachePolicy {
-  persist: boolean
-  ttl: number
-}
-
-type RequestCachePolicy = 'default' | 'revalidate' | 'no-store'
-
-function resolveRequestCachePolicy(
-  config: RequestConfig
-): RequestCachePolicy {
-  const headers = new Headers(config.headers)
-  const cacheControl = headers.get('cache-control')
-  let revalidate = false
-
-  if (cacheControl) {
-    for (const value of cacheControl.split(',')) {
-      const directive = value.trim()
-      const separator = directive.indexOf('=')
-      const name = (
-        separator === -1
-          ? directive
-          : directive.slice(0, separator)
-      ).trim().toLowerCase()
-
-      if (name === 'no-store') {
-        return 'no-store'
-      }
-
-      if (name === 'no-cache') {
-        revalidate = true
-        continue
-      }
-
-      if (name === 'max-age' && separator !== -1) {
-        const candidate = directive.slice(separator + 1).trim()
-        const match = /^(?:"(\d+)"|(\d+))$/.exec(candidate)
-
-        if (match && Number(match[1] ?? match[2]) === 0) {
-          revalidate = true
-        }
-      }
-    }
-  } else if (
-    headers
-      .get('pragma')
-      ?.split(',')
-      .some(value => value.trim().toLowerCase() === 'no-cache')
-  ) {
-    revalidate = true
-  }
-
-  return revalidate ? 'revalidate' : 'default'
-}
-
-function resolveResponseCachePolicy(
-  response: NporaResponse,
-  configuredTtl: number,
-  configuredStaleIfError?: number,
-  configuredStaleWhileRevalidate?: number
-): ResponseCachePolicy {
-  const cacheControl = response.headers.get('cache-control')
-  let maxAgeSeconds: number | undefined
-  let requiresRevalidation = false
-
-  if (cacheControl) {
-    for (const value of cacheControl.split(',')) {
-      const directive = value.trim()
-      const separator = directive.indexOf('=')
-      const name = (
-        separator === -1
-          ? directive
-          : directive.slice(0, separator)
-      ).trim().toLowerCase()
-
-      if (name === 'no-store') {
-        return NO_CACHE_POLICY
-      }
-
-      if (name === 'no-cache') {
-        requiresRevalidation = true
-        continue
-      }
-
-      if (name !== 'max-age') {
-        continue
-      }
-
-      if (maxAgeSeconds !== undefined) {
-        return NO_CACHE_POLICY
-      }
-
-      const candidate = directive.slice(separator + 1).trim()
-      const match = /^(?:"(\d+)"|(\d+))$/.exec(candidate)
-
-      if (!match) {
-        return NO_CACHE_POLICY
-      }
-
-      maxAgeSeconds = Number(match[1] ?? match[2])
-    }
-  }
-
-  if (
-    response.headers
-      .get('vary')
-      ?.split(',')
-      .some(name => {
-        const normalized = name.trim().toLowerCase()
-
-        return normalized === '*' ||
-          isRequestCacheControlHeader(normalized)
-      })
-  ) {
-    return NO_CACHE_POLICY
-  }
-
-  if (configuredTtl <= 0) {
-    return NO_CACHE_POLICY
-  }
-
-  if (
-    maxAgeSeconds !== undefined &&
-    !Number.isSafeInteger(maxAgeSeconds)
-  ) {
-    return NO_CACHE_POLICY
-  }
-
-  const ttl = requiresRevalidation
-    ? 0
-    : maxAgeSeconds === undefined
-      ? configuredTtl
-      : Math.min(
-          configuredTtl,
-          Math.max(
-            0,
-            (maxAgeSeconds - parseAge(response.headers.get('age'))) * 1000
-          )
-        )
-
-  return {
-    ttl,
-    persist: ttl > 0 ||
-      hasResponseValidator(response.headers) ||
-      resolveStaleIfErrorWindow(
-        response.headers,
-        configuredStaleIfError
-      ) > 0 ||
-      (
-        !requiresRevalidation &&
-        resolveStaleWhileRevalidateWindow(
-          response.headers,
-          configuredStaleWhileRevalidate
-        ) > 0
-      )
-  }
-}
-
-const NO_CACHE_POLICY: ResponseCachePolicy = {
-  persist: false,
-  ttl: 0
-}
-
-function parseAge(value: string | null): number {
-  if (!value || !/^\d+$/.test(value.trim())) {
-    return 0
-  }
-
-  const age = Number(value)
-
-  return Number.isSafeInteger(age) ? age : 0
-}
-
 function canUseStaleIfError(
   record: CacheEntry,
   config: RequestConfig,
@@ -2281,106 +2108,6 @@ function canUseStaleWhileRevalidate(
   } catch {
     return false
   }
-}
-
-function resolveStaleIfErrorWindow(
-  headers: Headers,
-  configured?: number
-): number {
-  const server = parseStaleIfError(headers.get('cache-control'))
-
-  if (configured === undefined) {
-    return server ?? 0
-  }
-
-  return server === undefined
-    ? configured
-    : Math.min(configured, server)
-}
-
-function resolveStaleWhileRevalidateWindow(
-  headers: Headers,
-  configured?: number
-): number {
-  const server = parseCacheDeltaSeconds(
-    headers.get('cache-control'),
-    'stale-while-revalidate'
-  )
-
-  if (configured === undefined) {
-    return server ?? 0
-  }
-
-  return server === undefined
-    ? configured
-    : Math.min(configured, server)
-}
-
-function parseStaleIfError(value: string | null): number | undefined {
-  return parseCacheDeltaSeconds(value, 'stale-if-error')
-}
-
-function parseCacheDeltaSeconds(
-  value: string | null,
-  expectedName: string
-): number | undefined {
-  let seconds: number | undefined
-
-  if (!value) {
-    return undefined
-  }
-
-  for (const item of value.split(',')) {
-    const directive = item.trim()
-    const separator = directive.indexOf('=')
-
-    if (
-      separator === -1 ||
-      directive.slice(0, separator).trim().toLowerCase() !== expectedName
-    ) {
-      continue
-    }
-
-    if (seconds !== undefined) {
-      return undefined
-    }
-
-    const candidate = directive.slice(separator + 1).trim()
-    const match = /^(?:"(\d+)"|(\d+))$/.exec(candidate)
-
-    if (!match) {
-      return undefined
-    }
-
-    seconds = Number(match[1] ?? match[2])
-  }
-
-  if (seconds === undefined || !Number.isSafeInteger(seconds)) {
-    return undefined
-  }
-
-  const milliseconds = seconds * 1000
-
-  return Number.isSafeInteger(milliseconds)
-    ? milliseconds
-    : undefined
-}
-
-function hasCacheControlDirective(
-  headers: Headers,
-  expectedName: string
-): boolean {
-  return headers
-    .get('cache-control')
-    ?.split(',')
-    .some(value => {
-      const separator = value.indexOf('=')
-      const name = separator === -1
-        ? value
-        : value.slice(0, separator)
-
-      return name.trim().toLowerCase() === expectedName
-    }) ?? false
 }
 
 function startBackgroundRefresh(

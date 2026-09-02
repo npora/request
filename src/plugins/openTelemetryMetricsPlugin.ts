@@ -42,6 +42,9 @@ export interface OpenTelemetryMeter {
 export interface OpenTelemetryMetricsPluginOptions {
   meter: OpenTelemetryMeter
 
+  /** Metric convention to emit. @default 'npora' */
+  semconv?: 'npora' | 'stable' | 'both'
+
   /** Static low-cardinality attributes added to every measurement. */
   attributes?: OpenTelemetryMetricAttributes
 
@@ -57,16 +60,16 @@ export interface OpenTelemetryMetricsPluginOptions {
 
 interface MetricState {
   attributes: Record<string, OpenTelemetryAttributeValue>
+  httpAttrs?: Record<string, OpenTelemetryAttributeValue>
   startedAt: number
-  retryAttempts: number
-  measureStreamConsumption: boolean
-  active: boolean
+  attemptStart?: number
+  retries: number
+  measureStream: boolean
 }
 
 interface StreamMetricState {
   attributes: Record<string, OpenTelemetryAttributeValue>
   startedAt: number
-  active: boolean
 }
 
 type StreamOutcome = 'complete' | 'cancelled' | 'error' |
@@ -80,49 +83,58 @@ export function openTelemetryMetricsPlugin(
   options: OpenTelemetryMetricsPluginOptions
 ): Plugin {
   validateOptions(options)
+  const semconv = options.semconv ?? 'npora'
 
-  const requestDuration = safeCreateHistogram(
+  const [
+    requestDuration,
+    rateLimitWaitDuration,
+    activeRequests,
+    retryAttempts,
+    cacheRequests,
+    streamDuration,
+    activeStreams
+  ] = semconv !== 'stable' ? [
+    safeCreateHistogram(
+      options.meter,
+      'npora.client.request.duration',
+      'ms'
+    ),
+    safeCreateHistogram(
+      options.meter,
+      'npora.client.rate_limit.wait.duration',
+      'ms'
+    ),
+    safeCreateUpDownCounter(
+      options.meter,
+      'npora.client.active_requests',
+      '{request}'
+    ),
+    safeCreateCounter(
+      options.meter,
+      'npora.client.retry.attempts',
+      '{attempt}'
+    ),
+    safeCreateCounter(
+      options.meter,
+      'npora.client.cache.requests',
+      '{request}'
+    ),
+    safeCreateHistogram(
+      options.meter,
+      'npora.client.stream.duration',
+      'ms'
+    ),
+    safeCreateUpDownCounter(
+      options.meter,
+      'npora.client.active_streams',
+      '{stream}'
+    )
+  ] : []
+  const stableRequestDuration = semconv !== 'npora' ? safeCreateHistogram(
     options.meter,
-    'npora.client.request.duration',
-    'Time until the request promise settles',
-    'ms'
-  )
-  const rateLimitWaitDuration = safeCreateHistogram(
-    options.meter,
-    'npora.client.rate_limit.wait.duration',
-    'Time spent waiting for rate-limit admission',
-    'ms'
-  )
-  const activeRequests = safeCreateUpDownCounter(
-    options.meter,
-    'npora.client.active_requests',
-    'Requests currently executing',
-    '{request}'
-  )
-  const retryAttempts = safeCreateCounter(
-    options.meter,
-    'npora.client.retry.attempts',
-    'Additional transport attempts',
-    '{attempt}'
-  )
-  const cacheRequests = safeCreateCounter(
-    options.meter,
-    'npora.client.cache.requests',
-    'Cache-enabled requests by outcome',
-    '{request}'
-  )
-  const streamDuration = safeCreateHistogram(
-    options.meter,
-    'npora.client.stream.duration',
-    'Time from returning a stream until consumption settles',
-    'ms'
-  )
-  const activeStreams = safeCreateUpDownCounter(
-    options.meter,
-    'npora.client.active_streams',
-    'Returned response streams awaiting completion or cancellation',
-    '{stream}'
-  )
+    'http.client.request.duration',
+    's'
+  ) : undefined
   const states = new WeakMap<object, MetricState>()
   const activeStates = new Set<MetricState>()
   const streamStates = new Set<StreamMetricState>()
@@ -155,18 +167,35 @@ export function openTelemetryMetricsPlugin(
         let state: MetricState
 
         try {
+          const attributes = createAttributes(
+            options,
+            requestContext.config,
+            requestOptions
+          )
+          const httpAttrs = stableRequestDuration
+            ? { ...attributes }
+            : undefined
+
+          if (httpAttrs) {
+            try {
+              const config = requestContext.config
+              const url = config.baseURL
+                ? new URL(config.url, config.baseURL)
+                : new URL(config.url)
+
+              httpAttrs['server.address'] = url.hostname
+              if (url.port) httpAttrs['server.port'] = +url.port
+            } catch {}
+          }
+
           state = {
-            attributes: createAttributes(
-              options,
-              requestContext.config,
-              requestOptions
-            ),
+            attributes,
+            httpAttrs,
             startedAt: requestContext.startTime,
-            retryAttempts: 0,
-            measureStreamConsumption:
+            retries: 0,
+            measureStream:
               requestOptions?.measureStreamConsumption ??
-              options.measureStreamConsumption ?? true,
-            active: true
+              options.measureStreamConsumption ?? true
           }
         } catch {
           return
@@ -184,10 +213,29 @@ export function openTelemetryMetricsPlugin(
       context.hooks.onTransport(requestContext => {
         const state = states.get(requestContext)
 
-        if (state && requestContext.attempt > 0) {
-          state.retryAttempts += 1
+        if (state) {
+          if (stableRequestDuration) state.attemptStart = Date.now()
+
+          if (requestContext.attempt > 0) {
+            state.retries += 1
+          }
         }
       })
+
+      const recordAttempt = (requestContext: RequestContext<unknown>) => {
+        const state = states.get(requestContext)
+
+        if (!state?.httpAttrs || state.attemptStart === undefined) return
+        safeRecord(
+          stableRequestDuration,
+          Math.max(0, Date.now() - state.attemptStart) / 1000,
+          createResultAttributes(state.httpAttrs, requestContext)
+        )
+        state.attemptStart = undefined
+      }
+
+      context.hooks.onResponse(recordAttempt, { requiresRawResponse: false })
+      context.hooks.onError(recordAttempt)
 
       context.hooks.onSettled(requestContext => {
         const state = states.get(requestContext)
@@ -196,9 +244,10 @@ export function openTelemetryMetricsPlugin(
           return
         }
 
-        const outcomeAttributes = createOutcomeAttributes(
+        const outcomeAttributes = createResultAttributes(
           state.attributes,
-          requestContext
+          requestContext,
+          true
         )
 
         safeRecord(
@@ -207,10 +256,10 @@ export function openTelemetryMetricsPlugin(
           outcomeAttributes
         )
 
-        if (state.retryAttempts > 0) {
+        if (state.retries > 0) {
           safeAdd(
             retryAttempts,
-            state.retryAttempts,
+            state.retries,
             outcomeAttributes
           )
         }
@@ -232,7 +281,7 @@ export function openTelemetryMetricsPlugin(
 
         if (
           requestContext.response &&
-          state.measureStreamConsumption
+          state.measureStream
         ) {
           instrumentStreamConsumption(
             requestContext,
@@ -292,8 +341,7 @@ function instrumentStreamConsumption(
       ...attributes,
       'stream.type': streamType
     },
-    startedAt: Date.now(),
-    active: true
+    startedAt: Date.now()
   }
   const finish = (outcome: StreamOutcome) => {
     finishStreamState(
@@ -456,12 +504,10 @@ function finishStreamState(
   activeInstrument: OpenTelemetryCounter | undefined,
   duration: OpenTelemetryHistogram | undefined
 ): void {
-  if (!state.active) {
+  if (!activeStates.delete(state)) {
     return
   }
 
-  state.active = false
-  activeStates.delete(state)
   const attributes = {
     ...state.attributes,
     'stream.outcome': outcome
@@ -497,23 +543,24 @@ function createAttributes(
   }
 }
 
-function createOutcomeAttributes(
+function createResultAttributes(
   attributes: OpenTelemetryMetricAttributes,
-  context: RequestContext<unknown>
+  context: RequestContext<unknown>,
+  includeOutcome = false
 ): Record<string, OpenTelemetryAttributeValue> {
   const result: Record<string, OpenTelemetryAttributeValue> = {
-    ...attributes,
-    'request.outcome': context.error ? 'error' : 'success'
+    ...attributes
   }
 
-  if (context.response?.status !== undefined) {
-    result['http.response.status_code'] = context.response.status
-  } else if (
-    isRequestError(context.error) &&
-    context.error.status !== undefined
-  ) {
-    result['http.response.status_code'] = context.error.status
+  if (includeOutcome) {
+    result['request.outcome'] = context.error ? 'error' : 'success'
   }
+
+  const status = context.response?.status ?? (
+    isRequestError(context.error) ? context.error.status : undefined
+  )
+
+  if (status !== undefined) result['http.response.status_code'] = status
 
   if (context.error) {
     result['error.type'] = resolveErrorType(context.error)
@@ -535,12 +582,10 @@ function finishState(
   activeStates: Set<MetricState>,
   instrument: OpenTelemetryCounter | undefined
 ): void {
-  if (!state.active) {
+  if (!activeStates.delete(state)) {
     return
   }
 
-  state.active = false
-  activeStates.delete(state)
   safeAdd(instrument, -1, state.attributes)
 }
 
@@ -558,11 +603,10 @@ function shouldRecord(
 function safeCreateCounter(
   meter: OpenTelemetryMeter,
   name: string,
-  description: string,
   unit: string
 ): OpenTelemetryCounter | undefined {
   try {
-    return meter.createCounter(name, { description, unit })
+    return meter.createCounter(name, { unit })
   } catch {
     return undefined
   }
@@ -571,11 +615,10 @@ function safeCreateCounter(
 function safeCreateUpDownCounter(
   meter: OpenTelemetryMeter,
   name: string,
-  description: string,
   unit: string
 ): OpenTelemetryCounter | undefined {
   try {
-    return meter.createUpDownCounter(name, { description, unit })
+    return meter.createUpDownCounter(name, { unit })
   } catch {
     return undefined
   }
@@ -584,11 +627,10 @@ function safeCreateUpDownCounter(
 function safeCreateHistogram(
   meter: OpenTelemetryMeter,
   name: string,
-  description: string,
   unit: string
 ): OpenTelemetryHistogram | undefined {
   try {
-    return meter.createHistogram(name, { description, unit })
+    return meter.createHistogram(name, { unit })
   } catch {
     return undefined
   }
@@ -625,8 +667,7 @@ function validateOptions(options: OpenTelemetryMetricsPluginOptions): void {
     typeof options.meter?.createUpDownCounter !== 'function' ||
     typeof options.meter?.createHistogram !== 'function'
   ) {
-    throw new TypeError(
-      'openTelemetryMetricsPlugin requires an OpenTelemetry meter API'
-    )
+    throw new TypeError()
   }
+
 }

@@ -549,14 +549,20 @@ default.
 
 Requires `openTelemetryMetricsPlugin()`.
 
+The plugin-level `semconv` option accepts `npora`, `stable`, or `both` and
+defaults to `npora` in 1.x. It cannot be changed per request because instrument
+registration belongs to the meter/plugin lifecycle.
+
 | Field | Default | Purpose |
 | --- | --- | --- |
 | `enabled` | `true` | Record metrics for this request. |
 | `measureStreamConsumption` | `true` | Measure returned ReadableStream, NDJSON, and SSE consumption through completion, error, or cancellation. |
 | `attributes` | `{}` | Add privacy-reviewed, low-cardinality attributes. |
 
-Request URLs, headers, payloads, and rate-limit keys are not exported
-automatically.
+The stable HTTP convention exports the resolved server address and optional
+port, but not credentials, path, query, or fragment. The npora
+convention exports no URL fields. Headers, payloads, and rate-limit keys are
+not exported automatically.
 
 ### `extensions.auth`
 
