@@ -9,6 +9,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
+import { retryRegistryInstall } from './registry-retry.mjs'
 
 const projectRoot = fileURLToPath(
   new URL('../../', import.meta.url)
@@ -37,16 +38,27 @@ try {
     })
   )
 
-  run(
-    'npm',
-    [
-      'install',
-      packageSpec,
-      '--ignore-scripts',
-      '--no-audit',
-      '--no-fund'
-    ]
+  const installArgs = [
+    'install',
+    packageSpec,
+    '--ignore-scripts',
+    '--no-audit',
+    '--no-fund'
+  ]
+  const installResult = await retryRegistryInstall(
+    () => runCommand('npm', installArgs),
+    {
+      onRetry({ attempt, delay, maximumAttempts }) {
+        console.warn(
+          `npm has not exposed ${packageSpec} yet; ` +
+          `retrying in ${delay}ms ` +
+          `(attempt ${attempt}/${maximumAttempts}).`
+        )
+      }
+    }
   )
+
+  assertRunSucceeded('npm', installArgs, installResult)
 
   const installedManifest = JSON.parse(
     readFileSync(
@@ -113,7 +125,13 @@ try {
 }
 
 function run(command, args) {
-  const result = spawnSync(command, args, {
+  const result = runCommand(command, args)
+
+  assertRunSucceeded(command, args, result)
+}
+
+function runCommand(command, args) {
+  return spawnSync(command, args, {
     cwd: temporaryDirectory,
     encoding: 'utf8',
     env: {
@@ -121,7 +139,9 @@ function run(command, args) {
       npm_config_cache: npmCache
     }
   })
+}
 
+function assertRunSucceeded(command, args, result) {
   assert.equal(
     result.status,
     0,
