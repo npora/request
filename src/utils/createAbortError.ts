@@ -15,14 +15,7 @@ export function createAbortError(
   cause: unknown = reason
 ): RequestError {
   if (isRequestError(reason)) {
-    return new RequestError(reason.message, {
-      code: reason.code,
-      status: reason.status,
-      data: reason.data,
-      response: reason.response,
-      config: reason.config ?? config,
-      cause: reason
-    })
+    return reason
   }
 
   return new RequestError('Request aborted', {

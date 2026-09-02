@@ -705,6 +705,8 @@ function createAbortError(
   reason: unknown,
   config: RequestConfig
 ): RequestError {
+  if (isRequestError(reason)) return reason
+
   return new RequestError(
     'Request aborted while waiting for rate limit permit',
     {

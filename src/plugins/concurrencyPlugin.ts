@@ -1,4 +1,4 @@
-import { RequestError } from '../errors'
+import { isRequestError, RequestError } from '../errors'
 import { MAX_TIMER_DELAY } from '../utils/maxTimerDelay'
 import type { RequestConfig } from '../types'
 import type { Plugin } from './Plugin'
@@ -493,6 +493,8 @@ function createAbortError(
   reason: unknown,
   config: RequestConfig
 ): RequestError {
+  if (isRequestError(reason)) return reason
+
   return new RequestError(
     'Request aborted while waiting for concurrency permit',
     {
