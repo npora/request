@@ -155,31 +155,27 @@ async function verifyValidationFailure(kind: 'ndjson' | 'sse') {
   const iterable = kind === 'ndjson'
     ? await client.ndjson('/failure', { itemSchema: ndjsonSchema })
     : await client.sse('/failure', { itemSchema: sseSchema })
-  let error: unknown
-
   try {
     for await (const _ of iterable) {
       // The second item intentionally fails.
     }
   } catch (caught) {
-    error = caught
+    if (!(caught instanceof SchemaValidationError)) throw caught
+
+    assert.equal(caught.itemIndex, 1)
+    assert.equal(cancelled, true)
+
+    return {
+      code: caught.code,
+      itemIndex: caught.itemIndex,
+      lineNumber: caught.lineNumber,
+      event: caught.event,
+      eventId: caught.eventId,
+      sourceCancelled: cancelled
+    }
   }
 
-  if (!(error instanceof SchemaValidationError)) {
-    throw error ?? new Error('Expected streaming schema validation to fail')
-  }
-
-  assert.equal(error.itemIndex, 1)
-  assert.equal(cancelled, true)
-
-  return {
-    code: error.code,
-    itemIndex: error.itemIndex,
-    lineNumber: error.lineNumber,
-    event: error.event,
-    eventId: error.eventId,
-    sourceCancelled: cancelled
-  }
+  throw new Error('Expected streaming schema validation to fail')
 }
 
 async function verifyConsumerCancellation(kind: 'ndjson' | 'sse') {
