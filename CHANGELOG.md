@@ -1,5 +1,11 @@
 # @npora/request
 
+## 1.17.4
+
+### Patch Changes
+
+- 177f4a4: Report completion for empty XHR downloads, enforce response-size limits even when the runtime omits progress events, and tolerate longer npm registry propagation during release verification.
+
 ## 1.17.3
 
 ### Patch Changes
