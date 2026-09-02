@@ -1,5 +1,11 @@
 # @npora/request
 
+## 1.17.3
+
+### Patch Changes
+
+- b67cc0f: Preserve total-timeout errors while requests wait in concurrency and rate-limit queues so callers, traces, and metrics observe one consistent failure classification.
+
 ## 1.17.2
 
 ### Patch Changes
