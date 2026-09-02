@@ -27,6 +27,11 @@ afterEach(() => {
 function createAdapter(
   requests: RequestConfig[]
 ): Adapter {
+  // Construct native state before prototype-pollution scenarios run. Node 22's
+  // undici Response constructor assigns internal headers through an object
+  // that can observe a later non-writable Object.prototype.headers property.
+  const raw = new Response()
+
   return {
     async request<T>(
       config: RequestConfig
@@ -41,7 +46,7 @@ function createAdapter(
         statusText: 'OK',
         headers: new Headers(),
         config,
-        raw: new Response()
+        raw
       }
     }
   }
