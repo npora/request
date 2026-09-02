@@ -108,7 +108,10 @@ class StressXMLHttpRequest {
 
   send(): void {
     this.upload.onprogress?.(progressEvent(5, 5))
-    this.onprogress?.(progressEvent(5, 5))
+    this.onprogress?.(progressEvent(
+      this.url.includes('/download-xhr') ? 2 : 5,
+      5
+    ))
     this.onload?.({} as ProgressEvent)
   }
 
