@@ -7,9 +7,12 @@ import {
   createClient,
   MockAdapter,
   openTelemetryMetricsPlugin,
+  openTelemetryPlugin,
   rateLimitPlugin,
   retryPlugin,
+  type OpenTelemetryAttributeValue,
   type OpenTelemetryMetricAttributes,
+  type OpenTelemetryPluginOptions,
   type Plugin
 } from '../src'
 
@@ -167,6 +170,21 @@ describe('plugin composition state matrix', () => {
 
       void client.get('/active')
       return client.get('/queue', { totalTimeout: 25 })
+    }],
+    ['rate-limit queue', () => {
+      const limiter = rateLimitPlugin({
+        maxRequests: 1,
+        interval: 1000,
+        maxQueue: 1
+      })
+      const client = createClient({
+        fetch: async () => new Response('{"ok":true}', {
+          headers: { 'content-type': 'application/json' }
+        })
+      }).use(limiter)
+
+      void client.get('/admitted')
+      return client.get('/queue', { totalTimeout: 25 })
     }]
   ])('should classify totalTimeout once during %s', async (_stage, run) => {
     vi.useFakeTimers()
@@ -212,6 +230,104 @@ describe('plugin composition state matrix', () => {
       expect(attempts).toEqual([0, 1])
     }
   )
+
+  it('should jointly clean plugin-owned state when plugins are removed', async () => {
+    const metrics = createMeter()
+    const tracing = createTracing()
+    const cache = cachePlugin()
+    const concurrency = concurrencyPlugin({ maxConcurrent: 1, maxQueue: 1 })
+    let resolveActive!: (response: Response) => void
+    let streamCancelled = false
+    const fetch = vi.fn(async input => {
+      const url = String(input)
+
+      if (url.endsWith('/stream')) {
+        return new Response(new ReadableStream<Uint8Array>({
+          start(controller) {
+            controller.enqueue(new Uint8Array([1]))
+          },
+          cancel() {
+            streamCancelled = true
+          }
+        }))
+      }
+
+      if (url.endsWith('/active')) {
+        return new Promise<Response>(resolve => {
+          resolveActive = resolve
+        })
+      }
+
+      return new Response('{"queued":true}', {
+        headers: { 'content-type': 'application/json' }
+      })
+    })
+    const client = createClient({ fetch })
+      .use(cache)
+      .use(concurrency)
+      .use(openTelemetryPlugin(tracing.options))
+      .use(openTelemetryMetricsPlugin({ meter: metrics.meter }))
+    const stream = await client.get<ReadableStream<Uint8Array>>('/stream', {
+      responseType: 'stream'
+    })
+    const reader = stream.getReader()
+
+    await reader.read()
+
+    const cachedConfig = {
+      extensions: { cache: { enabled: true } }
+    } as const
+    const active = client.get('/active', cachedConfig)
+
+    await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(2))
+    const follower = client.get('/active', cachedConfig)
+    const queued = client.get('/queued')
+
+    await vi.waitFor(() => {
+      expect(concurrency.getState('default').queued).toBe(1)
+    })
+
+    client.unuse('cache')
+    client.unuse('concurrency')
+    client.unuse('opentelemetry')
+    client.unuse('opentelemetry-metrics')
+
+    await expect(follower).rejects.toMatchObject({
+      code: 'ABORT_ERROR',
+      message: 'Cache plugin removed during shared request'
+    })
+    await expect(queued).rejects.toMatchObject({
+      code: 'ABORT_ERROR',
+      message: 'Concurrency plugin removed while request was queued'
+    })
+    expect(concurrency.getState('default')).toEqual({ active: 0, queued: 0 })
+    const activeRequests = values(metrics, 'npora.client.active_requests')
+    const activeStreams = values(metrics, 'npora.client.active_streams')
+
+    expect(activeRequests).toHaveLength(8)
+    expect(sum(activeRequests)).toBe(0)
+    expect(activeStreams).toEqual([1, -1])
+    expect(
+      metrics.records['npora.client.stream.duration']?.map(record => (
+        record.attributes?.['stream.outcome']
+      ))
+    ).toEqual(['instrumentation_removed'])
+    expect(tracing.spans).toHaveLength(2)
+    expect(tracing.spans[1]?.attributes).toMatchObject({
+      'npora.request.instrumentation_removed': true
+    })
+    expect(tracing.spans[1]?.end).toHaveBeenCalledOnce()
+
+    resolveActive(new Response('{"active":true}', {
+      headers: { 'content-type': 'application/json' }
+    }))
+    await expect(active).resolves.toEqual({ active: true })
+    expect(fetch).toHaveBeenCalledTimes(2)
+    await reader.cancel()
+    expect(streamCancelled).toBe(true)
+    expect(tracing.spans[1]?.end).toHaveBeenCalledOnce()
+    expect(values(metrics, 'npora.client.stream.duration')).toHaveLength(1)
+  })
 })
 
 interface MetricRecord {
@@ -242,4 +358,49 @@ function createMeter() {
 
 function values(metrics: ReturnType<typeof createMeter>, name: string) {
   return metrics.records[name]?.map(record => record.value) ?? []
+}
+
+function sum(input: readonly number[]): number {
+  return input.reduce((total, value) => total + value, 0)
+}
+
+function createTracing() {
+  const spans: Array<{
+    attributes: Record<string, OpenTelemetryAttributeValue>
+    end: ReturnType<typeof vi.fn>
+  }> = []
+  const options: OpenTelemetryPluginOptions = {
+    tracer: {
+      startSpan() {
+        const span = {
+          attributes: {} as Record<string, OpenTelemetryAttributeValue>,
+          setAttribute(name: string, value: OpenTelemetryAttributeValue) {
+            span.attributes[name] = value
+            return span
+          },
+          setStatus() {
+            return span
+          },
+          recordException() {},
+          end: vi.fn()
+        }
+
+        spans.push(span)
+        return span
+      }
+    },
+    context: {
+      active() {}
+    },
+    trace: {
+      setSpan(context) {
+        return context
+      }
+    },
+    propagation: {
+      inject() {}
+    }
+  }
+
+  return { options, spans }
 }
