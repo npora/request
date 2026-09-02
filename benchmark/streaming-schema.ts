@@ -165,7 +165,10 @@ async function verifyValidationFailure(kind: 'ndjson' | 'sse') {
     error = caught
   }
 
-  assert.ok(error instanceof SchemaValidationError)
+  if (!(error instanceof SchemaValidationError)) {
+    throw error ?? new Error('Expected streaming schema validation to fail')
+  }
+
   assert.equal(error.itemIndex, 1)
   assert.equal(cancelled, true)
 

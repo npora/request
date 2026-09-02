@@ -378,7 +378,7 @@ function measureAsyncIterable<T>(
   finish: (outcome: StreamOutcome) => void
 ): AsyncIterable<T> {
   return (async function* () {
-    let outcome: StreamOutcome = 'cancelled'
+    let outcome: StreamOutcome | undefined
 
     try {
       yield* iterable
@@ -387,7 +387,7 @@ function measureAsyncIterable<T>(
       outcome = 'error'
       throw error
     } finally {
-      finish(outcome)
+      finish(outcome ?? 'cancelled')
     }
   })()
 }
