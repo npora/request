@@ -198,6 +198,64 @@ describe('plugin composition state matrix', () => {
     expect(vi.getTimerCount()).toBe(0)
   })
 
+  it.each(['concurrency', 'rate-limit'])(
+    'should preserve totalTimeout telemetry in the %s queue',
+    async limiterName => {
+      vi.useFakeTimers()
+      vi.setSystemTime(0)
+      const metrics = createMeter()
+      const adapter = new MockAdapter({
+        delay: limiterName === 'concurrency' ? 1000 : 0
+      })
+      const limiter = limiterName === 'concurrency'
+        ? concurrencyPlugin({ maxConcurrent: 1, maxQueue: 1 })
+        : rateLimitPlugin({
+            maxRequests: 1,
+            interval: 1000,
+            maxQueue: 1
+          })
+
+      adapter
+        .onGet('/admitted')
+        .reply(200, { admitted: true })
+        .onGet('/queued')
+        .reply(200, { queued: true })
+
+      const client = createClient({ adapter })
+        .use(limiter)
+        .use(openTelemetryMetricsPlugin({
+          meter: metrics.meter,
+          shouldRecord: config => config.url === '/queued'
+        }))
+      const admitted = client.get('/admitted')
+
+      await vi.advanceTimersByTimeAsync(0)
+      const queued = client.get('/queued', { totalTimeout: 25 })
+      const rejection = expect(queued).rejects.toMatchObject({
+        code: 'TIMEOUT_ERROR'
+      })
+
+      await vi.advanceTimersByTimeAsync(25)
+      await rejection
+      await vi.waitFor(() => {
+        expect(
+          metrics.records['npora.client.request.duration']
+        ).toHaveLength(1)
+      })
+      expect(
+        metrics.records['npora.client.request.duration']?.[0]?.attributes
+      ).toMatchObject({
+        'error.type': 'TIMEOUT_ERROR',
+        'request.outcome': 'error'
+      })
+
+      if (limiterName === 'concurrency') {
+        await vi.advanceTimersByTimeAsync(975)
+      }
+      await expect(admitted).resolves.toEqual({ admitted: true })
+    }
+  )
+
   it.each(['Fetch', 'custom adapter'])(
     'should preserve retry attempt semantics with %s',
     async transport => {
