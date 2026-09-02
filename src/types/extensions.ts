@@ -192,6 +192,55 @@ export interface ConcurrencyOptions {
   queueTimeout?: number
 }
 
+export interface RateLimitOptions {
+  /** Enable request-rate limiting. @default true */
+  enabled?: boolean
+
+  /** Override the isolation key for this request. */
+  key?: string
+
+  /** Maximum time this transport attempt may wait for a permit. */
+  queueTimeout?: number
+
+  /** Participate in shared 429 Retry-After cooldowns. @default true */
+  sharedRetryAfter?: boolean
+}
+
+export type OpenTelemetryAttributeValue =
+  | string
+  | number
+  | boolean
+  | readonly string[]
+  | readonly number[]
+  | readonly boolean[]
+
+/** Per-request overrides for `openTelemetryPlugin()`. */
+export interface OpenTelemetryOptions {
+  /** Enable tracing for this request. @default true */
+  enabled?: boolean
+
+  /** Inject the active span context into request headers. @default true */
+  propagate?: boolean
+
+  /** Override the low-cardinality span name. */
+  spanName?: string
+
+  /** Additional span attributes. Values must not contain secrets. */
+  attributes?: Readonly<Record<string, OpenTelemetryAttributeValue>>
+}
+
+/** Per-request overrides for `openTelemetryMetricsPlugin()`. */
+export interface OpenTelemetryMetricsOptions {
+  /** Enable metrics for this request. @default true */
+  enabled?: boolean
+
+  /** Measure returned stream consumption until completion or cancellation. @default true */
+  measureStreamConsumption?: boolean
+
+  /** Additional low-cardinality attributes. Values must not contain secrets. */
+  attributes?: Readonly<Record<string, OpenTelemetryAttributeValue>>
+}
+
 export interface AuthOptions {
   token?: string | (() => string | Promise<string>)
 

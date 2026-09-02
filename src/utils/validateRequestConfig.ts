@@ -1,6 +1,7 @@
 import { RequestError } from '../errors'
 import type { RequestConfig } from '../types'
 import { isURLSearchParams } from './isURLSearchParams'
+import { isFormData } from './isFormData'
 import { MAX_TIMER_DELAY } from './maxTimerDelay'
 import { hasOwnProperty } from './hasOwnProperty'
 import { isAbsoluteURL } from './buildRequest'
@@ -25,6 +26,7 @@ export function validateRequestConfig(
   validateURL(config)
   validateMethod(config)
   validateFetch(config)
+  validateStructuredConfig(config)
   validateJsonCodec(config)
   validateTimeout(config)
   validateLimits(config)
@@ -137,6 +139,46 @@ function validateFetch(config: RequestConfig): void {
   }
 }
 
+function validateStructuredConfig(config: RequestConfig): void {
+  validateRecord(config.fetchOptions, 'Request fetchOptions', config)
+  validateRecord(config.extensions, 'Request extensions', config)
+
+  if (config.query !== undefined) {
+    validateRecord(config.query, 'Request query', config)
+  }
+
+  if (
+    config.form !== undefined &&
+    !isURLSearchParams(config.form)
+  ) {
+    validateRecord(config.form, 'Request form', config)
+  }
+
+  if (
+    config.formData !== undefined &&
+    !isFormData(config.formData)
+  ) {
+    validateRecord(config.formData, 'Request formData', config)
+  }
+}
+
+function validateRecord(
+  value: unknown,
+  name: string,
+  config: RequestConfig
+): void {
+  if (
+    value !== undefined &&
+    (
+      typeof value !== 'object' ||
+      value === null ||
+      Array.isArray(value)
+    )
+  ) {
+    throw configError(`${name} must be an object`, config)
+  }
+}
+
 function validateJsonCodec(config: RequestConfig): void {
   if (
     config.parseJson !== undefined &&
@@ -197,12 +239,33 @@ function validateResponseOptions(config: RequestConfig): void {
 }
 
 function validateSchema(config: RequestConfig): void {
-  if (config.schema === undefined) {
+  validateStandardSchemaOption(config.schema, 'schema', config)
+  validateStandardSchemaOption(config.itemSchema, 'itemSchema', config)
+
+  if (
+    config.itemSchema !== undefined &&
+    config.responseType !== undefined &&
+    config.responseType !== 'sse' &&
+    config.responseType !== 'ndjson'
+  ) {
+    throw configError(
+      'Request itemSchema requires an SSE or NDJSON response',
+      config
+    )
+  }
+}
+
+function validateStandardSchemaOption(
+  schema: RequestConfig['schema'],
+  option: 'schema' | 'itemSchema',
+  config: RequestConfig
+): void {
+  if (schema === undefined) {
     return
   }
 
   try {
-    const candidate = config.schema as unknown
+    const candidate = schema as unknown
 
     if (
       (typeof candidate !== 'object' && typeof candidate !== 'function') ||
@@ -226,7 +289,7 @@ function validateSchema(config: RequestConfig): void {
     }
   } catch (error) {
     throw configError(
-      'Request schema must implement Standard Schema v1',
+      `Request ${option} must implement Standard Schema v1`,
       config,
       error
     )

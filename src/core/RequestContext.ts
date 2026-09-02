@@ -20,6 +20,15 @@ export class RequestContext<T = unknown> {
 
   public attempt = 0
 
+  /** @internal Total time spent waiting for rate-limit admission. */
+  public rateLimitWaitTime = 0
+
+  /** @internal Whether the rate-limit plugin admitted an attempt. */
+  public rateLimitApplied = false
+
+  /** @internal Whether the cache plugin supplied the final response. */
+  public cacheHit = false
+
   constructor(
     config: RequestConfig,
     public readonly preserveRaw = true,

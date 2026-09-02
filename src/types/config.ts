@@ -7,6 +7,9 @@ import type {
   ConcurrencyOptions,
   DownloadOptions,
   LoggerOptions,
+  OpenTelemetryOptions,
+  OpenTelemetryMetricsOptions,
+  RateLimitOptions,
   RetryOptions,
   UploadOptions
 } from './extensions'
@@ -75,6 +78,12 @@ export interface RequestExtensions {
   download?: DownloadOptions
 
   logger?: LoggerOptions
+
+  openTelemetry?: OpenTelemetryOptions
+
+  openTelemetryMetrics?: OpenTelemetryMetricsOptions
+
+  rateLimit?: RateLimitOptions
 
   retry?: number | RetryOptions
 
@@ -198,6 +207,13 @@ export interface RequestConfig {
    * Accepts any Standard Schema v1 compatible validator.
    */
   schema?: StandardSchemaV1
+
+  /**
+   * Validate and optionally transform each SSE event or NDJSON record lazily.
+   *
+   * Accepts any Standard Schema v1 compatible validator.
+   */
+  itemSchema?: StandardSchemaV1
 
   validateStatus?: (status: number) => boolean
 

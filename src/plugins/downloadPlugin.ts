@@ -108,7 +108,7 @@ export function downloadPlugin(
           }
         )
         xhrContexts.add(requestContext)
-      })
+      }, { priority: -3000 })
 
       context.hooks.onResponse(async requestContext => {
         if (xhrContexts.has(requestContext)) {

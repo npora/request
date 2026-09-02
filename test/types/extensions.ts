@@ -24,7 +24,12 @@ import type {
   JsonParserContext,
   LoggerEntry,
   MemoryCacheStoreOptions,
+  OpenTelemetryPluginOptions,
+  OpenTelemetryMetricsPluginOptions,
   Plugin,
+  RateLimitPlugin,
+  RateLimitPluginOptions,
+  RateLimitState,
   RequestLogger,
   RequestConfig,
   ServerSentEvent,
@@ -46,6 +51,9 @@ import {
   isRequestError,
   isSchemaValidationError,
   MemoryCacheStore,
+  rateLimitPlugin,
+  openTelemetryPlugin,
+  openTelemetryMetricsPlugin,
   TieredCacheStore,
   WebStorageCacheStore
 } from '@npora/request'
@@ -132,12 +140,60 @@ const config: RequestConfig = {
       key: 'primary-api',
       queueTimeout: 1000
     },
+    rateLimit: {
+      key: 'primary-api',
+      queueTimeout: 1000
+    },
+    openTelemetry: {
+      spanName: 'GET user',
+      propagate: true,
+      attributes: {
+        'app.operation': 'load-user'
+      }
+    },
+    openTelemetryMetrics: {
+      measureStreamConsumption: true,
+      attributes: {
+        'app.operation': 'load-user'
+      }
+    },
     metrics: {
       enabled: true,
       sampleRate: 0.5
     }
   }
 }
+
+const telemetryOptions: OpenTelemetryPluginOptions = {
+  tracer: {
+    startSpan() {
+      return {
+        setAttribute() { return this },
+        setStatus() { return this },
+        recordException() {},
+        end() {}
+      }
+    }
+  },
+  context: { active: () => ({}) },
+  trace: { setSpan: context => context },
+  propagation: { inject() {} }
+}
+
+const telemetryPlugin: Plugin = openTelemetryPlugin(telemetryOptions)
+
+const metricsPlugin: Plugin = openTelemetryMetricsPlugin({
+  measureStreamConsumption: true,
+  semconv: 'both',
+  meter: {
+    createCounter() { return { add() {} } },
+    createUpDownCounter() { return { add() {} } },
+    createHistogram() { return { record() {} } }
+  }
+} satisfies OpenTelemetryMetricsPluginOptions)
+
+void telemetryPlugin
+void metricsPlugin
 
 const urlConfig: RequestConfig = {
   url: new URL('https://api.example.com/user')
@@ -178,6 +234,23 @@ type HasNoLegacyExtensionKeys =
 const hasNoLegacyExtensionKeys: HasNoLegacyExtensionKeys = true
 
 void hasNoLegacyExtensionKeys
+
+const rateLimitOptions: RateLimitPluginOptions = {
+  maxRequests: 100,
+  interval: 1000,
+  maxQueue: 500,
+  queueTimeout: 5000,
+  maxKeys: 1000,
+  sharedRetryAfter: true,
+  maxRetryAfter: 60000
+}
+const rateLimiter: RateLimitPlugin = rateLimitPlugin(rateLimitOptions)
+const rateLimitState: Readonly<RateLimitState> = rateLimiter.getState(
+  'default'
+)
+
+void rateLimitState.remaining
+void rateLimitState.cooldownUntil
 
 const plugin: Plugin = {
   name: 'metrics',

@@ -2683,6 +2683,46 @@ test(
 )
 
 test(
+  'should validate and transform NDJSON items in the browser',
+  async ({ page }) => {
+    await openFixture(page)
+
+    const records = await page.evaluate(async () => {
+      const request = (window as BrowserWindow).nporaRequest
+
+      if (!request) {
+        throw new Error('Npora request client is unavailable')
+      }
+
+      const stream = await request.ndjson('/records', {
+        itemSchema: {
+          '~standard': {
+            version: 1,
+            vendor: 'browser-test',
+            validate(value: unknown) {
+              const record = value as { id: number; name: string }
+
+              return {
+                value: `${record.id}:${record.name}`
+              }
+            }
+          }
+        }
+      })
+      const records = []
+
+      for await (const record of stream) {
+        records.push(record)
+      }
+
+      return records
+    })
+
+    expect(records).toEqual(['1:你好', '2:browser'])
+  }
+)
+
+test(
   'should surface an interrupted browser response stream',
   async ({ page }) => {
     await openFixture(page)
@@ -2749,6 +2789,177 @@ test(
     })
 
     expect(result).toBe('CONCURRENCY_LIMIT')
+  }
+)
+
+test(
+  'should enforce request rate limits in the browser',
+  async ({ page }) => {
+    await openFixture(page)
+
+    const result = await page.evaluate(async () => {
+      const moduleURL = `${location.origin}/dist/index.js`
+      const {
+        createClient,
+        rateLimitPlugin
+      } = await import(moduleURL)
+      const request = createClient({
+        baseURL: '/api'
+      }).use(rateLimitPlugin({
+        maxRequests: 1,
+        interval: 1000,
+        maxQueue: 0
+      }))
+      const first = request.get('/user')
+      let code: string | undefined
+
+      try {
+        await request.get('/user')
+      } catch (error) {
+        code = (error as { code?: string }).code
+      }
+
+      await first
+      return code
+    })
+
+    expect(result).toBe('RATE_LIMIT')
+  }
+)
+
+test(
+  'should inject OpenTelemetry trace context in the browser',
+  async ({ page }) => {
+    await openFixture(page)
+
+    const result = await page.evaluate(async () => {
+      const module = await import('/dist/index.js')
+      const spans: Array<{
+        attributes: Record<string, unknown>
+        ended: number
+      }> = []
+      const request = module.createClient({ baseURL: '/api' }).use(
+        module.openTelemetryPlugin({
+          tracer: {
+            startSpan(_name: string, options: { attributes?: Record<
+              string,
+              unknown
+            > } = {}) {
+              const state = {
+                attributes: { ...options.attributes },
+                ended: 0
+              }
+
+              spans.push(state)
+              return {
+                setAttribute(key: string, value: unknown) {
+                  state.attributes[key] = value
+                  return this
+                },
+                setStatus() { return this },
+                recordException() {},
+                end() { state.ended += 1 }
+              }
+            }
+          },
+          context: { active: () => ({}) },
+          trace: { setSpan: (context: unknown) => context },
+          propagation: {
+            inject(_context: unknown, carrier: Headers, setter: {
+              set(carrier: Headers, key: string, value: string): void
+            }) {
+              setter.set(
+                carrier,
+                'traceparent',
+                '00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01'
+              )
+            }
+          }
+        })
+      )
+      const response = await request.get<{
+        headers: Record<string, string>
+      }>('/echo')
+
+      return {
+        traceparent: response.headers.traceparent,
+        spans
+      }
+    })
+
+    expect(result.traceparent).toBe(
+      '00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01'
+    )
+    expect(result.spans).toHaveLength(1)
+    expect(result.spans[0]).toMatchObject({
+      attributes: {
+        'http.request.method': 'GET',
+        'http.response.status_code': 200
+      },
+      ended: 1
+    })
+  }
+)
+
+test(
+  'should record OpenTelemetry metrics in the browser',
+  async ({ page }) => {
+    await openFixture(page)
+
+    const result = await page.evaluate(async () => {
+      const module = await import('/dist/index.js')
+      const records: Record<string, Array<{
+        value: number
+        attributes?: Record<string, unknown>
+      }>> = {}
+      const instrument = (name: string) => ({
+        add(value: number, attributes?: Record<string, unknown>) {
+          ;(records[name] ??= []).push({ value, attributes })
+        },
+        record(value: number, attributes?: Record<string, unknown>) {
+          ;(records[name] ??= []).push({ value, attributes })
+        }
+      })
+      const request = module.createClient({ baseURL: '/api' }).use(
+        module.openTelemetryMetricsPlugin({
+          meter: {
+            createCounter: instrument,
+            createUpDownCounter: instrument,
+            createHistogram: instrument
+          }
+        })
+      )
+
+      await request.get('/user')
+      const stream = await request.ndjson('/records')
+
+      for await (const _ of stream) {
+        // Complete the browser stream so consumption metrics settle.
+      }
+
+      return records
+    })
+
+    expect(
+      result['npora.client.active_requests']?.map(record => record.value)
+    ).toEqual([1, -1, 1, -1])
+    expect(result['npora.client.request.duration']).toHaveLength(2)
+    expect(
+      result['npora.client.request.duration']?.[0]?.attributes
+    ).toMatchObject({
+      'http.request.method': 'GET',
+      'http.response.status_code': 200,
+      'request.outcome': 'success'
+    })
+    expect(
+      result['npora.client.active_streams']?.map(record => record.value)
+    ).toEqual([1, -1])
+    expect(
+      result['npora.client.stream.duration']?.[0]?.attributes
+    ).toMatchObject({
+      'stream.type': 'ndjson',
+      'stream.outcome': 'complete'
+    })
   }
 )
 

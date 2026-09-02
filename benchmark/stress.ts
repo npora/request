@@ -7,6 +7,9 @@ import {
   createClient,
   downloadPlugin,
   loggerPlugin,
+  openTelemetryMetricsPlugin,
+  openTelemetryPlugin,
+  rateLimitPlugin,
   RequestError,
   retryPlugin,
   uploadPlugin,
@@ -32,6 +35,8 @@ let asyncCircuitAttempts = 0
 let authRefreshCalls = 0
 let authTokenCancellationCalls = 0
 let cacheReadCancellationCalls = 0
+let telemetryInjections = 0
+let telemetryMetricMeasurements = 0
 const options = parseBenchmarkOptions(process.argv.slice(2), {
   operations: DEFAULT_OPERATIONS,
   concurrency: 64,
@@ -132,6 +137,46 @@ const cacheClearClient = createClient({
 }).use(cacheClearPlugin)
 const concurrencyImmediateClient = createClient({ adapter: stableAdapter })
   .use(concurrencyPlugin({ maxConcurrent: options.concurrency }))
+const rateLimitImmediateClient = createClient({ adapter: stableAdapter })
+  .use(rateLimitPlugin({ maxRequests: 1_000_000 }))
+const telemetrySpan = {
+  setAttribute() { return this },
+  setStatus() { return this },
+  recordException() {},
+  end() {}
+}
+const telemetryOptions = {
+  tracer: { startSpan: () => telemetrySpan },
+  context: { active: () => undefined },
+  trace: { setSpan: () => undefined },
+  propagation: {
+    inject(_context: unknown, carrier: Headers, setter: {
+      set(carrier: Headers, key: string, value: string): void
+    }) {
+      telemetryInjections += 1
+      setter.set(
+        carrier,
+        'traceparent',
+        '00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01'
+      )
+    }
+  }
+}
+const telemetryImmediateClient = createClient({ adapter: stableAdapter })
+  .use(openTelemetryPlugin(telemetryOptions))
+const metricInstrument = {
+  add() { telemetryMetricMeasurements += 1 },
+  record() { telemetryMetricMeasurements += 1 }
+}
+const metricMeter = {
+  createCounter: () => metricInstrument,
+  createUpDownCounter: () => metricInstrument,
+  createHistogram: () => metricInstrument
+}
+const telemetryMetricsImmediateClient = createClient({ adapter: stableAdapter })
+  .use(openTelemetryMetricsPlugin({
+    meter: metricMeter
+  }))
 const concurrencyContendedClient = createClient({ adapter: stableAdapter })
   .use(concurrencyPlugin({ maxConcurrent: 1, queueTimeout: Infinity }))
 const queueCancellationClient = createClient({
@@ -230,6 +275,8 @@ const disabledPluginClient = createClient({ adapter: stableAdapter })
   .use(cachePlugin())
   .use(concurrencyPlugin())
   .use(circuitBreakerPlugin())
+  .use(rateLimitPlugin())
+  .use(openTelemetryPlugin(telemetryOptions))
   .use(loggerPlugin({ logger: { info() {}, error() {} } }))
 
 const originalFetch = globalThis.fetch
@@ -252,12 +299,14 @@ const downloadFetchClient = createClient().use(
 const downloadXhrClient = createClient().use(
   downloadPlugin({ transport: 'xhr' })
 )
-const streamingClient = createClient()
+const streamingClient = createClient().use(openTelemetryMetricsPlugin({
+  meter: metricMeter
+}))
 
 const scenarios: StressScenario[] = [
   {
     name: 'coreBare',
-    weight: 1_600_000,
+    weight: 1_000_000,
     operation: () => bareClient.get('/core')
   },
   {
@@ -323,6 +372,34 @@ const scenarios: StressScenario[] = [
     name: 'concurrencyImmediate',
     weight: 700_000,
     operation: () => concurrencyImmediateClient.get('/concurrency')
+  },
+  {
+    name: 'rateLimitImmediate',
+    weight: 200_000,
+    operation: () => rateLimitImmediateClient.get('/rate-limit')
+  },
+  {
+    name: 'openTelemetryImmediate',
+    weight: 200_000,
+    operation: () => telemetryImmediateClient.get(
+      'https://stress.example.com/telemetry'
+    ),
+    verify() {
+      assert(telemetryInjections > 0, 'Trace context was not injected')
+    }
+  },
+  {
+    name: 'openTelemetryMetricsImmediate',
+    weight: 200_000,
+    operation: () => telemetryMetricsImmediateClient.get(
+      'https://stress.example.com/metrics'
+    ),
+    verify() {
+      assert(
+        telemetryMetricMeasurements > 0,
+        'OpenTelemetry metrics were not recorded'
+      )
+    }
   },
   {
     name: 'concurrencyContended',
@@ -576,6 +653,8 @@ const scenarios: StressScenario[] = [
         cache: { enabled: false },
         concurrency: { enabled: false },
         circuitBreaker: { enabled: false },
+        rateLimit: { enabled: false },
+        openTelemetry: { enabled: false },
         logger: { enabled: false }
       }
     })
@@ -647,6 +726,8 @@ const report = {
       downloadFetch: downloadFetchProgress,
       downloadXhr: downloadXhrProgress
     },
+    traceContextInjections: telemetryInjections,
+    telemetryMetricMeasurements,
     streamRecords
   },
   scenarios: results
@@ -663,6 +744,13 @@ async function warmUp(): Promise<void> {
   for (let index = 0; index < options.warmup; index += 1) {
     await bareClient.get('/warmup')
     await concurrencyImmediateClient.get('/warmup')
+    await rateLimitImmediateClient.get('/warmup')
+    await telemetryImmediateClient.get(
+      'https://stress.example.com/warmup'
+    )
+    await telemetryMetricsImmediateClient.get(
+      'https://stress.example.com/warmup'
+    )
     await circuitSuccessClient.get('/warmup')
     await mixedClient.get('/warmup')
   }
@@ -674,11 +762,13 @@ async function runStressScenario(
   operation: (index: number) => Promise<unknown>
 ): Promise<StressResult> {
   collectGarbage()
-  const sampleStride = Math.max(1, Math.floor(operations / SAMPLE_LIMIT))
-  const latencies: number[] = []
+  const sampleCount = Math.min(operations, SAMPLE_LIMIT)
+  const latencies = new Array<number>(sampleCount)
   const heapBefore = process.memoryUsage().heapUsed
   let peakRssBytes = process.memoryUsage().rss
   let nextOperation = 0
+  let nextSample = 0
+  let nextSampleOperation = 0
   let failures = 0
   let firstFailure: string | undefined
   const scenarioStartedAt = performance.now()
@@ -694,8 +784,23 @@ async function runStressScenario(
           return
         }
 
-        const sampled = index % sampleStride === 0 && latencies.length < SAMPLE_LIMIT
-        const operationStartedAt = sampled ? performance.now() : 0
+        const sampleIndex = index === nextSampleOperation
+          ? nextSample
+          : undefined
+
+        if (sampleIndex !== undefined) {
+          nextSample += 1
+          nextSampleOperation = sampleCount <= 1
+            ? operations
+            : Math.floor(
+                nextSample * (operations - 1) /
+                  (sampleCount - 1)
+              )
+        }
+
+        const operationStartedAt = sampleIndex === undefined
+          ? 0
+          : performance.now()
 
         try {
           await operation(index)
@@ -704,8 +809,8 @@ async function runStressScenario(
           firstFailure ??= describeError(error)
         }
 
-        if (sampled) {
-          latencies.push(performance.now() - operationStartedAt)
+        if (sampleIndex !== undefined) {
+          latencies[sampleIndex] = performance.now() - operationStartedAt
         }
 
         if (index % 50_000 === 0) {
@@ -765,7 +870,7 @@ function allocateOperations(
 }
 
 function summarizeLatencies(latencies: number[]): StressResult['latencyMs'] {
-  const sorted = [...latencies].sort((left, right) => left - right)
+  const sorted = latencies.sort((left, right) => left - right)
   const total = sorted.reduce((sum, value) => sum + value, 0)
 
   return {

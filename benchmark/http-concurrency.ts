@@ -12,7 +12,8 @@ import {
 const options = parseBenchmarkOptions(process.argv.slice(2), {
   operations: 100_000,
   concurrency: 256,
-  warmup: 500
+  warmup: 500,
+  samples: 4096
 })
 let received = 0
 const server = createServer((_request, response) => {
@@ -43,7 +44,8 @@ try {
   const result = await runConcurrent(
     options.operations,
     options.concurrency,
-    () => client.get<{ ok: boolean }>('/load')
+    () => client.get<{ ok: boolean }>('/load'),
+    options.samples
   )
 
   assert.equal(received, options.warmup + options.operations)

@@ -115,6 +115,10 @@ await api.get('/health', {
 The request-level function overrides the client default. Use a custom `Adapter`
 only when the transport is not Fetch-compatible.
 
+Node.js applications can inject an Undici Fetch wrapper for ProxyAgent,
+connection pooling, mutual TLS, and custom DNS. See the
+[Undici integration guide](undici.md).
+
 Use `stringifyJson` for values such as BigInt, dates, or application-specific
 wire formats, and `parseJson` for matching decoding or hardened JSON parsers:
 
@@ -262,6 +266,7 @@ continue to expose a separately readable raw body.
 | --- | --- | --- | --- |
 | `responseType` | `ResponseType` | detected | Parse as `json`, `text`, `blob`, `arrayBuffer`, `bytes`, `formData`, `stream`, `sse`, or `ndjson`. |
 | `schema` | `StandardSchemaV1` | none | Validate and optionally transform the parsed value. |
+| `itemSchema` | `StandardSchemaV1` | none | Lazily validate and transform each SSE event or NDJSON record. |
 | `validateStatus` | `(status: number) => boolean` | HTTP 2xx | Decide which HTTP statuses resolve successfully. |
 | `throwHttpErrors` | `boolean` | `true` | Set to `false` to resolve parsed HTTP error responses instead of throwing `HTTP_ERROR`. |
 
@@ -393,6 +398,11 @@ persistence and in-flight sharing unless `extensions.cache.key` is set. An
 explicit key declares that the application owns parser and serializer
 compatibility for that entry.
 
+The generated key does not serialize request bodies. Body-bearing methods such
+as `POST` and `QUERY` therefore bypass persistence and in-flight sharing unless
+an explicit key is supplied. That key must distinguish the serialized body and
+any representation headers that affect the response.
+
 Request headers also control the plugin. `Cache-Control: no-cache`,
 `Cache-Control: max-age=0`, and legacy `Pragma: no-cache` force validation or a
 network refresh. `Cache-Control: no-store` bypasses cache reads, writes, and
@@ -503,6 +513,56 @@ Requires `concurrencyPlugin()`.
 | `queueTimeout` | plugin-level value | Maximum time waiting for a permit, capped at `2_147_483_647`. |
 
 Queue overflow and queue timeout fail with `CONCURRENCY_LIMIT`.
+
+### `extensions.rateLimit`
+
+Requires `rateLimitPlugin()`.
+
+| Field | Default | Purpose |
+| --- | --- | --- |
+| `enabled` | `true` | Apply the transport-attempt rate limit. |
+| `key` | resolved request origin | Override rolling-window isolation. |
+| `queueTimeout` | plugin-level value | Maximum time waiting for a permit, capped at `2_147_483_647`. |
+| `sharedRetryAfter` | `true` | Allow this request's 429 response to update its key's shared cooldown. |
+
+Queue overflow and queue timeout fail with `RATE_LIMIT`. Retry attempts consume
+permits; cache hits that never enter transport do not. Plugin options
+`sharedRetryAfter` and `maxRetryAfter` default to `true` and 60 seconds.
+
+### `extensions.openTelemetry`
+
+Requires `openTelemetryPlugin()`.
+
+| Field | Default | Purpose |
+| --- | --- | --- |
+| `enabled` | `true` | Trace this request's transport attempts. |
+| `propagate` | plugin-level value or `true` | Inject the active span context into request headers. |
+| `spanName` | HTTP method | Override the low-cardinality span name. |
+| `attributes` | `{}` | Add privacy-reviewed attributes for this request. |
+
+Retry attempts receive separate spans and resend counts. Cache hits and earlier
+request-admission rejections do not create spans; the first span includes a
+later rate-limit wait. URL query strings and exception events are excluded by
+default.
+
+### `extensions.openTelemetryMetrics`
+
+Requires `openTelemetryMetricsPlugin()`.
+
+The plugin-level `semconv` option accepts `npora`, `stable`, or `both` and
+defaults to `npora` in 1.x. It cannot be changed per request because instrument
+registration belongs to the meter/plugin lifecycle.
+
+| Field | Default | Purpose |
+| --- | --- | --- |
+| `enabled` | `true` | Record metrics for this request. |
+| `measureStreamConsumption` | `true` | Measure returned ReadableStream, NDJSON, and SSE consumption through completion, error, or cancellation. |
+| `attributes` | `{}` | Add privacy-reviewed, low-cardinality attributes. |
+
+The stable HTTP convention exports the resolved server address and optional
+port, but not credentials, path, query, or fragment. The npora
+convention exports no URL fields. Headers, payloads, and rate-limit keys are
+not exported automatically.
 
 ### `extensions.auth`
 

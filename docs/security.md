@@ -115,6 +115,21 @@ application.
 - Timeout, abort, XHR, hook, and plugin resources are cleaned up when a buffered
   request settles. Streaming resources remain active only until the response
   body completes, is cancelled, or errors.
+- OpenTelemetry URL attributes remove credentials, query strings, and fragments
+  by default, and exception events are opt-in. Trace propagation can add
+  `traceparent`, `tracestate`, or baggage headers, so applications should use
+  `shouldTrace` or per-request propagation controls for untrusted destinations
+  and review the configured propagator's baggage policy.
+- OpenTelemetry `npora.*` metrics emit only method, bounded
+  outcome/status/error and stream type/outcome classes, cache hit/miss,
+  durations, and application-supplied attributes. Stable HTTP metrics also
+  emit the resolved server address and optional port, but omit
+  credentials, path, query, and fragment. Headers, payloads, cache keys, and
+  rate-limit keys are omitted. Applications must keep custom metric attributes
+  low-cardinality and free of secrets.
+- Shared 429 cooldowns accept only the standard `Retry-After` header and clamp
+  it to `maxRetryAfter` (60 seconds by default), preventing an upstream from
+  retaining an origin queue indefinitely.
 - Error-body reads and asynchronous JSON parsers cannot stall error propagation
   indefinitely: disabled per-attempt timeouts receive a 10-second fallback.
 - Malformed HTTP error payloads cannot obscure their status classification;
@@ -130,7 +145,8 @@ Applications must still:
 
 - Allowlist trusted origins when request URLs can be influenced by users.
 - Treat server responses as untrusted and configure an appropriate response
-  schema before use when runtime validation is required.
+  schema before use when runtime validation is required. Use `itemSchema` for
+  untrusted SSE events and NDJSON records so validation remains incremental.
 - Store credentials using controls appropriate to the runtime.
 - Avoid placing secrets in URLs, thrown error messages, or application logs.
 - Do not serialize a complete `RequestError` into logs or telemetry. Its public

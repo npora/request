@@ -115,6 +115,15 @@ describe('RequestError', () => {
     expect(error.config).toBe(config)
   })
 
+  it('should preserve explicitly null error data', () => {
+    const error = new RequestError<null>('Empty response', {
+      code: 'HTTP_ERROR',
+      data: null
+    })
+
+    expect(error.data).toBeNull()
+  })
+
   it('should serialize only privacy-safe error metadata', () => {
     const config: RequestConfig = {
       url: '/users/1',

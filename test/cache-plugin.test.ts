@@ -1966,6 +1966,34 @@ describe('cachePlugin', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 
+  it('should require an explicit key for body-bearing cache methods', async () => {
+    let version = 0
+    const fetchMock = vi.fn().mockImplementation(() => {
+      version += 1
+      return Promise.resolve(createJsonResponse({ version }))
+    })
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const request = createClient().use(cachePlugin({
+      methods: ['GET', 'HEAD', 'QUERY']
+    }))
+    const cache = {
+      enabled: true,
+      ttl: Infinity
+    }
+
+    await expect(request.query('/search', {
+      json: { term: 'first' },
+      extensions: { cache }
+    })).resolves.toEqual({ version: 1 })
+    await expect(request.query('/search', {
+      json: { term: 'second' },
+      extensions: { cache }
+    })).resolves.toEqual({ version: 2 })
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
   it('should not vary cache keys by local request context', async () => {
     const fetchMock = vi.fn().mockResolvedValue(createJsonResponse({ ok: true }))
 

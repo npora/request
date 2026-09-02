@@ -1,6 +1,6 @@
 {
   "name": "@npora/request",
-  "version": "1.17.0",
+  "version": "1.17.1",
   "description": "A modern, TypeScript-first HTTP client powered by the Fetch API.",
   "keywords": [
     "npora",
@@ -14,6 +14,9 @@
     "sse",
     "ndjson",
     "standard-schema",
+    "opentelemetry",
+    "metrics",
+    "trace-context",
     "circuit-breaker",
     "web-worker"
   ],
@@ -77,6 +80,21 @@
       "import": "./dist/plugins/logger.js",
       "require": "./dist/plugins/logger.cjs"
     },
+    "./plugins/opentelemetry": {
+      "types": "./dist/plugins/opentelemetry.d.ts",
+      "import": "./dist/plugins/opentelemetry.js",
+      "require": "./dist/plugins/opentelemetry.cjs"
+    },
+    "./plugins/opentelemetry-metrics": {
+      "types": "./dist/plugins/opentelemetry-metrics.d.ts",
+      "import": "./dist/plugins/opentelemetry-metrics.js",
+      "require": "./dist/plugins/opentelemetry-metrics.cjs"
+    },
+    "./plugins/rate-limit": {
+      "types": "./dist/plugins/rate-limit.d.ts",
+      "import": "./dist/plugins/rate-limit.js",
+      "require": "./dist/plugins/rate-limit.cjs"
+    },
     "./plugins/retry": {
       "types": "./dist/plugins/retry.d.ts",
       "import": "./dist/plugins/retry.js",
@@ -115,6 +133,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
+    "typecheck:next": "node node_modules/typescript-next/bin/tsc --noEmit",
     "changeset": "changeset",
     "version-packages": "changeset version",
     "release": "pnpm build && pnpm test:package && changeset publish",
@@ -125,6 +144,7 @@
     "test:security": "vitest run test/security.test.ts",
     "test:docs": "node test/docs.mjs",
     "test:release-workflow": "node test/release-workflow.mjs",
+    "test:complexity": "node scripts/check-complexity.mjs $(find src -name '*.ts' ! -path '*/types/*' ! -name 'index.ts')",
     "test:types": "pnpm build && tsc -p test/types/tsconfig.json",
     "test:examples": "tsc -p examples/tsconfig.json",
     "test:package": "node test/package/esm.mjs && node test/package/cjs.cjs && node test/package/subpaths.mjs && node test/package/subpaths.cjs && node test/package/api-exports.mjs && node test/package/api-contract.mjs && node test/package/npm-pack-result.test.mjs && node test/package/manifest.mjs && pnpm test:size",
@@ -138,6 +158,8 @@
     "audit:signatures": "pnpm audit signatures",
     "benchmark": "tsx benchmark/request.ts",
     "benchmark:http": "tsx benchmark/http-concurrency.ts",
+    "benchmark:streaming": "node --expose-gc --import tsx benchmark/streaming-schema.ts",
+    "benchmark:check": "node benchmark/check-performance.mjs",
     "benchmark:libraries": "npm --prefix benchmark/competitors run benchmark",
     "benchmark:libraries:install": "npm install --prefix benchmark/competitors --ignore-scripts --no-audit --no-fund",
     "stress": "node --expose-gc --import tsx benchmark/stress.ts",
@@ -145,13 +167,17 @@
   },
   "devDependencies": {
     "@changesets/cli": "^3.0.0",
+    "@opentelemetry/api": "^1.9.1",
+    "@opentelemetry/sdk-metrics": "^2.10.0",
+    "@opentelemetry/sdk-trace-base": "^2.10.0",
     "@playwright/test": "^1.61.1",
     "@types/node": "^26.2.0",
     "@vitest/coverage-v8": "^4.1.10",
     "tsdown": "^0.22.14",
     "tsx": "^4.23.11",
-    "typescript": "^7.0.2",
+    "typescript": "^6.0.3",
     "typescript-api": "npm:@typescript/typescript6@^6.0.2",
+    "typescript-next": "npm:typescript@^7.0.2",
     "vitest": "^4.1.10"
   }
 }

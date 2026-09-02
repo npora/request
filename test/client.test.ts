@@ -122,6 +122,12 @@ describe('client', () => {
     await expect(
       client.getResponse('/user', invalidConfig)
     ).rejects.toThrow('configuration merge failure')
+    await expect(
+      client.request(invalidConfig as never)
+    ).rejects.toThrow('configuration merge failure')
+    await expect(
+      client.requestResponse(invalidConfig as never)
+    ).rejects.toThrow('configuration merge failure')
   })
 
   it('should expose the complete response when requested', async () => {

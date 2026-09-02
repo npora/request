@@ -2,6 +2,7 @@ import type { RequestConfig } from '../types'
 import { hasOwnProperty } from '../utils/hasOwnProperty'
 import { isURLSearchParams } from '../utils/isURLSearchParams'
 import { isHeaders } from '../utils/isHeaders'
+import { getTrustedDefaults } from './trustedDefaults'
 
 /**
  * Request configuration merger.
@@ -38,6 +39,7 @@ export class ConfigMerger {
       ...defaults,
       ...config
     }
+    const trustedDefaults = getTrustedDefaults(defaults)
 
     if (
       hasOwnProperty.call(config, 'validateStatus') &&
@@ -51,54 +53,83 @@ export class ConfigMerger {
       result.validateStatus = undefined
     }
 
-    if (defaults.fetchOptions || config.fetchOptions) {
+    if (result.fetchOptions) {
       result.fetchOptions = this.mergeFetchOptions(
-        defaults.fetchOptions,
-        config.fetchOptions
+        trustedDefaults
+          ? trustedDefaults.fetchOptions
+          : ownValue(defaults, 'fetchOptions'),
+        ownValue(config, 'fetchOptions')
       )
     }
 
-    if (isContextObject(config.context)) {
-      result.context = {
-        ...(isContextObject(defaults.context) ? defaults.context : {}),
-        ...config.context
+    if (hasOwnProperty.call(config, 'context')) {
+      if (isContextObject(config.context)) {
+        const defaultContext = trustedDefaults
+          ? trustedDefaults.context
+          : ownValue(defaults, 'context')
+
+        result.context = {
+          ...(isContextObject(defaultContext) ? defaultContext : {}),
+          ...config.context
+        }
       }
-    } else if (isContextObject(defaults.context)) {
-      result.context = { ...defaults.context }
+    } else {
+      const defaultContext = trustedDefaults
+        ? trustedDefaults.context
+        : ownValue(defaults, 'context')
+
+      if (isContextObject(defaultContext)) {
+        result.context = { ...defaultContext }
+      }
     }
 
-    if (
-      defaults.headers ||
-      config.headers ||
-      defaults.removeHeaders ||
-      config.removeHeaders
-    ) {
+    if (result.headers || result.removeHeaders) {
       result.headers = this.mergeHeaders(
-        defaults.headers,
-        config.headers,
-        defaults.removeHeaders,
-        config.removeHeaders
+        trustedDefaults
+          ? trustedDefaults.headers
+          : ownValue(defaults, 'headers'),
+        ownValue(config, 'headers'),
+        trustedDefaults
+          ? trustedDefaults.removeHeaders
+          : ownValue(defaults, 'removeHeaders'),
+        ownValue(config, 'removeHeaders')
+      )
+    }
+
+    if (result.query || result.searchParams) {
+      this.mergeQueryConfig(
+        result,
+        trustedDefaults
+          ? trustedDefaults.query
+          : ownValue(defaults, 'query'),
+        ownValue(config, 'query'),
+        trustedDefaults
+          ? trustedDefaults.searchParams
+          : ownValue(defaults, 'searchParams'),
+        ownValue(config, 'searchParams')
+      )
+    }
+
+    if (result.extensions) {
+      result.extensions = this.mergeExtensions(
+        trustedDefaults
+          ? trustedDefaults.extensions
+          : ownValue(defaults, 'extensions'),
+        ownValue(config, 'extensions')
       )
     }
 
     if (
-      defaults.query ||
-      config.query ||
-      defaults.searchParams ||
-      config.searchParams
+      (
+        trustedDefaults
+          ? trustedDefaults.hasBodyConfig
+          : this.hasBodyConfig(defaults)
+      ) ||
+      this.hasBodyValue(result)
     ) {
-      this.mergeQueryConfig(result, defaults, config)
-    }
-
-    if (defaults.extensions || config.extensions) {
-      result.extensions = this.mergeExtensions(
-        defaults.extensions,
-        config.extensions
-      )
-    }
-
-    if (this.hasBodyConfig(config)) {
-      this.mergeBodyConfig(result, config)
+      if (this.hasBodyConfig(config)) {
+        this.mergeBodyConfig(result, config)
+      }
     }
 
     return result
@@ -106,38 +137,60 @@ export class ConfigMerger {
 
   private static mergeQueryConfig(
     result: Partial<RequestConfig>,
-    defaults: Partial<RequestConfig>,
-    config: Partial<RequestConfig>
+    defaultQuery: RequestConfig['query'],
+    query: RequestConfig['query'],
+    defaultSearchParams: RequestConfig['searchParams'],
+    searchParams: RequestConfig['searchParams']
   ): void {
-    if (config.searchParams !== undefined) {
-      result.query = config.query
-      result.searchParams = isURLSearchParams(config.searchParams)
-        ? new URLSearchParams(config.searchParams)
-        : config.searchParams
+    if (searchParams !== undefined) {
+      result.query = query
+      result.searchParams = isURLSearchParams(searchParams)
+        ? new URLSearchParams(searchParams)
+        : searchParams
       return
     }
 
-    if (config.query !== undefined) {
+    if (query !== undefined) {
+      if (!isRecordObject(query)) {
+        result.query = query
+        result.searchParams = undefined
+        return
+      }
+
       result.query = this.mergeObject(
-        defaults.searchParams ? undefined : defaults.query,
-        config.query
+        defaultSearchParams
+          ? undefined
+          : isRecordObject(defaultQuery)
+          ? defaultQuery
+          : undefined,
+        query
       )
       result.searchParams = undefined
       return
     }
 
-    result.query = defaults.query
-      ? { ...defaults.query }
+    result.query = defaultQuery
+      ? isRecordObject(defaultQuery)
+        ? { ...defaultQuery }
+        : defaultQuery
       : undefined
-    result.searchParams = isURLSearchParams(defaults.searchParams)
-      ? new URLSearchParams(defaults.searchParams)
-      : defaults.searchParams
+    result.searchParams = isURLSearchParams(defaultSearchParams)
+      ? new URLSearchParams(defaultSearchParams)
+      : defaultSearchParams
   }
 
   private static mergeFetchOptions(
     defaults?: RequestConfig['fetchOptions'],
     options?: RequestConfig['fetchOptions']
   ): RequestConfig['fetchOptions'] {
+    if (options !== undefined && !isRecordObject(options)) {
+      return options
+    }
+
+    if (defaults !== undefined && !isRecordObject(defaults)) {
+      return options ?? defaults
+    }
+
     return {
       ...defaults,
       ...options
@@ -233,6 +286,14 @@ export class ConfigMerger {
     defaults?: RequestConfig['extensions'],
     extensions?: RequestConfig['extensions']
   ): RequestConfig['extensions'] {
+    if (extensions !== undefined && !isRecordObject(extensions)) {
+      return extensions
+    }
+
+    if (defaults !== undefined && !isRecordObject(defaults)) {
+      return extensions ?? defaults
+    }
+
     if (!defaults) {
       return extensions
         ? { ...extensions }
@@ -257,7 +318,9 @@ export class ConfigMerger {
         continue
       }
 
-      const defaultValue = (defaults as Record<string, unknown>)[key]
+      const defaultValue = hasOwnProperty.call(defaults, key)
+        ? (defaults as Record<string, unknown>)[key]
+        : undefined
       const requestValue = (extensions as Record<string, unknown>)[key]
 
       if (
@@ -285,6 +348,17 @@ export class ConfigMerger {
     )
   }
 
+  private static hasBodyValue(
+    config: Partial<RequestConfig>
+  ): boolean {
+    return (
+      config.body !== undefined ||
+      config.json !== undefined ||
+      config.form !== undefined ||
+      config.formData !== undefined
+    )
+  }
+
   private static mergeBodyConfig(
     result: Partial<RequestConfig>,
     config: Partial<RequestConfig>
@@ -306,6 +380,19 @@ function isContextObject(
   value: unknown
 ): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function isRecordObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function ownValue<
+  T extends object,
+  K extends keyof T
+>(value: T, key: K): T[K] | undefined {
+  return hasOwnProperty.call(value, key)
+    ? value[key]
+    : undefined
 }
 
 function setHeader(

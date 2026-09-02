@@ -191,6 +191,7 @@ describe('downloadPlugin XMLHttpRequest fallback', () => {
   })
 
   it('should retry failed XHR downloads through the normal retry lifecycle', async () => {
+    const attempts: number[] = []
     scenario = xhr => {
       if (FakeXMLHttpRequest.instances.length === 1) {
         xhr.fail()
@@ -203,6 +204,12 @@ describe('downloadPlugin XMLHttpRequest fallback', () => {
     const request = createClient()
       .use(downloadPlugin({ transport: 'xhr' }))
       .use(retryPlugin({ retries: 1, delay: () => 0 }))
+      .use({
+        name: 'attempt-observer',
+        install(context) {
+          context.hooks.onTransport(request => attempts.push(request.attempt))
+        }
+      })
 
     const data = await request.get<Blob>('/file', {
       extensions: {
@@ -212,6 +219,7 @@ describe('downloadPlugin XMLHttpRequest fallback', () => {
 
     expect(await data.text()).toBe('npora')
     expect(FakeXMLHttpRequest.instances).toHaveLength(2)
+    expect(attempts).toEqual([0, 1])
   })
 
   it('should use forced XHR without issuing a Fetch request', async () => {

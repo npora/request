@@ -216,7 +216,7 @@ export class MockAdapter implements Adapter {
     })
 
     if (ruleIndex !== -1) {
-      const rule = this.rules[ruleIndex]
+      const rule = this.rules[ruleIndex]!
 
       if (rule.once) {
         this.rules.splice(ruleIndex, 1)

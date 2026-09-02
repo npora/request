@@ -66,6 +66,13 @@ limits also account for the synchronized feature, support-policy, and
 supply-chain README while retaining measured headroom without hiding larger
 future growth.
 
+The official rolling-window rate limiter adds a standalone plugin subpath,
+strict attempt timestamp accounting, FIFO cancellation-aware queues, bounded
+key retention, public request options, and a stable error code. Root,
+declaration, tarball, and unpacked budgets track its measured cost plus narrow
+headroom; the new rate-limit subpath has its own transitive budget, unrelated
+core and plugin budgets remain fixed, and no runtime dependency was added.
+
 Versions 1.11.0 through 1.14.0 kept the same budgets while adding native
 ordered `URLSearchParams`, retry-aware progress transports, richer progress
 events, and backpressure-aware streaming downloads. By 1.14.0 the raw
@@ -240,6 +247,18 @@ and unpacked budgets track the measured implementation, type, and documentation
 cost plus narrow headroom; plugin and testing budgets remain fixed and no
 runtime dependency was added.
 
+Per-item SSE and NDJSON Standard Schema validation reuses the existing schema
+contract and streaming cancellation path. Root and declaration budgets include
+the measured lazy validation, inferred overloads, and error-location metadata.
+Core, testing, tarball, and unpacked budgets also track their transitive share;
+no runtime dependency or buffering layer is added.
+
+The OpenTelemetry integration is a first-party structural adapter with a
+separate `plugins/opentelemetry` entry point. Root, declaration, tarball, and
+unpacked budgets include the measured public export and types, while the new
+subpath has an independent transitive budget. No OpenTelemetry SDK or exporter
+is bundled or declared as a runtime dependency.
+
 Opaque Fetch response handling adds filtered-response classification and cache
 isolation without a public type or dependency. Root, core, tarball, and
 unpacked budgets plus the cache subpath track the measured implementation and
@@ -287,6 +306,25 @@ subpaths load only what they use. Root, core, retry, cache, testing, tarball,
 and unpacked budgets track the measured safety cost plus narrow headroom; no
 runtime dependency was added.
 
+The 1.17 hardening patch prevents inherited nested client configuration and
+adapters from becoming trusted own fields during merging, keeps body-bearing
+requests out of automatic cache keys, and preserves explicit null error data.
+Its second audit also rejects malformed structured request options, prevents
+inherited plugin defaults from entering overrides, and normalizes trailing
+query delimiters. Sanitized defaults snapshots restore the hot merge path and
+skip body ownership probes for known body-free defaults. Root, core, cache,
+tarball, and unpacked budgets include the measured guards and snapshot metadata
+plus narrow headroom; declarations and unrelated plugin subpaths remain fixed.
+
 `pnpm test:package` includes the size check, so release verification cannot
 publish a package that exceeds the checked-in budgets. CI also stores the JSON
 report for comparing changes over time.
+
+Origin-shared 429 cooldowns add bounded Retry-After state and timer handling to
+the existing rate-limit subpath. OpenTelemetry metrics use a separate
+`plugins/opentelemetry-metrics` entry point and structural Meter API, so no SDK
+or exporter dependency is bundled. Root, declaration, rate-limit, tarball, and
+unpacked budgets track the measured public API; the metrics subpath has its own
+narrow transitive budget. Full stream-consumption measurement adds isolated
+ReadableStream and async-iterable wrappers to that optional subpath; updated
+budgets include their measured cost without adding a runtime dependency.

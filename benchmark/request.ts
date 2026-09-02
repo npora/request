@@ -5,6 +5,8 @@ import {
   concurrencyPlugin,
   createClient,
   loggerPlugin,
+  openTelemetryMetricsPlugin,
+  rateLimitPlugin,
   RequestError,
   retryPlugin,
   type Adapter,
@@ -15,8 +17,8 @@ import {
 import {
   parseBenchmarkOptions,
   printBenchmarkReport,
-  runConcurrent,
-  runSequential,
+  runConcurrent as runConcurrentHarness,
+  runSequential as runSequentialHarness,
   writeBenchmarkReport
 } from './harness'
 
@@ -25,8 +27,27 @@ const options = parseBenchmarkOptions(
   {
     operations: 5000,
     concurrency: 50,
-    warmup: 250
+    warmup: 250,
+    samples: 4096
   }
+)
+const runSequential = (
+  operations: number,
+  operation: () => Promise<unknown>
+) => runSequentialHarness(
+  operations,
+  operation,
+  options.samples
+)
+const runConcurrent = (
+  operations: number,
+  concurrency: number,
+  operation: () => Promise<unknown>
+) => runConcurrentHarness(
+  operations,
+  concurrency,
+  operation,
+  options.samples
 )
 const adapter = createBenchmarkAdapter()
 const requestConfig: RequestConfig = {
@@ -84,6 +105,22 @@ const cacheDedupeClient = createClient({
 const concurrencyClient = createClient({
   adapter
 }).use(concurrencyPlugin())
+const rateLimitClient = createClient({
+  adapter
+}).use(rateLimitPlugin({ maxRequests: 1_000_000 }))
+const noopMetricInstrument = {
+  add() {},
+  record() {}
+}
+const openTelemetryMetricsClient = createClient({ adapter }).use(
+  openTelemetryMetricsPlugin({
+    meter: {
+      createCounter: () => noopMetricInstrument,
+      createUpDownCounter: () => noopMetricInstrument,
+      createHistogram: () => noopMetricInstrument
+    }
+  })
+)
 const concurrencyContendedClient = createClient({
   adapter
 }).use(concurrencyPlugin({
@@ -183,6 +220,14 @@ const direct = await runSequential(
   options.operations,
   () => adapter.request(requestConfig)
 )
+const bareRequestApi = await runSequential(
+  options.operations,
+  () => bareClient.request(bareRequestConfig)
+)
+const bareRequestResponseApi = await runSequential(
+  options.operations,
+  () => bareClient.requestResponse(bareRequestConfig)
+)
 const sequential = await runSequential(
   options.operations,
   () => client.get('/benchmark', requestConfig)
@@ -236,6 +281,14 @@ const cacheDedupeClientResult = await runConcurrent(
 const concurrencyImmediateClient = await runSequential(
   options.operations,
   () => concurrencyClient.get('/benchmark', requestConfig)
+)
+const rateLimitImmediateClient = await runSequential(
+  options.operations,
+  () => rateLimitClient.get('/benchmark')
+)
+const openTelemetryMetricsImmediateClient = await runSequential(
+  options.operations,
+  () => openTelemetryMetricsClient.get('/benchmark')
 )
 const concurrencyContendedClientResult = await runConcurrent(
   options.operations,
@@ -342,10 +395,13 @@ const report = {
   configuration: {
     operations: options.operations,
     concurrency: options.concurrency,
-    warmup: options.warmup
+    warmup: options.warmup,
+    samples: options.samples
   },
   scenarios: {
     directAdapter: direct,
+    bareRequestApi,
+    bareRequestResponseApi,
     sequentialClient: sequential,
     bareSequentialClient: bareSequential,
     jsonBodySequentialClient: jsonBodySequential,
@@ -358,6 +414,8 @@ const report = {
     cacheMissClient: cacheMissClientResult,
     cacheDedupeClient: cacheDedupeClientResult,
     concurrencyImmediateClient,
+    rateLimitImmediateClient,
+    openTelemetryMetricsImmediateClient,
     concurrencyContendedClient: concurrencyContendedClientResult,
     circuitBreakerSuccessClient,
     concurrencyBaseClient: concurrencyBaseClientResult,
@@ -409,6 +467,8 @@ async function warmUp(iterations: number): Promise<void> {
       )
     ])
     await concurrencyClient.get('/benchmark', requestConfig)
+    await rateLimitClient.get('/benchmark')
+    await openTelemetryMetricsClient.get('/benchmark')
     await concurrencyContendedClient.get('/benchmark', requestConfig)
     await circuitBreakerClient.get('/benchmark', requestConfig)
     await concurrencyBaseClient.get('/benchmark', requestConfig)

@@ -4,22 +4,20 @@ import type {
 import type { PluginHooks } from '../interceptors/PluginHooks'
 import type { Adapter, NporaResponse, RequestConfig } from '../types'
 import {
-  isRequestError,
-  RequestError,
-  SchemaValidationError
+  RequestError
 } from '../errors'
 import {
-  finalizeStreamingResponse,
   validateRequestConfig
 } from '../utils'
+import { validateStandardSchemaValue } from '../utils/validateStandardSchema'
 import { createTimeoutSignal } from '../utils/createTimeoutSignal'
 import { throwIfAborted } from '../utils/createAbortError'
 import { isPromiseLike } from '../utils/isPromiseLike'
 import { MAX_TIMER_DELAY } from '../utils/maxTimerDelay'
 import { normalizeURL } from '../utils/normalizeURL'
 import { waitForSignal } from '../utils/waitForSignal'
-import { isReadableStream } from '../utils/isReadableStream'
 import { RequestContext } from './RequestContext'
+import { finalizeTotalTimeout, waitForRetry } from './lifecycleTiming'
 
 export interface PipelineInterceptors {
   request: InterceptorManager<RequestConfig>
@@ -399,71 +397,20 @@ export class Pipeline {
       return
     }
 
-    let result: Awaited<ReturnType<typeof schema['~standard']['validate']>>
-    let schemaVendor = 'unknown'
-
-    try {
-      const standard = schema['~standard']
-
-      schemaVendor = standard.vendor
-      result = await standard.validate(response.data)
-    } catch (error) {
-      throw new SchemaValidationError(
-        'Response schema validator failed',
-        response,
-        schemaVendor,
-        [],
-        error
-      )
-    }
-
-    if (
-      typeof result !== 'object' ||
-      result === null
-    ) {
-      throw new SchemaValidationError(
-        'Response schema validator returned an invalid result',
-        response,
-        schemaVendor,
-        [],
-        new TypeError('Expected a Standard Schema result')
-      )
-    }
-
-    const issues = 'issues' in result ? result.issues : undefined
-
-    if (issues !== undefined) {
-      if (!Array.isArray(issues)) {
-        throw new SchemaValidationError(
-          'Response schema validator returned an invalid result',
-          response,
-          schemaVendor,
-          [],
-          new TypeError('Expected Standard Schema issues to be an array')
-        )
+    const value = await validateStandardSchemaValue(
+      schema,
+      response.data,
+      response,
+      {
+        failed: 'Response schema validator failed',
+        invalid: 'Response schema validator returned an invalid result',
+        rejected: 'Response schema validation failed'
       }
-
-      throw new SchemaValidationError(
-        'Response schema validation failed',
-        response,
-        schemaVendor,
-        issues
-      )
-    }
-
-    if (!('value' in result)) {
-      throw new SchemaValidationError(
-        'Response schema validator returned an invalid result',
-        response,
-        schemaVendor,
-        [],
-        new TypeError('Expected a Standard Schema value')
-      )
-    }
+    )
 
     context.response = {
       ...response,
-      data: result.value as T
+      data: value as T
     }
   }
 
@@ -544,164 +491,4 @@ export class Pipeline {
 
 interface InternalInterceptorManager<T> {
   runMaybeAsync(value: T): T | Promise<T>
-}
-
-function waitForRetry(
-  milliseconds: number,
-  config: RequestConfig
-): Promise<void> | undefined {
-  const signal = config.signal
-
-  if (signal?.aborted) {
-    return Promise.reject(createAbortError(signal.reason, config))
-  }
-
-  if (milliseconds <= 0) {
-    return undefined
-  }
-
-  return new Promise((resolve, reject) => {
-    let timer: ReturnType<typeof setTimeout> | undefined
-    let settled = false
-
-    const onAbort = () => {
-      if (settled) {
-        return
-      }
-
-      settled = true
-      if (timer !== undefined) {
-        clearTimeout(timer)
-      }
-      cleanup()
-      reject(createAbortError(signal?.reason, config))
-    }
-
-    const cleanup = () => {
-      try {
-        signal?.removeEventListener('abort', onAbort)
-      } catch {
-        // Cleanup failures must not retain a retry wait.
-      }
-    }
-
-    try {
-      signal?.addEventListener('abort', onAbort, {
-        once: true
-      })
-    } catch (error) {
-      if (!settled) {
-        settled = true
-        cleanup()
-        reject(error)
-      }
-      return
-    }
-
-    if (signal?.aborted) {
-      onAbort()
-    }
-
-    if (settled) {
-      return
-    }
-
-    try {
-      timer = setTimeout(() => {
-        settled = true
-        cleanup()
-        resolve()
-      }, Math.min(milliseconds, MAX_TIMER_DELAY))
-    } catch (error) {
-      settled = true
-      cleanup()
-      reject(error)
-      return
-    }
-
-    if (settled) {
-      clearTimeout(timer)
-      timer = undefined
-    }
-  })
-}
-
-function createAbortError(
-  reason: unknown,
-  config: RequestConfig
-): RequestError {
-  if (isRequestError(reason)) {
-    return new RequestError(reason.message, {
-      code: reason.code,
-      status: reason.status,
-      data: reason.data,
-      response: reason.response,
-      config: reason.config ?? config,
-      cause: reason
-    })
-  }
-
-  return new RequestError('Request aborted during retry delay', {
-    code: 'ABORT_ERROR',
-    config,
-    cause: reason
-  })
-}
-
-function finalizeTotalTimeout<T>(
-  response: NporaResponse<T>,
-  clear: () => void
-): NporaResponse<T> {
-  const data = response.data
-
-  if (isReadableStream(data)) {
-    const source = data === response.raw.body
-      ? response.raw
-      : new Response(data, {
-          status: response.status,
-          statusText: response.statusText,
-          headers: response.headers
-        })
-    const raw = finalizeStreamingResponse(
-      source,
-      undefined,
-      response.config,
-      clear
-    )
-
-    return {
-      ...response,
-      data: raw.body as T,
-      raw
-    }
-  }
-
-  if (isAsyncIterable(data)) {
-    return {
-      ...response,
-      data: finalizeAsyncIterable(data, clear) as T
-    }
-  }
-
-  clear()
-  return response
-}
-
-function finalizeAsyncIterable<T>(
-  iterable: AsyncIterable<T>,
-  clear: () => void
-): AsyncIterable<T> {
-  return (async function* () {
-    try {
-      yield* iterable
-    } finally {
-      clear()
-    }
-  })()
-}
-
-function isAsyncIterable(value: unknown): value is AsyncIterable<unknown> {
-  return typeof value === 'object' &&
-    value !== null &&
-    Symbol.asyncIterator in value
 }
