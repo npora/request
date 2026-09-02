@@ -57,6 +57,40 @@ describe('registry install retry', () => {
     expect(wait.mock.calls).toEqual([[10], [20]])
   })
 
+  it('tolerates multi-minute default registry propagation delays', async () => {
+    const install = vi.fn()
+      .mockReturnValueOnce(failure('ETARGET'))
+      .mockReturnValueOnce(failure('ETARGET'))
+      .mockReturnValueOnce(failure('E404'))
+      .mockReturnValueOnce(failure('ETARGET'))
+      .mockReturnValueOnce(failure('E404'))
+      .mockReturnValueOnce(failure('ETARGET'))
+      .mockReturnValueOnce(failure('E404'))
+      .mockReturnValue(success())
+    const wait = vi.fn().mockResolvedValue(undefined)
+    const onRetry = vi.fn()
+
+    await expect(retryRegistryInstall(install, {
+      wait,
+      onRetry
+    })).resolves.toEqual(success())
+    expect(install).toHaveBeenCalledTimes(8)
+    expect(wait.mock.calls).toEqual([
+      [2_000],
+      [4_000],
+      [8_000],
+      [16_000],
+      [30_000],
+      [30_000],
+      [30_000]
+    ])
+    expect(onRetry).toHaveBeenLastCalledWith({
+      attempt: 8,
+      delay: 30_000,
+      maximumAttempts: 11
+    })
+  })
+
   it('recognizes propagation codes in either npm output stream', () => {
     expect(isRegistryPropagationFailure(failure('ETARGET'))).toBe(true)
     expect(isRegistryPropagationFailure({

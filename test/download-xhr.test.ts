@@ -485,6 +485,7 @@ describe('downloadPlugin XMLHttpRequest fallback', () => {
 
   it('should handle successful responses without an HTTP body', async () => {
     const clone = vi.spyOn(Response.prototype, 'clone')
+    const onProgress = vi.fn()
 
     scenario = xhr => {
       xhr.status = 204
@@ -499,7 +500,7 @@ describe('downloadPlugin XMLHttpRequest fallback', () => {
     const response = await request.getResponse<void>('/empty', {
       extensions: {
         download: {
-          onProgress: vi.fn()
+          onProgress
         }
       }
     })
@@ -508,6 +509,63 @@ describe('downloadPlugin XMLHttpRequest fallback', () => {
     expect(response.data).toBeUndefined()
     expect(response.raw.body).toBeNull()
     expect(clone).not.toHaveBeenCalled()
+    expect(onProgress).toHaveBeenCalledOnce()
+    expect(onProgress).toHaveBeenCalledWith({
+      loaded: 0,
+      total: 0,
+      bytes: 0
+    })
+  })
+
+  it('should enforce maxResponseSize without native progress events', async () => {
+    scenario = xhr => {
+      xhr.response = new Blob(['npora'])
+      xhr.load()
+    }
+
+    const request = createClient().use(
+      downloadPlugin({ transport: 'xhr' })
+    )
+
+    await expect(request.get('/large-without-progress', {
+      maxResponseSize: 4,
+      extensions: {
+        download: { onProgress() {} }
+      }
+    })).rejects.toMatchObject({
+      code: 'RESPONSE_TOO_LARGE'
+    })
+  })
+
+  it('should flush final XHR download progress on load', async () => {
+    scenario = xhr => {
+      xhr.progress(2, 5)
+      xhr.load()
+    }
+
+    const onProgress = vi.fn()
+    const request = createClient().use(
+      downloadPlugin({ transport: 'xhr' })
+    )
+
+    await request.get('/final-progress', {
+      extensions: {
+        download: { onProgress }
+      }
+    })
+
+    expect(onProgress).toHaveBeenNthCalledWith(1, {
+      loaded: 2,
+      total: 5,
+      progress: 0.4,
+      bytes: 2
+    })
+    expect(onProgress).toHaveBeenNthCalledWith(2, {
+      loaded: 5,
+      total: 5,
+      progress: 1,
+      bytes: 3
+    })
   })
 
   it('should not clone the raw XHR body for data-only requests', async () => {
@@ -840,7 +898,7 @@ describe('downloadPlugin XMLHttpRequest fallback', () => {
       Array.from({ length: 100 }, (_, id) => String(id))
     )
     expect(FakeXMLHttpRequest.instances).toHaveLength(100)
-    expect(progress).toHaveBeenCalledTimes(100)
+    expect(progress).toHaveBeenCalledTimes(190)
     expect(fetchMock).not.toHaveBeenCalled()
   })
 

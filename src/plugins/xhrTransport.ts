@@ -55,6 +55,7 @@ export function xhrRequest<T>(
 
   return new Promise((resolve, reject) => {
     let settled = false
+    let downloadProgressLoaded = -1
 
     const cleanup = () => {
       try {
@@ -108,7 +109,28 @@ export function xhrRequest<T>(
       )
     }
 
+    const downloadProgress = createProgressHandler(
+      options.onDownloadProgress,
+      abortWith,
+      config.maxResponseSize,
+      config
+    )
+
     xhr.onload = () => {
+      const loaded = isBlob(xhr.response) ? xhr.response.size : 0
+
+      if (downloadProgressLoaded < loaded && downloadProgress) {
+        downloadProgress({
+          loaded,
+          total: loaded,
+          lengthComputable: true
+        } as ProgressEvent<EventTarget>)
+
+        if (settled) {
+          return
+        }
+      }
+
       void processResponse<T>(xhr, config, options.preserveRaw ?? true).then(
         resolveOnce,
         rejectOnce
@@ -127,12 +149,12 @@ export function xhrRequest<T>(
         createAbortError(signal?.reason, config)
       )
     }
-    xhr.onprogress = createProgressHandler(
-      options.onDownloadProgress,
-      abortWith,
-      config.maxResponseSize,
-      config
-    )
+    xhr.onprogress = downloadProgress
+      ? event => {
+          downloadProgressLoaded = event.loaded
+          downloadProgress(event)
+        }
+      : null
 
     if (xhr.upload) {
       xhr.upload.onprogress = createProgressHandler(
@@ -370,7 +392,7 @@ function createProgressHandler(
   return event => {
     if (
       Number.isFinite(maxResponseSize) &&
-      event.loaded > (maxResponseSize ?? Number.POSITIVE_INFINITY)
+      event.loaded > (maxResponseSize as number)
     ) {
       abortWith(
         new RequestError(
@@ -384,13 +406,13 @@ function createProgressHandler(
       return
     }
 
-    if (!callback || !trackProgress) {
+    if (!callback) {
       return
     }
 
     try {
       callback(
-        trackProgress(
+        trackProgress!(
           event.loaded,
           event.lengthComputable
             ? event.total

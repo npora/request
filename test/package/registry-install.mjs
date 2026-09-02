@@ -43,7 +43,8 @@ try {
     packageSpec,
     '--ignore-scripts',
     '--no-audit',
-    '--no-fund'
+    '--no-fund',
+    '--prefer-online'
   ]
   const installResult = await retryRegistryInstall(
     () => runCommand('npm', installArgs),
