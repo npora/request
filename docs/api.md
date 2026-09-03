@@ -7,6 +7,25 @@ request fields, see the [configuration reference](configuration.md).
 For Node.js proxy, pooling, mTLS, and DNS setup, see the
 [Undici integration guide](undici.md).
 
+## Find an API
+
+| Area | Start with |
+| --- | --- |
+| Create or extend a client | [`createClient()`](#createclient) and [`extend()`](#extend) |
+| Send requests | [`request()`](#request) and [HTTP methods](#http-methods) |
+| Configure requests | [Base config](#base), [body](#body), and [request control](#control) |
+| Inspect results | [Response options](#response) and [`NporaResponse`](#response-1) |
+| Test request code | [`MockAdapter`](#mockadapter) |
+| Add lifecycle behavior | [Interceptors](#interceptors) and [plugins](#plugins) |
+| Handle failures | [Error API](#error) |
+| Implement a transport | [Adapter API](#adapter) |
+| Check compatibility promises | [Stability](#stability) |
+
+Most applications only need `createClient()`, an HTTP method, and the
+[configuration reference](configuration.md). Import individual plugins through
+their documented subpaths when a project needs retry, caching, authentication,
+traffic control, transfer progress, or OpenTelemetry support.
+
 ## Core guarantees
 
 - **Native transport model:** Fetch-compatible inputs, responses, cancellation,

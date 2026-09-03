@@ -7,78 +7,21 @@
 [![license](https://img.shields.io/npm/l/@npora/request.svg)](LICENSE)
 
 A production-focused, TypeScript-first HTTP client built on the standard Fetch
-API, with zero runtime dependencies.
+API. It adds typed responses, runtime validation, streaming, stable errors, and
+composable resilience while keeping native platform values visible. The package
+has zero runtime dependencies.
 
-Npora Request keeps the native Fetch model while adding the contracts and
-resilience needed by real applications: inferred response types, runtime
-validation, incremental streaming, stable errors, deterministic extension
-ordering, retries, caching, concurrency control, circuit breaking,
-authentication, and upload/download progress.
+## Start here
 
-## Why Npora Request
-
-- **Trust responses at runtime.** Standard Schema v1 validation checks and can
-  transform untrusted data while preserving full response and error metadata.
-- **Stream without buffering everything.** File downloads, SSE, and NDJSON can
-  be consumed lazily with backpressure, cancellation, timeout, progress, and
-  response-size enforcement.
-- **Add resilience without hiding the transport.** Retry, cache, circuit
-  breaker, concurrency, authentication, logging, and progress are isolated,
-  composable plugins over the standard Fetch API.
-- **Use one predictable contract everywhere.** Browsers, Web Workers, Node.js,
-  ESM, and CommonJS share the same typed lifecycle and stable error codes.
-- **Keep native platform values native.** `URL`, `Request`, `Headers`,
-  `FormData`, `Blob`, `ArrayBuffer`, and `ReadableStream` retain their Fetch
-  semantics, including supported cross-realm inputs.
-- **Bound untrusted traffic.** Separate request, successful response, and error
-  response limits prevent accidental buffering while preserving meaningful
-  error codes and cancellation.
-- **Ship less supply-chain risk.** The package has no runtime dependencies and
-  verifies public exports, browser behavior, security regressions, and size
-  budgets before release.
-
-## Design focus
-
-Npora Request combines runtime validation, incremental streaming, persistent
-cache correctness, resilience, observability, and cancellation under one
-typed, deterministic lifecycle. It keeps the standard Fetch model, ships with
-zero runtime dependencies, supports ESM and CommonJS, and exposes optional
-capabilities through tree-shakeable subpath exports.
-
-The current stress gate completed **10,000,000 logical operations at concurrency
-256 with zero unexpected failures**, followed by **100,000 real localhost HTTP
-requests at concurrency 256**. These are reproducible engineering checks, not
-claims about every remote workload; commands and limitations are in the
-[benchmark documentation](docs/benchmark.md).
-
-## Features
-
-- Data-first and complete-response APIs with TypeScript inference.
-- Native `URL` and `Request` inputs with explicit per-call overrides and stable
-  lifecycle snapshots.
-- First-class RFC 10008 `QUERY` helpers with JSON bodies and safe retries for
-  replayable content.
-- Query- and fragment-safe `baseURL` prefix composition.
-- Object query merging plus native ordered `URLSearchParams` through
-  `searchParams`.
-- Native multipart and URL-encoded response parsing through `formData`.
-- Raw binary response parsing as a portable `Uint8Array` through `bytes`.
-- Response-type-driven `Accept` negotiation with custom-header precedence.
-- Standards-correct opaque and manual-redirect Fetch responses without false
-  HTTP or parser failures.
-- Optional non-throwing HTTP status handling with parsed response data and
-  complete metadata.
-- Standard Schema v1 validation and transformation for untrusted responses.
-- Incremental SSE and NDJSON async iterables with cancellation and size limits.
-- Progress-aware file download streams that preserve backpressure and avoid
-  buffering the complete response in memory.
-- Unified errors across Fetch, XHR, parsing, validation, timeouts, and aborts.
-- Request/response/error interceptors with deterministic priority ordering.
-- Shallow-merged local request context for tracing and lifecycle policies.
-- Official retry, cache, circuit-breaker, concurrency, authentication, logger,
-  upload, and download plugins.
-- Method-aware `MockAdapter` routing, matching, delays, failures, and history.
-- Browser, Web Worker, ESM, and CommonJS support with zero runtime dependencies.
+| Goal | Documentation |
+| --- | --- |
+| Send the first request | [Quick start](#quick-start) |
+| Find a client or response API | [API reference](docs/api.md) |
+| Configure URLs, bodies, timeouts, or parsing | [Configuration reference](docs/configuration.md) |
+| Add retry, cache, authentication, or observability | [Plugins](#plugins) |
+| Handle stable error codes | [Errors](#errors) |
+| Configure Node.js proxying, pooling, mTLS, or DNS | [Undici integration](docs/undici.md) |
+| Review runtime boundaries and release checks | [Testing](docs/testing.md) and [security](docs/security.md) |
 
 ## Install
 
@@ -93,18 +36,6 @@ npm install @npora/request
 Node.js 22 or newer is required. Modern Chromium-based browsers, Firefox,
 Safari/WebKit, and Web Workers are supported through their native Fetch
 implementations.
-
-## Version support
-
-| Version | Status | Guidance |
-| --- | --- | --- |
-| `latest` | Current | Recommended for all new and existing applications. |
-| Earlier releases `>=1.0.0` | Historical stable | Upgrade to `latest` for current fixes and security hardening. |
-| `<1.0.0` | Deprecated and unsupported | Upgrade immediately; 0.x receives no fixes or security updates. |
-
-All published releases before `1.0.0` are deprecated by project policy. Do not
-use a 0.x release in production, documentation examples, dependency templates,
-or new lockfiles.
 
 ## Quick start
 
@@ -127,8 +58,18 @@ const api = createClient({
 const user = await api.get<User>('/users/1')
 ```
 
-Data-first methods return the parsed response body. Use a response method when
-status, headers, or the native `Response` is needed:
+Data-first methods return the parsed response body. Request JSON with the
+dedicated `json` option:
+
+```ts
+const created = await api.post<User>('/users', {
+  json: {
+    name: 'Ada'
+  }
+})
+```
+
+Use a response method when status, headers, or the native `Response` is needed:
 
 ```ts
 const response = await api.getResponse<User>('/users/1')
@@ -138,6 +79,36 @@ console.log(response.status)
 console.log(response.headers)
 console.log(response.raw)
 ```
+
+## Why Npora Request
+
+- **Runtime-safe responses.** Standard Schema v1 validates and transforms
+  untrusted data while preserving response and error metadata.
+- **Incremental streaming.** File downloads, SSE, and NDJSON preserve
+  backpressure, cancellation, timeouts, progress, and response-size limits.
+- **Composable resilience.** Retry, cache, circuit breaker, concurrency,
+  rate limiting, authentication, logging, and observability are isolated
+  plugins over the standard Fetch lifecycle.
+- **Native platform contracts.** `URL`, `Request`, `Headers`, `FormData`,
+  `Blob`, `ArrayBuffer`, and `ReadableStream` retain their Fetch semantics.
+- **Bounded traffic and stable failures.** Separate request, successful
+  response, and error response limits use typed errors with documented codes.
+- **Portable, verifiable delivery.** Browser, Web Worker, Node.js, ESM, and
+  CommonJS behavior is checked alongside public exports, security regressions,
+  and package-size budgets.
+
+## Version support
+
+| Version | Status | Guidance |
+| --- | --- | --- |
+| `latest` | Current stable 1.x | Recommended for new and existing applications. |
+| Earlier releases `>=1.0.0` | Historical | Upgrade to `latest` for current fixes and security hardening. |
+| `<1.0.0` | Unsupported | Upgrade immediately; 0.x receives no fixes or security updates. |
+
+The current 1.x line is in active maintenance. Backward-compatible fixes ship
+as patch releases; new public capabilities require a minor release, and
+breaking public API changes require a new major version. All published releases
+before `1.0.0` are deprecated.
 
 ## Native Fetch inputs
 
