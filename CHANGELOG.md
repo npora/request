@@ -66,6 +66,9 @@
 
 ## 1.16.0
 
+> This version was prepared but not published as a standalone npm release. Its
+> changes first became available in `1.17.0`.
+
 ### Minor Changes
 
 - Add inheritable `parseJson` and `stringifyJson` options for custom buffered

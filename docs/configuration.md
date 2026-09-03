@@ -16,6 +16,22 @@ await api.get('/users', {
 })
 ```
 
+## Find an option
+
+| Need | Section |
+| --- | --- |
+| URL, headers, query, JSON codecs, or custom Fetch | [Core options](#core-options) |
+| JSON, form, binary, or streaming request data | [Request body](#request-body) |
+| Cancellation, timeout, and size limits | [Cancellation and limits](#cancellation-and-limits) |
+| Parsing, schemas, streaming, or HTTP errors | [Response handling](#response-handling) |
+| Retry, cache, auth, traffic control, progress, or telemetry | [Extension options](#extension-options) |
+| Inheritance and validation behavior | [Merge and validation rules](#merge-and-validation-rules) |
+
+Start with client defaults for policy shared by one API, then override only the
+values that differ on an individual request. Plugin-owned settings always live
+under `extensions`; installing a plugin enables its lifecycle behavior, while
+its documented request extension controls that behavior per call.
+
 ## Core options
 
 | Option | Type | Default | Purpose |
