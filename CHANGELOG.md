@@ -1,5 +1,12 @@
 # @npora/request
 
+## 1.17.5
+
+### Patch Changes
+
+- c25684d: Restructure the package and API documentation entry points around installation,
+  first-request usage, stable version guidance, and task-oriented navigation.
+
 ## 1.17.4
 
 ### Patch Changes
