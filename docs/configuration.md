@@ -390,7 +390,7 @@ Requires `cachePlugin()`.
 
 | Field | Default | Purpose |
 | --- | --- | --- |
-| `enabled` | `true` for configured cache methods | Enable caching for this request. |
+| `enabled` | `false` unless explicitly set to `true` | Enable caching for this request, subject to the configured cache methods. |
 | `ttl` | `30000` | Cached lifetime in milliseconds. `0` disables persistence. |
 | `staleIfError` | response directive or disabled | Maximum stale fallback window in milliseconds. |
 | `staleWhileRevalidate` | response directive or disabled | Maximum immediate stale window while refreshing in the background. |
@@ -407,6 +407,23 @@ headers may shorten the configured TTL. `no-store`, ambiguous `max-age`, and
 `no-cache` is not persisted. A `304` response refreshes cached metadata and the
 configured lifetime. Equivalent concurrent requests may still share their
 network operation.
+
+Installing `cachePlugin()` alone does not cache requests. Enable it on an
+individual request or in client defaults for an API whose responses are safe
+to cache:
+
+```ts
+const cache = cachePlugin()
+const api = createClient({
+  baseURL: 'https://api.example.com',
+  extensions: { cache: { enabled: true } }
+}).use(cache)
+
+await api.get('/public-catalog')
+await api.get('/private-profile', {
+  extensions: { cache: { enabled: false } }
+})
+```
 
 Because cached entries contain parsed values and generated keys assume stable
 query encoding, requests with `parseJson` or `querySerializer` bypass cache
