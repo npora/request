@@ -16,6 +16,7 @@ has zero runtime dependencies.
 | Goal | Documentation |
 | --- | --- |
 | Send the first request | [Quick start](#quick-start) |
+| Move an existing Axios client | [Migrating from Axios](docs/migrating-from-axios.md) |
 | Find a client or response API | [API reference](docs/api.md) |
 | Configure URLs, bodies, timeouts, or parsing | [Configuration reference](docs/configuration.md) |
 | Add retry, cache, authentication, or observability | [Plugins](#plugins) |
@@ -58,8 +59,24 @@ const api = createClient({
 const user = await api.get<User>('/users/1')
 ```
 
-Data-first methods return the parsed response body. Request JSON with the
-dedicated `json` option:
+Data-first methods return the parsed response body. The `User` generic gives
+TypeScript a type; it does **not** check the server response at runtime. For
+untrusted data, pass a [Standard Schema](#response-validation) validator:
+
+```ts
+import { z } from 'zod'
+
+const userSchema = z.object({
+  id: z.number(),
+  name: z.string()
+})
+
+const validatedUser = await api.get('/users/1', {
+  schema: userSchema
+}) // inferred from the schema and checked at runtime
+```
+
+Request JSON with the dedicated `json` option:
 
 ```ts
 const created = await api.post<User>('/users', {
@@ -311,6 +328,12 @@ import { retryPlugin } from '@npora/request/plugins/retry'
 
 const request = createClient().use(retryPlugin({ retries: 2 }))
 ```
+
+Retry is opt-in: installing `retryPlugin()` without a `retries` value leaves
+the default at zero. Cache is also opt-in per request, or through a client
+default under `extensions.cache`. See the
+[configuration reference](docs/configuration.md#extension-options) for the
+precise defaults and method rules.
 
 `MockAdapter` is also available from `@npora/request/testing` and
 `@npora/request/adapters/mock` so test-only utilities do not need to be
@@ -783,6 +806,7 @@ allowlist, and size budgets.
 - [API reference](https://github.com/npora/request/blob/main/docs/api.md)
 - [Architecture](https://github.com/npora/request/blob/main/docs/architecture.md)
 - [Migration from 0.x](https://github.com/npora/request/blob/main/docs/migration.md)
+- [Migrating from Axios](https://github.com/npora/request/blob/main/docs/migrating-from-axios.md)
 - [Security model](https://github.com/npora/request/blob/main/docs/security.md)
 - [Testing and release gates](https://github.com/npora/request/blob/main/docs/testing.md)
 - [Performance benchmarks](https://github.com/npora/request/blob/main/docs/benchmark.md)
