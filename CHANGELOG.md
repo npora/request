@@ -1,5 +1,11 @@
 # @npora/request
 
+## 1.18.0
+
+### Minor Changes
+
+- f1ffd84: Add an opt-in memory-only TTL cache subpath with bounded LRU eviction, conservative HTTP and credential-aware caching, a runnable example, and application bundle size regression checks.
+
 ## 1.17.5
 
 ### Patch Changes
