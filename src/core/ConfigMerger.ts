@@ -84,16 +84,28 @@ export class ConfigMerger {
     }
 
     if (result.headers || result.removeHeaders) {
-      result.headers = this.mergeHeaders(
-        trustedDefaults
-          ? trustedDefaults.headers
-          : ownValue(defaults, 'headers'),
-        ownValue(config, 'headers'),
-        trustedDefaults
-          ? trustedDefaults.removeHeaders
-          : ownValue(defaults, 'removeHeaders'),
-        ownValue(config, 'removeHeaders')
-      )
+      const defaultHeaders = trustedDefaults
+        ? trustedDefaults.headers
+        : ownValue(defaults, 'headers')
+      const headers = ownValue(config, 'headers')
+      const defaultRemovals = trustedDefaults
+        ? trustedDefaults.removeHeaders
+        : ownValue(defaults, 'removeHeaders')
+      const removals = ownValue(config, 'removeHeaders')
+
+      // Trusted client defaults already have normalized headers. Copy them so
+      // an adapter cannot change the headers of a later request.
+      result.headers = trustedDefaults && defaultHeaders &&
+        headers === undefined &&
+        defaultRemovals === undefined &&
+        removals === undefined
+        ? { ...defaultHeaders }
+        : this.mergeHeaders(
+            defaultHeaders,
+            headers,
+            defaultRemovals,
+            removals
+          )
     }
 
     if (result.query || result.searchParams) {

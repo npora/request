@@ -3,19 +3,28 @@ import type {
   HttpMethod,
   RequestConfig
 } from '../types'
-import { isRequestError, RequestError } from '../errors'
+import { RequestError } from '../errors'
 import { isPromiseLike } from '../utils/isPromiseLike'
 import { waitForSignal } from '../utils/waitForSignal'
 import type { RequestContext } from '../core/RequestContext'
-import type { Plugin, PluginContext } from './Plugin'
+import type { Plugin } from './Plugin'
 import { resolveExtensionConfig } from './resolveExtensionConfig'
 import {
-  hasCacheControlDirective,
   resolveRequestCachePolicy,
-  resolveResponseCachePolicy,
-  resolveStaleIfErrorWindow,
-  resolveStaleWhileRevalidateWindow
+  resolveResponseCachePolicy
 } from './cachePolicy'
+import {
+  abortBackgroundRefreshes,
+  canRevalidateCacheEntry,
+  canUseStaleIfError,
+  canUseStaleWhileRevalidate,
+  isAsyncIterable,
+  isCacheableRequest,
+  isEligibleStaleIfError,
+  isSchemaValidationFailure,
+  prepareConditionalRevalidation,
+  startBackgroundRefresh
+} from './cacheLifecycle'
 import {
   MemoryCacheStore
 } from './cacheStores'
@@ -1087,7 +1096,8 @@ export function cachePlugin(
               record,
               requestContext.config,
               requestContext.preserveRaw
-            )
+            ) &&
+            restoreCacheEntry(record, requestContext.config)
           ) {
             return prepareCacheMiss(
               requestContext,
@@ -1463,244 +1473,4 @@ export function cachePlugin(
   }
 
   return plugin
-}
-
-function isCacheableRequest(
-  config: RequestConfig,
-  methods: ReadonlySet<HttpMethod>,
-  cache: CacheOptions
-): boolean {
-  return (
-    methods.has(config.method ?? 'GET') &&
-    (!hasRequestBody(config) || Boolean(cache.key)) &&
-    (!config.parseJson || Boolean(cache.key)) &&
-    (!config.querySerializer || Boolean(cache.key)) &&
-    config.responseType !== 'stream' &&
-    config.responseType !== 'sse' &&
-    config.responseType !== 'ndjson' &&
-    config.responseType !== 'bytes' &&
-    config.responseType !== 'formData' &&
-    config.fetchOptions?.mode !== 'no-cors' &&
-    config.fetchOptions?.redirect !== 'manual'
-  )
-}
-
-function hasRequestBody(config: RequestConfig): boolean {
-  return config.body != null ||
-    config.json !== undefined ||
-    config.form != null ||
-    config.formData != null
-}
-
-function isAsyncIterable(value: unknown): value is AsyncIterable<unknown> {
-  return typeof value === 'object' &&
-    value !== null &&
-    Symbol.asyncIterator in value
-}
-
-function isSchemaValidationFailure(error: unknown): boolean {
-  return isRequestError(error) && error.code === 'SCHEMA_ERROR'
-}
-
-function canUseStaleIfError(
-  record: CacheEntry,
-  config: RequestConfig,
-  preserveRaw: boolean,
-  configuredStaleIfError?: number
-): boolean {
-  try {
-    if (preserveRaw && !record.raw) {
-      return false
-    }
-
-    const headers = new Headers(config.headers)
-
-    if (
-      headers.has('if-none-match') ||
-      headers.has('if-modified-since') ||
-      headers.has('range')
-    ) {
-      return false
-    }
-
-    const window = resolveStaleIfErrorWindow(
-      new Headers(record.headers),
-      configuredStaleIfError
-    )
-
-    return window > 0 &&
-      Number.isFinite(record.expiresAt) &&
-      Date.now() < record.expiresAt + window &&
-      restoreCacheEntry(record, config) !== undefined
-  } catch {
-    return false
-  }
-}
-
-function canUseStaleWhileRevalidate(
-  record: CacheEntry,
-  config: RequestConfig,
-  preserveRaw: boolean,
-  configured?: number
-): boolean {
-  try {
-    if (preserveRaw && !record.raw) {
-      return false
-    }
-
-    const requestHeaders = new Headers(config.headers)
-    const responseHeaders = new Headers(record.headers)
-
-    if (
-      requestHeaders.has('if-none-match') ||
-      requestHeaders.has('if-modified-since') ||
-      requestHeaders.has('range') ||
-      hasCacheControlDirective(responseHeaders, 'no-cache') ||
-      hasCacheControlDirective(responseHeaders, 'must-revalidate')
-    ) {
-      return false
-    }
-
-    const window = resolveStaleWhileRevalidateWindow(
-      responseHeaders,
-      configured
-    )
-
-    return window > 0 &&
-      Number.isFinite(record.expiresAt) &&
-      Date.now() < record.expiresAt + window &&
-      restoreCacheEntry(record, config) !== undefined
-  } catch {
-    return false
-  }
-}
-
-function startBackgroundRefresh(
-  context: PluginContext,
-  refreshes: Map<string, AbortController>,
-  key: string,
-  config: RequestConfig,
-  preserveRaw: boolean,
-  recordEvent: RecordCacheEvent
-): void {
-  if (refreshes.has(key)) {
-    return
-  }
-
-  const controller = new AbortController()
-  const refreshConfig: RequestConfig = {
-    ...config,
-    signal: controller.signal
-  }
-
-  refreshes.set(key, controller)
-  recordEvent('background-refresh')
-
-  void Promise.resolve()
-    .then(() => context.dispatch(refreshConfig, {
-      background: true,
-      preserveRaw
-    }))
-    .then(
-      () => recordEvent('background-refresh-success'),
-      () => recordEvent('background-refresh-error')
-    )
-    .finally(() => {
-      if (refreshes.get(key) === controller) {
-        refreshes.delete(key)
-      }
-    })
-}
-
-function abortBackgroundRefreshes(
-  refreshes: Map<string, AbortController>
-): void {
-  for (const controller of refreshes.values()) {
-    controller.abort('Cache background refresh stopped')
-  }
-
-  refreshes.clear()
-}
-
-function isEligibleStaleIfError(error: unknown): boolean {
-  return isRequestError(error) && (
-    error.code === 'NETWORK_ERROR' ||
-    error.code === 'TIMEOUT_ERROR' ||
-    (
-      error.code === 'HTTP_ERROR' &&
-      error.status !== undefined &&
-      error.status >= 500 &&
-      error.status < 600
-    )
-  )
-}
-
-function canRevalidateCacheEntry(
-  record: CacheEntry,
-  config: RequestConfig,
-  preserveRaw: boolean
-): boolean {
-  try {
-    if (preserveRaw && !record.raw) {
-      return false
-    }
-
-    const requestHeaders = new Headers(config.headers)
-
-    if (
-      requestHeaders.has('if-none-match') ||
-      requestHeaders.has('if-modified-since') ||
-      requestHeaders.has('range')
-    ) {
-      return false
-    }
-
-    return hasResponseValidator(new Headers(record.headers)) &&
-      restoreCacheEntry(record, config) !== undefined
-  } catch {
-    return false
-  }
-}
-
-function prepareConditionalRevalidation(
-  config: RequestConfig,
-  record: CacheEntry
-): boolean {
-  const storedHeaders = new Headers(record.headers)
-  const etag = storedHeaders.get('etag')
-  const lastModified = storedHeaders.get('last-modified')
-
-  if (!etag && !lastModified) {
-    return false
-  }
-
-  const headers = new Headers(config.headers)
-
-  if (etag) {
-    headers.set('if-none-match', etag)
-  }
-
-  if (lastModified) {
-    headers.set('if-modified-since', lastModified)
-  }
-
-  const validateStatus = config.validateStatus
-  const throwHttpErrors = config.throwHttpErrors
-
-  config.headers = headers
-  config.throwHttpErrors = undefined
-  config.validateStatus = status => {
-    return status === 304 || (
-      validateStatus
-        ? validateStatus(status)
-        : throwHttpErrors === false || (
-          status >= 200 && status < 300
-        )
-    )
-  }
-  return true
-}
-
-function hasResponseValidator(headers: Headers): boolean {
-  return headers.has('etag') || headers.has('last-modified')
 }

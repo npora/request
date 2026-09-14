@@ -147,7 +147,7 @@
     "test:complexity": "node scripts/check-complexity.mjs $(find src -name '*.ts' ! -path '*/types/*' ! -name 'index.ts')",
     "test:types": "pnpm build && tsc -p test/types/tsconfig.json",
     "test:examples": "tsc -p examples/tsconfig.json",
-    "test:package": "node test/package/esm.mjs && node test/package/cjs.cjs && node test/package/subpaths.mjs && node test/package/subpaths.cjs && node test/package/api-exports.mjs && node test/package/api-contract.mjs && node test/package/npm-pack-result.test.mjs && node test/package/manifest.mjs && pnpm test:size",
+    "test:package": "node test/package/esm.mjs && node test/package/cjs.cjs && node test/package/subpaths.mjs && node test/package/subpaths.cjs && node test/package/api-exports.mjs && node test/package/api-contract.mjs && node test/package/npm-pack-result.test.mjs && node test/package/manifest.mjs && node test/consumer/install.mjs && pnpm test:size",
     "test:registry": "node test/package/registry-install.mjs",
     "test:size": "node test/package/size.mjs",
     "test:browser": "playwright test --config=browser/playwright.config.ts",

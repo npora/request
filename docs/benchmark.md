@@ -119,6 +119,8 @@ service latency or production proxy/TLS behavior.
 - `cacheHitClient`: repeated data reads from the default in-memory cache.
 - `cachePrimitiveHitClient`: repeated immutable string reads from the default
   in-memory cache.
+- `cacheStaleWhileRevalidateClient`: repeated stale object reads while one
+  background refresh remains pending, exposing response restoration work.
 - `cacheMissClient`: repeated cacheable requests with persistence disabled,
   covering miss registration and response handling.
 - `cacheDedupeClient`: concurrent cache misses sharing one leader response.
