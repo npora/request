@@ -4,6 +4,7 @@ import {
   RequestError
 } from '@npora/request/core'
 import { retryPlugin } from '@npora/request/plugins/retry'
+import { memoryCachePlugin } from '@npora/request/plugins/memory-cache'
 import { MockAdapter } from '@npora/request/testing'
 
 const adapter = new MockAdapter()
@@ -21,6 +22,15 @@ const request = createClient({ adapter }).use(
 assert.deepEqual(await request.get('/retry'), {
   format: 'esm-subpath'
 })
+
+adapter.onGet('/memory').reply(200, { format: 'memory-subpath' })
+const memory = createClient({
+  adapter,
+  fetchOptions: { credentials: 'omit' },
+  extensions: { memoryCache: { enabled: true } }
+}).use(memoryCachePlugin())
+assert.deepEqual(await memory.get('/memory'), { format: 'memory-subpath' })
+assert.deepEqual(await memory.get('/memory'), { format: 'memory-subpath' })
 
 adapter.onGet('/error').reply(503, { unavailable: true })
 

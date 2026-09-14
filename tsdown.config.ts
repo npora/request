@@ -7,6 +7,7 @@ export default defineConfig({
     plugins: 'src/plugins/index.ts',
     'plugins/auth': 'src/plugins/authPlugin.ts',
     'plugins/cache': 'src/plugins/cachePlugin.ts',
+    'plugins/memory-cache': 'src/plugins/memoryCachePlugin.ts',
     'plugins/circuit-breaker': 'src/plugins/circuitBreakerPlugin.ts',
     'plugins/concurrency': 'src/plugins/concurrencyPlugin.ts',
     'plugins/download': 'src/plugins/downloadPlugin.ts',

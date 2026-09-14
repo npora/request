@@ -3,6 +3,7 @@ import { createServer } from 'node:http'
 import { once } from 'node:events'
 import { createClient } from '@npora/request/core'
 import { cachePlugin } from '@npora/request/plugins/cache'
+import { memoryCachePlugin } from '@npora/request/plugins/memory-cache'
 import { retryPlugin } from '@npora/request/plugins/retry'
 
 let count = 0
@@ -59,6 +60,15 @@ try {
   assert.equal(count, 1)
   await cache.clear()
   assert.deepEqual(await api.get('/count'), { count: 2 })
+
+  const compact = createClient({
+    baseURL: `http://127.0.0.1:${address.port}`,
+    fetchOptions: { credentials: 'omit' },
+    extensions: { memoryCache: { enabled: true } }
+  }).use(memoryCachePlugin())
+  assert.deepEqual(await compact.get('/count'), { count: 3 })
+  assert.deepEqual(await compact.get('/count'), { count: 3 })
+  assert.equal(count, 3)
 
   assert.deepEqual(await api.get('/retry'), { retries: 2 })
   await assert.rejects(api.get('/error'), error => error.code === 'HTTP_ERROR')

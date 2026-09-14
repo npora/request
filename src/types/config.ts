@@ -7,6 +7,7 @@ import type {
   ConcurrencyOptions,
   DownloadOptions,
   LoggerOptions,
+  MemoryCacheOptions,
   OpenTelemetryOptions,
   OpenTelemetryMetricsOptions,
   RateLimitOptions,
@@ -70,6 +71,8 @@ export interface RequestExtensions {
   auth?: AuthOptions
 
   cache?: CacheOptions
+
+  memoryCache?: MemoryCacheOptions
 
   circuitBreaker?: CircuitBreakerOptions
 

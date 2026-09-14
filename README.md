@@ -335,6 +335,13 @@ default under `extensions.cache`. See the
 [configuration reference](docs/configuration.md#extension-options) for the
 precise defaults and method rules.
 
+For a smaller memory-only cache, import `memoryCachePlugin` from
+`@npora/request/plugins/memory-cache` and enable `extensions.memoryCache`.
+It stores successful `GET` and `HEAD` responses with a TTL and bounded LRU
+capacity. Set `fetchOptions.credentials: 'omit'` for requests without implicit
+credentials; requests with credentials need an explicit, correctly scoped
+`memoryCache.key`. See the [runnable example](examples/memory-cache.ts).
+
 `MockAdapter` is also available from `@npora/request/testing` and
 `@npora/request/adapters/mock` so test-only utilities do not need to be
 imported through the production entry point.

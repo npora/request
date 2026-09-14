@@ -171,6 +171,13 @@ export interface CacheOptions {
   dedupe?: boolean
 }
 
+/** Per-request settings for the small in-memory TTL cache. */
+export interface MemoryCacheOptions {
+  enabled?: boolean
+  ttl?: number
+  key?: string
+}
+
 export interface ConcurrencyOptions {
   /**
    * Enable concurrency limiting for this request.
