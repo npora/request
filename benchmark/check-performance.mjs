@@ -10,18 +10,22 @@ const [budget, request, streaming] = await Promise.all([
 const checks = []
 
 assert.equal(budget.schemaVersion, 1, 'Unsupported performance budget schema')
+assert.equal(request.schemaVersion, 2, 'Unsupported request benchmark schema')
 assert.ok(request.scenarios, 'Request benchmark scenarios are missing')
+assert.ok(request.pairedRatios, 'Paired request ratios are missing')
 assert.ok(streaming.scenarios, 'Streaming benchmark scenarios are missing')
 
 for (const [expression, minimum] of Object.entries(budget.requestRatios)) {
-  const [scenarioName, baselineName] = expression.split('/')
-  const scenario = request.scenarios[scenarioName]
-  const baseline = request.scenarios[baselineName]
+  const samples = request.pairedRatios[expression]
 
-  assert.ok(scenario, `Missing request scenario ${scenarioName}`)
-  assert.ok(baseline, `Missing request baseline ${baselineName}`)
+  assert.ok(
+    Array.isArray(samples) && samples.length === 5 &&
+      samples.every(value => Number.isFinite(value) && value > 0),
+    `Expected five valid paired ratios for ${expression}`
+  )
 
-  const ratio = scenario.operationsPerSecond / baseline.operationsPerSecond
+  const ordered = [...samples].sort((first, second) => first - second)
+  const ratio = ordered[2]
 
   checks.push({
     check: expression,

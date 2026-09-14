@@ -126,11 +126,14 @@ jobs:
       - name: Record package size
         run: pnpm test:size -- --output package-size-results/report.json
 
+      - name: Measure consumer bundles
+        run: pnpm benchmark:consumer-size -- --output package-size-results/consumer.json
+
       - name: Upload package size report
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: package-size
-          path: package-size-results/report.json
+          path: package-size-results/
           retention-days: 30
 
       - name: Run performance benchmarks
