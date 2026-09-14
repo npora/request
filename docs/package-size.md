@@ -37,7 +37,7 @@ basic application. Cache contributed the largest optional bundle increment;
 measure it again when its implementation changes instead of assuming subpath
 imports alone will shrink an application bundle.
 
-The memory-only cache application measures 14.1 kB gzip, about 4.5 kB below
+The memory-only cache application measures 14.2 kB gzip, about 4.5 kB below
 the full cache application. It intentionally omits revalidation, stale
 serving, concurrent miss sharing, persistent stores, and tag invalidation.
 Its consumer budget also requires at least a 15% reduction from full cache.

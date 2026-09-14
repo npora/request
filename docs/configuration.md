@@ -403,7 +403,9 @@ output are eligible. Set `fetchOptions.credentials: 'omit'` so ambient cookies
 cannot influence a generated key. If credentials are needed, supply a key that
 includes the user/session scope and every input that changes the response.
 The plugin bypasses explicit request cache directives, `no-store`, `no-cache`,
-`Vary`, streaming responses, and responses outside 2xx. Response `max-age`
+`Vary`, streaming responses, partial-content `206`, and responses outside 2xx.
+Requests with explicit Fetch cache, integrity, referrer, mode, or non-`follow`
+redirect options bypass the plugin so those Fetch rules still run. Response `max-age`
 and `Age` can shorten the TTL. It does not revalidate, serve stale entries,
 share concurrent misses, persist to storage, or invalidate by tag. Use
 `cache.clear()` for manual invalidation.
