@@ -101,16 +101,22 @@ const report = {
 
 console.table(results)
 
-const outputIndex = process.argv.indexOf('--output')
+const args = process.argv.slice(2)
+
+if (args[0] === '--') {
+  args.shift()
+}
+
+const outputIndex = args.indexOf('--output')
 
 if (outputIndex !== -1) {
-  assert.equal(outputIndex, 2, 'Usage: consumer-size.mjs [--output path]')
-  assert.equal(process.argv.length, 4, 'Usage: consumer-size.mjs [--output path]')
-  const outputPath = resolve(process.argv[3])
+  assert.equal(outputIndex, 0, 'Usage: consumer-size.mjs [--output path]')
+  assert.equal(args.length, 2, 'Usage: consumer-size.mjs [--output path]')
+  const outputPath = resolve(args[1])
 
   await mkdir(dirname(outputPath), { recursive: true })
   await writeFile(outputPath, `${JSON.stringify(report, null, 2)}\n`)
   console.log(`Consumer size report: ${outputPath}`)
 } else {
-  assert.equal(process.argv.length, 2, 'Usage: consumer-size.mjs [--output path]')
+  assert.equal(args.length, 0, 'Usage: consumer-size.mjs [--output path]')
 }
