@@ -33,6 +33,16 @@ const scenarios = {
     }).use(cachePlugin())
     export const load = () => api.get('/users/1')
   `,
+  'core + memory cache': `
+    import { createClient } from '@npora/request/core'
+    import { memoryCachePlugin } from '@npora/request/plugins/memory-cache'
+    export const api = createClient({
+      baseURL: 'https://api.example.com',
+      fetchOptions: { credentials: 'omit' },
+      extensions: { memoryCache: { enabled: true } }
+    }).use(memoryCachePlugin())
+    export const load = () => api.get('/users/1')
+  `,
   'root: retry + cache': `
     import { createClient, retryPlugin, cachePlugin } from '@npora/request'
     export const api = createClient({

@@ -27,11 +27,20 @@ import {
   WebStorageCacheStore
 } from '@npora/request/plugins/cache'
 import { retryPlugin } from '@npora/request/plugins/retry'
+import {
+  memoryCachePlugin,
+  type MemoryCachePluginOptions
+} from '@npora/request/plugins/memory-cache'
 import type { MockAdapterOptions } from '@npora/request/testing'
 import { MockAdapter } from '@npora/request/testing'
 
 const adapterOptions: MockAdapterOptions = { delay: 1 }
 const cacheOptions: CachePluginOptions = { maxEntries: 100 }
+const memoryOptions: MemoryCachePluginOptions = { ttl: 1000, maxEntries: 50 }
+const memoryClient = createClient({
+  fetchOptions: { credentials: 'omit' },
+  extensions: { memoryCache: { enabled: true, ttl: 1000 } }
+}).use(memoryCachePlugin(memoryOptions))
 const cacheEvent: CacheEvent = { type: 'hit', timestamp: Date.now() }
 const cacheStats: CacheStats = cachePlugin().getStats()
 const deletion: void | Promise<void> = cachePlugin().delete({
@@ -76,6 +85,7 @@ const refreshLease: Promise<CacheRefreshLease> =
   }).acquireRefreshLease!('subpath-test')
 
 void cacheEvent
+void memoryClient
 void cacheStats
 void deletion
 void tagDeletion

@@ -384,6 +384,44 @@ the built-in decision; return `undefined` to fall back to `statusCodes`,
 `X-Rate-Limit-Reset`. Reset values accept delay seconds or current-era Unix
 timestamps. Server delays are capped by `maxDelay` and are never jittered.
 
+### `extensions.memoryCache`
+
+For memory-only TTL caching, use the separate
+`@npora/request/plugins/memory-cache` entry with `extensions.memoryCache`.
+It uses a smaller application bundle and has fewer cache policies. The two
+cache plugins cannot be installed on the same client.
+
+| `extensions.memoryCache` field | Default | Purpose |
+| --- | --- | --- |
+| `enabled` | `false` | Explicitly enable memory caching. |
+| `ttl` | plugin default (`30000`) | Time to retain a successful response in milliseconds. |
+| `key` | generated | Override the key; required when implicit credentials are possible. |
+
+`memoryCachePlugin({ ttl, maxEntries })` defaults to 30 seconds and 100 LRU
+entries. Only bodyless `GET` and `HEAD` requests with data or complete-response
+output are eligible. Set `fetchOptions.credentials: 'omit'` so ambient cookies
+cannot influence a generated key. If credentials are needed, supply a key that
+includes the user/session scope and every input that changes the response.
+The plugin bypasses explicit request cache directives, `no-store`, `no-cache`,
+`Vary`, streaming responses, and responses outside 2xx. Response `max-age`
+and `Age` can shorten the TTL. It does not revalidate, serve stale entries,
+share concurrent misses, persist to storage, or invalidate by tag. Use
+`cache.clear()` for manual invalidation.
+
+```ts
+import { createClient } from '@npora/request/core'
+import { memoryCachePlugin } from '@npora/request/plugins/memory-cache'
+
+const cache = memoryCachePlugin({ maxEntries: 100 })
+const api = createClient({
+  baseURL: 'https://api.example.com',
+  fetchOptions: { credentials: 'omit' },
+  extensions: { memoryCache: { enabled: true, ttl: 30000 } }
+}).use(cache)
+
+await api.get('/catalog')
+```
+
 ### `extensions.cache`
 
 Requires `cachePlugin()`.

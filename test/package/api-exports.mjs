@@ -53,6 +53,7 @@ const publicExports = [
   'JsonStringifier',
   'LoggerOptions',
   'LoggerEntry',
+  'MemoryCacheOptions',
   'MemoryCacheStore',
   'MemoryCacheStoreOptions',
   'MockAdapter',

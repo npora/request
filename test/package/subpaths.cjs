@@ -7,6 +7,7 @@ const {
   retryPlugin
 } = require('@npora/request/plugins/retry')
 const { MockAdapter } = require('@npora/request/adapters/mock')
+const { memoryCachePlugin } = require('@npora/request/plugins/memory-cache')
 
 async function main() {
   const adapter = new MockAdapter()
@@ -24,6 +25,15 @@ async function main() {
   assert.deepEqual(await request.get('/retry'), {
     format: 'cjs-subpath'
   })
+
+  adapter.onGet('/memory').reply(200, { format: 'memory-subpath' })
+  const memory = createClient({
+    adapter,
+    fetchOptions: { credentials: 'omit' },
+    extensions: { memoryCache: { enabled: true } }
+  }).use(memoryCachePlugin())
+  assert.deepEqual(await memory.get('/memory'), { format: 'memory-subpath' })
+  assert.deepEqual(await memory.get('/memory'), { format: 'memory-subpath' })
 
   adapter.onGet('/error').reply(503, { unavailable: true })
 

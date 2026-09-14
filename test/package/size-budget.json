@@ -11,12 +11,12 @@
       "transitive": true
     },
     "dist/index.d.ts": {
-      "bytes": 66500,
+      "bytes": 67000,
       "gzipBytes": 20450,
       "transitive": true
     },
     "dist/index.d.cts": {
-      "bytes": 66500,
+      "bytes": 67000,
       "gzipBytes": 20450,
       "transitive": true
     },
@@ -33,6 +33,11 @@
     "dist/plugins/cache.js": {
       "bytes": 46350,
       "gzipBytes": 13600,
+      "transitive": true
+    },
+    "dist/plugins/memory-cache.js": {
+      "bytes": 5000,
+      "gzipBytes": 2300,
       "transitive": true
     },
     "dist/plugins/rate-limit.js": {
@@ -57,7 +62,7 @@
     }
   },
   "package": {
-    "bytes": 129000,
-    "unpackedBytes": 492000
+    "bytes": 134000,
+    "unpackedBytes": 506000
   }
 }
