@@ -69,6 +69,35 @@ describe('client', () => {
     )
   })
 
+  it('should isolate inherited headers between requests', async () => {
+    const seen: Array<string | null> = []
+    const client = createClient({
+      headers: { authorization: 'Bearer original' },
+      adapter: {
+        async request<T>(config: RequestConfig): Promise<NporaResponse<T>> {
+          seen.push(new Headers(config.headers).get('authorization'))
+          const headers = config.headers as Record<string, string>
+
+          headers.authorization = 'Bearer changed'
+
+          return {
+            data: undefined as T,
+            status: 200,
+            statusText: 'OK',
+            headers: new Headers(),
+            config,
+            raw: new Response()
+          }
+        }
+      }
+    })
+
+    await client.get('/first')
+    await client.get('/second')
+
+    expect(seen).toEqual(['Bearer original', 'Bearer original'])
+  })
+
   it('should bypass config merging for bare method shortcuts', async () => {
     const merge = vi.spyOn(ConfigMerger, 'merge')
     const client = createClient({

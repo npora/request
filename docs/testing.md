@@ -52,6 +52,8 @@ Package verification covers:
 - Exact runtime and TypeScript export contracts.
 - Black-box public behavior.
 - npm tarball file allowlist.
+- A local tarball installed into an isolated Node application, exercising
+  native Fetch, retry, cache invalidation, errors, and cancellation.
 - Raw, gzip, declaration, packed, and unpacked size budgets.
 
 The published `latest` package can be tested in an isolated temporary project:
@@ -74,7 +76,9 @@ pnpm test:browser
 Playwright validates Chromium, Firefox, and WebKit, including native Fetch
 inputs, SSE and NDJSON streaming, W3C trace-context header injection, Web
 Workers, plugin lifecycle, HEAD/OPTIONS/QUERY, and concurrent XHR
-upload/download progress.
+upload/download progress. A minified application bundle imported through the
+package exports also checks cache clearing, errors, and cancellation in all
+three browsers.
 
 ## Performance checks
 

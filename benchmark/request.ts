@@ -10,6 +10,8 @@ import {
   RequestError,
   retryPlugin,
   type Adapter,
+  type CacheEntry,
+  type CacheStore,
   type NporaResponse,
   type Plugin,
   type RequestConfig
@@ -96,6 +98,24 @@ const cacheClient = createClient({
 const cachePrimitiveClient = createClient({
   adapter: createPrimitiveBenchmarkAdapter()
 }).use(cachePlugin())
+const staleRecord: CacheEntry = {
+  data: {
+    items: Array.from({ length: 32 }, (_, id) => ({ id, name: `user-${id}` }))
+  },
+  expiresAt: Date.now() - 1000,
+  status: 200,
+  statusText: 'OK',
+  headers: []
+}
+const staleStore: CacheStore = {
+  get: () => staleRecord,
+  set() {},
+  delete() {},
+  clear() {}
+}
+const staleCacheClient = createClient({
+  adapter: { request: () => new Promise<never>(() => {}) }
+}).use(cachePlugin({ store: staleStore }))
 const cacheMissClient = createClient({
   adapter
 }).use(cachePlugin())
@@ -174,6 +194,13 @@ const cachedRequestConfig: RequestConfig = {
       enabled: true,
       ttl: Number.POSITIVE_INFINITY
     }
+  }
+}
+const staleRequestConfig: RequestConfig = {
+  url: '/benchmark-stale',
+  method: 'GET',
+  extensions: {
+    cache: { enabled: true, staleWhileRevalidate: 60_000 }
   }
 }
 const cacheMissRequestConfig: RequestConfig = {
@@ -265,6 +292,10 @@ const cacheHitClient = await runSequential(
 const cachePrimitiveHitClient = await runSequential(
   options.operations,
   () => cachePrimitiveClient.get('/benchmark-cache', cachedRequestConfig)
+)
+const cacheStaleWhileRevalidateClient = await runSequential(
+  options.operations,
+  () => staleCacheClient.get('/benchmark-stale', staleRequestConfig)
 )
 const cacheMissClientResult = await runSequential(
   options.operations,
@@ -422,6 +453,7 @@ const report = {
     concurrentPluginPipeline: pluginPipeline,
     cacheHitClient,
     cachePrimitiveHitClient,
+    cacheStaleWhileRevalidateClient,
     cacheMissClient: cacheMissClientResult,
     cacheDedupeClient: cacheDedupeClientResult,
     concurrencyImmediateClient,
