@@ -16,7 +16,7 @@ has zero runtime dependencies.
 | Goal | Documentation |
 | --- | --- |
 | Send the first request | [Quick start](#quick-start) |
-| Move an existing Axios client | [Migrating from Axios](docs/migrating-from-axios.md) |
+| Build a client for an application | [Common workflows](docs/workflows.md) |
 | Find a client or response API | [API reference](docs/api.md) |
 | Configure URLs, bodies, timeouts, or parsing | [Configuration reference](docs/configuration.md) |
 | Add retry, cache, authentication, or observability | [Plugins](#plugins) |
@@ -806,7 +806,7 @@ allowlist, and size budgets.
 - [API reference](https://github.com/npora/request/blob/main/docs/api.md)
 - [Architecture](https://github.com/npora/request/blob/main/docs/architecture.md)
 - [Migration from 0.x](https://github.com/npora/request/blob/main/docs/migration.md)
-- [Migrating from Axios](https://github.com/npora/request/blob/main/docs/migrating-from-axios.md)
+- [Common workflows](https://github.com/npora/request/blob/main/docs/workflows.md)
 - [Security model](https://github.com/npora/request/blob/main/docs/security.md)
 - [Testing and release gates](https://github.com/npora/request/blob/main/docs/testing.md)
 - [Performance benchmarks](https://github.com/npora/request/blob/main/docs/benchmark.md)
