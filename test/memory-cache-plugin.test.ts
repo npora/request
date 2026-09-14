@@ -114,6 +114,56 @@ describe('memoryCachePlugin', () => {
     expect(fetchMock).toHaveBeenCalledTimes(5)
   })
 
+  it('honors explicit Fetch policy and integrity options', async () => {
+    const fetchMock = vi.fn()
+      .mockImplementation(() => Promise.resolve(jsonResponse(fetchMock.mock.calls.length)))
+    vi.stubGlobal('fetch', fetchMock)
+    const api = createClient({
+      fetchOptions: { credentials: 'omit' },
+      extensions: { memoryCache: { enabled: true } }
+    }).use(memoryCachePlugin())
+    const url = 'https://example.com/fetch-policy'
+
+    expect(await api.get(url)).toEqual({ count: 1 })
+    const policies: RequestInit[] = [
+      { cache: 'no-store' },
+      { cache: 'reload' },
+      { integrity: 'sha256-invalid' },
+      { redirect: 'error' },
+      { mode: 'same-origin' },
+      { referrer: 'https://example.com/other' },
+      { referrerPolicy: 'no-referrer' }
+    ]
+
+    for (const [index, fetchOptions] of policies.entries()) {
+      expect(await api.get(url, { fetchOptions }))
+        .toEqual({ count: index + 2 })
+    }
+
+    expect(await api.get(url)).toEqual({ count: 1 })
+    expect(fetchMock).toHaveBeenCalledTimes(policies.length + 1)
+  })
+
+  it('does not persist partial-content responses', async () => {
+    const fetchMock = vi.fn()
+      .mockImplementation(() => Promise.resolve(new Response(
+        JSON.stringify({ count: fetchMock.mock.calls.length }),
+        { status: fetchMock.mock.calls.length === 1 ? 206 : 200,
+          headers: { 'content-type': 'application/json' } }
+      )))
+    vi.stubGlobal('fetch', fetchMock)
+    const api = createClient({
+      fetchOptions: { credentials: 'omit' },
+      extensions: { memoryCache: { enabled: true } }
+    }).use(memoryCachePlugin())
+    const url = 'https://example.com/partial'
+
+    expect(await api.get(url)).toEqual({ count: 1 })
+    expect(await api.get(url)).toEqual({ count: 2 })
+    expect(await api.get(url)).toEqual({ count: 2 })
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
   it('returns independent data and complete raw responses', async () => {
     const fetchMock = vi.fn().mockImplementation(() => Promise.resolve(jsonResponse(1)))
     vi.stubGlobal('fetch', fetchMock)

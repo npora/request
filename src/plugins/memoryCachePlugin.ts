@@ -96,6 +96,7 @@ export function memoryCachePlugin(
           !cacheableRequest(config, cache) ||
           !requestAllowsCache(config) ||
           response.status < 200 || response.status >= 300 ||
+          response.status === 206 ||
           response.raw.type === 'opaque' ||
           response.raw.type === 'opaqueredirect' ||
           isAsyncIterable(response.data)) return
@@ -139,8 +140,13 @@ function cacheableRequest(
     config.responseType !== 'ndjson' &&
     config.responseType !== 'bytes' &&
     config.responseType !== 'formData' &&
-    config.fetchOptions?.mode !== 'no-cors' &&
-    config.fetchOptions?.redirect !== 'manual' &&
+    config.fetchOptions?.cache === undefined &&
+    config.fetchOptions?.integrity === undefined &&
+    config.fetchOptions?.referrer === undefined &&
+    config.fetchOptions?.referrerPolicy === undefined &&
+    config.fetchOptions?.mode === undefined &&
+    (config.fetchOptions?.redirect === undefined ||
+      config.fetchOptions.redirect === 'follow') &&
     (config.fetchOptions?.credentials === 'omit' || Boolean(cache.key))
 }
 
