@@ -206,6 +206,13 @@ CI stores the JSON report as a build artifact. Correctness and resource
 cleanup remain enforced separately by unit, integration and browser stress
 tests.
 
+The six request throughput gates use five paired rounds rather than one
+ratio calculated from scenarios measured far apart. Each pair runs the
+candidate and baseline next to each other, reverses their order on alternating
+rounds, and gates on the median of the five raw ratios. This reduces sensitivity
+to runner load and measurement order without lowering the existing thresholds.
+The full scenario results remain in the report for trend analysis.
+
 Half-open circuit probes retain their configured concurrency slot while an
 asynchronous `shouldCountFailure` policy is still classifying the result. Slow
 or rejected policies therefore cannot admit an unbounded replacement stream;

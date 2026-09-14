@@ -384,8 +384,16 @@ const fetchAdapterQueryClient = await runSequential(
 
 globalThis.fetch = originalFetch
 
+const budgetOperationsPerRound = Math.max(
+  1000,
+  Math.floor(options.operations / 5)
+)
+const pairedRatios = await measureBudgetRatios(
+  budgetOperationsPerRound
+)
+
 const report = {
-  schemaVersion: 1,
+  schemaVersion: 2,
   generatedAt: new Date().toISOString(),
   runtime: {
     node: process.version,
@@ -396,8 +404,11 @@ const report = {
     operations: options.operations,
     concurrency: options.concurrency,
     warmup: options.warmup,
-    samples: options.samples
+    samples: options.samples,
+    budgetOperationsPerRound,
+    budgetRounds: 5
   },
+  pairedRatios,
   scenarios: {
     directAdapter: direct,
     bareRequestApi,
@@ -445,6 +456,79 @@ const report = {
 
 printBenchmarkReport(report.scenarios)
 await writeBenchmarkReport(options.output, report)
+
+async function measureBudgetRatios(
+  operations: number
+): Promise<Record<string, number[]>> {
+  const pairs = [
+    {
+      name: 'bareSequentialClient/directAdapter',
+      candidate: () => bareClient.get('/benchmark'),
+      baseline: () => adapter.request(requestConfig)
+    },
+    {
+      name: 'jsonBodySequentialClient/bareSequentialClient',
+      candidate: () => jsonBodyClient.post(
+        '/benchmark',
+        jsonBodyRequestConfig
+      ),
+      baseline: () => bareClient.get('/benchmark')
+    },
+    {
+      name: 'sequentialPluginPipeline/bareSequentialClient',
+      candidate: () => pipelineClient.get('/benchmark', requestConfig),
+      baseline: () => bareClient.get('/benchmark')
+    },
+    {
+      name: 'cachePrimitiveHitClient/bareSequentialClient',
+      candidate: () => cachePrimitiveClient.get(
+        '/benchmark-cache',
+        cachedRequestConfig
+      ),
+      baseline: () => bareClient.get('/benchmark')
+    },
+    {
+      name: 'rateLimitImmediateClient/bareSequentialClient',
+      candidate: () => rateLimitClient.get('/benchmark'),
+      baseline: () => bareClient.get('/benchmark')
+    },
+    {
+      name: 'openTelemetryMetricsImmediateClient/bareSequentialClient',
+      candidate: () => openTelemetryMetricsClient.get('/benchmark'),
+      baseline: () => bareClient.get('/benchmark')
+    }
+  ]
+  const ratios: Record<string, number[]> = {}
+
+  for (const pair of pairs) {
+    const samples: number[] = []
+
+    for (let round = 0; round < 5; round += 1) {
+      const first = round % 2 === 0
+        ? pair.baseline
+        : pair.candidate
+      const second = round % 2 === 0
+        ? pair.candidate
+        : pair.baseline
+      const firstResult = await runSequential(operations, first)
+      const secondResult = await runSequential(operations, second)
+      const candidate = round % 2 === 0
+        ? secondResult
+        : firstResult
+      const baseline = round % 2 === 0
+        ? firstResult
+        : secondResult
+
+      samples.push(
+        candidate.operationsPerSecond / baseline.operationsPerSecond
+      )
+    }
+
+    ratios[pair.name] = samples
+  }
+
+  return ratios
+}
 
 async function warmUp(iterations: number): Promise<void> {
   await cacheClient.get('/benchmark-cache', cachedRequestConfig)

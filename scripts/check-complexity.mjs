@@ -8,7 +8,7 @@ const MAX_COMPLEXITY = 45
 const MAX_NESTING = 8
 const LEGACY_FILE_LIMITS = new Map([
   // Exact ratchets: these files may shrink, but cannot grow while being split.
-  ['src/plugins/cachePlugin.ts', 2681],
+  ['src/plugins/cachePlugin.ts', 1707],
   ['src/plugins/indexedDBCacheStore.ts', 1236]
 ])
 const LEGACY_FUNCTION_LINES = new Map([

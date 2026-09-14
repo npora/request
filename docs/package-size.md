@@ -11,6 +11,30 @@ pnpm build
 pnpm test:size
 ```
 
+Measure what a browser application actually receives after bundling and tree
+shaking the published entrypoints:
+
+```sh
+pnpm benchmark:consumer-size -- --output package-size-results/consumer.json
+```
+
+The measurement uses esbuild with a minified ESM browser build targeting
+ES2020. Its six small application entries cover the root and core imports,
+plus retry and cache plugin combinations. It reports the final JavaScript
+bytes, gzip bytes, and input module count. Run `pnpm build` first so the
+measurement uses current `dist` output. These application bundle sizes differ
+from the transitive package closure budgets below: a bundler can remove unused
+exports and combine shared chunks. The consumer report is informational and is
+recorded in CI alongside the package size report.
+
+On the local Node.js 24.18.0 and esbuild 0.28.2 build used for this change,
+the basic root and core imports both produced about 12.9 kB gzip. Core plus
+retry was 14.3 kB, core plus cache was 18.6 kB, and core plus both was 20.1
+kB. The root entry therefore had no meaningful penalty for this tree-shaken
+basic application. Cache contributed the largest optional bundle increment;
+measure it again when its implementation changes instead of assuming subpath
+imports alone will shrink an application bundle.
+
 Generate a machine-readable report:
 
 ```sh
