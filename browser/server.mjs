@@ -508,18 +508,18 @@ async function readRequestBuffer(request) {
 }
 
 function delay(milliseconds) {
-  // Keep the bound explicit at the timer sink, including for future callers.
-  if (
-    !Number.isFinite(milliseconds) ||
-    milliseconds <= 0 ||
-    milliseconds > 1000
-  ) {
-    throw new RangeError(
-      'Browser fixture delay must be greater than 0 and at most 1000ms'
-    )
-  }
-
   return new Promise(resolve => {
+    // Validate in the same scope as the timer so static analysis sees the bound.
+    if (
+      !Number.isFinite(milliseconds) ||
+      milliseconds <= 0 ||
+      milliseconds > 1000
+    ) {
+      throw new RangeError(
+        'Browser fixture delay must be greater than 0 and at most 1000ms'
+      )
+    }
+
     setTimeout(resolve, milliseconds)
   })
 }
