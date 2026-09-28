@@ -82,6 +82,19 @@ Plugin request configuration belongs under `RequestConfig.extensions`.
 Third-party packages extend `RequestExtensions` instead of adding fields to the
 core configuration type.
 
+The full cache plugin keeps its public entry in `cachePlugin.ts`. Internal
+modules separate public type declarations (`cacheTypes.ts`), statistics and
+isolated observers (`cacheEvents.ts`), shared state (`cacheState.ts`), explicit
+mutations (`cacheMutations.ts`), serialized operations (`cacheOperations.ts`),
+and response persistence/revalidation (`cacheResponseHandler.ts`). These
+modules share one state object per plugin instance. Request policy and reads
+live in `cacheRequestHandler.ts`, fresh/stale entry selection in
+`cacheRecordHandler.ts`, and shared misses and refresh leases in
+`cacheMissHandler.ts`. `cacheInstallation.ts` owns per-installation leaders,
+refresh leases, terminal settlement, and removal cleanup. Cache functions use
+the standard source complexity limits without exceptions. Internal modules
+are not additional package entrypoints.
+
 ## Dependency direction
 
 ```text

@@ -8,12 +8,7 @@ const MAX_COMPLEXITY = 45
 const MAX_NESTING = 8
 const LEGACY_FILE_LIMITS = new Map([
   // Exact ratchets: these files may shrink, but cannot grow while being split.
-  ['src/plugins/cachePlugin.ts', 1477],
   ['src/plugins/indexedDBCacheStore.ts', 1236]
-])
-const LEGACY_FUNCTION_LINES = new Map([
-  ['src/plugins/cachePlugin.ts:cachePlugin', 1200],
-  ['src/plugins/cachePlugin.ts:install', 850]
 ])
 const files = process.argv.slice(2)
 
@@ -60,9 +55,7 @@ function visitFunctions(node, source, path) {
     const name = functionName(node)
 
     const functionLines = end - start + 1
-    const maximumFunctionLines = LEGACY_FUNCTION_LINES.get(
-      `${path}:${name}`
-    ) ?? MAX_FUNCTION_LINES
+    const maximumFunctionLines = MAX_FUNCTION_LINES
 
     if (functionLines > maximumFunctionLines) {
       failures.push(
