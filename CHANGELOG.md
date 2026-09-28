@@ -1,5 +1,14 @@
 # @npora/request
 
+## 1.18.3
+
+### Patch Changes
+
+- 5118cdf: Separate IndexedDB cache types, transaction helpers, record accounting, option
+  validation, and schema pruning into internal modules while preserving public
+  exports, transaction ordering, and storage behavior. Remove the remaining
+  source complexity exemption.
+
 ## 1.18.2
 
 ### Patch Changes
