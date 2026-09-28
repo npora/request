@@ -1,5 +1,15 @@
 # @npora/request
 
+## 1.18.2
+
+### Patch Changes
+
+- 6b146d9: Split full-cache state, mutations, operation ordering, statistics, request
+  lookup, miss coordination, response handling, and installation cleanup into
+  internal modules while preserving public exports and cache behavior. Remove
+  cache source complexity exceptions, share asynchronous read handling, and
+  account for the measured module-boundary bundle cost.
+
 ## 1.18.1
 
 ### Patch Changes
