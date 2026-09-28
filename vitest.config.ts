@@ -35,6 +35,8 @@ export default defineConfig({
         'src/**/index.ts',
         // Exercised against real IndexedDB in the Playwright browser suite.
         'src/plugins/indexedDBCacheStore.ts',
+        'src/plugins/indexedDBCacheTransactions.ts',
+        'src/plugins/indexedDBCacheMaintenance.ts',
         'src/types/**'
       ],
 

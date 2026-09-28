@@ -24,6 +24,11 @@ Coverage thresholds are:
 | Functions | 90% |
 | Lines | 85% |
 
+IndexedDB record validation, schema classification, byte accounting, and option
+validation have Node boundary tests and count toward these thresholds. Database
+transactions, cursor maintenance, and the store itself are exercised against
+real IndexedDB in Chromium, Firefox, and WebKit rather than a Node simulation.
+
 ## Security checks
 
 ```sh
