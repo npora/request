@@ -6,10 +6,6 @@ const DEFAULT_MAX_LINES = 800
 const MAX_FUNCTION_LINES = 260
 const MAX_COMPLEXITY = 45
 const MAX_NESTING = 8
-const LEGACY_FILE_LIMITS = new Map([
-  // Exact ratchets: these files may shrink, but cannot grow while being split.
-  ['src/plugins/indexedDBCacheStore.ts', 1236]
-])
 const files = process.argv.slice(2)
 
 if (files.length === 0) {
@@ -29,7 +25,7 @@ for (const file of files) {
   )
   const path = relative(process.cwd(), file)
   const lines = source.getLineAndCharacterOfPosition(source.end).line + 1
-  const maximumLines = LEGACY_FILE_LIMITS.get(path) ?? DEFAULT_MAX_LINES
+  const maximumLines = DEFAULT_MAX_LINES
 
   if (lines > maximumLines) {
     failures.push(`${path}: ${lines} file lines exceeds ${maximumLines}`)

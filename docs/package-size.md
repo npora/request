@@ -55,6 +55,11 @@ track the measured implementation cost with narrow headroom. Declaration,
 other subpath, and tarball budgets remain fixed. Public cache contracts and
 runtime dependencies are unchanged.
 
+The IndexedDB helper extraction also removes the last source complexity
+exemption: its store file falls from 1,235 to 620 lines. All seven measured
+consumer bundles are unchanged on the same build. Existing runtime,
+declaration, tarball, unpacked-package, and consumer budgets remain fixed.
+
 Generate a machine-readable report:
 
 ```sh

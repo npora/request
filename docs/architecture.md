@@ -95,6 +95,13 @@ refresh leases, terminal settlement, and removal cleanup. Cache functions use
 the standard source complexity limits without exceptions. Internal modules
 are not additional package entrypoints.
 
+`indexedDBCacheStore.ts` owns the persistent store and its transaction scopes.
+Internal IndexedDB modules separate types, database/request/cursor primitives,
+record validation and size accounting, option validation, and schema pruning.
+Cursor callbacks remain synchronous and cleanup events follow transaction
+completion. All production files and functions now use the standard complexity
+limits without legacy exemptions; public store exports remain unchanged.
+
 ## Dependency direction
 
 ```text
