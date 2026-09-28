@@ -1,13 +1,13 @@
 {
   "files": {
     "dist/index.js": {
-      "bytes": 147850,
-      "gzipBytes": 49300,
+      "bytes": 150600,
+      "gzipBytes": 50150,
       "transitive": true
     },
     "dist/index.cjs": {
-      "bytes": 152100,
-      "gzipBytes": 50350,
+      "bytes": 154860,
+      "gzipBytes": 51220,
       "transitive": true
     },
     "dist/index.d.ts": {
@@ -31,8 +31,8 @@
       "transitive": true
     },
     "dist/plugins/cache.js": {
-      "bytes": 46350,
-      "gzipBytes": 13600,
+      "bytes": 49100,
+      "gzipBytes": 14450,
       "transitive": true
     },
     "dist/plugins/memory-cache.js": {
@@ -63,6 +63,6 @@
   },
   "package": {
     "bytes": 134000,
-    "unpackedBytes": 506000
+    "unpackedBytes": 508050
   }
 }

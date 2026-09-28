@@ -145,6 +145,8 @@
     "example": "tsx examples/basic.ts",
     "example:plugins": "tsx examples/plugins.ts",
     "example:memory-cache": "tsx examples/memory-cache.ts",
+    "example:streaming": "tsx examples/streaming.ts",
+    "example:auth-refresh": "tsx examples/auth-refresh.ts",
     "test:coverage": "vitest run --coverage",
     "test:run": "vitest run",
     "test:security": "vitest run test/security.test.ts",

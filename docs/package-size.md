@@ -42,6 +42,19 @@ the full cache application. It intentionally omits revalidation, stale
 serving, concurrent miss sharing, persistent stores, and tag invalidation.
 Its consumer budget also requires at least a 15% reduction from full cache.
 
+Splitting the full cache implementation into internal state, mutation,
+operation, observer, request coordination, response, and installation modules
+reduces `cachePlugin.ts` from 1,476 to 76 lines. Cache files and functions now
+use the standard complexity limits without exceptions. Explicit state sharing
+and factory boundaries add a measured 746 bytes gzip to the core-plus-cache
+consumer (18,666 to 19,412 bytes on the same build); the request-coordination
+step contributes 304 bytes of that increment. Basic, retry-only, and
+memory-cache consumer sizes are unchanged, and all consumer budgets remain
+fixed. Root ESM/CommonJS, full-cache transitive, and unpacked-package budgets
+track the measured implementation cost with narrow headroom. Declaration,
+other subpath, and tarball budgets remain fixed. Public cache contracts and
+runtime dependencies are unchanged.
+
 Generate a machine-readable report:
 
 ```sh

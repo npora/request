@@ -17,6 +17,7 @@ has zero runtime dependencies.
 | --- | --- |
 | Send the first request | [Quick start](#quick-start) |
 | Build a client for an application | [Common workflows](docs/workflows.md) |
+| Refresh authentication tokens | [Authentication workflow](docs/workflows.md#refresh-authentication-tokens) |
 | Find a client or response API | [API reference](docs/api.md) |
 | Configure URLs, bodies, timeouts, or parsing | [Configuration reference](docs/configuration.md) |
 | Add retry, cache, authentication, or observability | [Plugins](#plugins) |
@@ -221,6 +222,11 @@ the loop cancels the response reader. `maxResponseSize` remains enforced while
 the stream is consumed. `itemSchema` validates and may transform each item
 immediately before it is yielded, without buffering the rest of the stream.
 Failures expose the item index and NDJSON line or SSE event metadata.
+
+Run `pnpm example:streaming` from this repository for a self-contained local
+demonstration of SSE, validated NDJSON, early termination, cancellation, and
+schema errors. See [streaming workflows](docs/workflows.md#consume-streaming-responses)
+for consumption and error-handling contracts.
 
 Native `FormData`, `Blob`, `ArrayBuffer`, and `ReadableStream` request bodies
 also work when created by another same-origin window or iframe. Detection does
