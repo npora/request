@@ -182,13 +182,13 @@
     "@opentelemetry/sdk-trace-base": "^2.10.0",
     "@playwright/test": "^1.61.1",
     "@types/node": "^26.2.0",
-    "@vitest/coverage-v8": "^4.1.10",
+    "@vitest/coverage-v8": "^4.1.11",
     "esbuild": "^0.28.2",
     "tsdown": "^0.22.14",
     "tsx": "^4.23.11",
     "typescript": "^6.0.3",
     "typescript-api": "npm:@typescript/typescript6@^6.0.2",
     "typescript-next": "npm:typescript@^7.0.2",
-    "vitest": "^4.1.10"
+    "vitest": "^4.1.11"
   }
 }
