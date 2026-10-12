@@ -158,6 +158,7 @@ try {
     configuration,
     versions,
     provenance: await readProvenance(),
+    balancedRoundOrder: configuration.rounds % clients.size === 0,
     requestsReceived: Object.fromEntries(received),
     expectedRequestsPerScenario: requestsPerScenario,
     results,
@@ -303,7 +304,7 @@ function parseOptions(args) {
       'warmup'
     ),
     rounds: positiveInteger(
-      values.get('--rounds') ?? '3',
+      values.get('--rounds') ?? '5',
       'rounds'
     ),
     scenarios,
@@ -443,11 +444,17 @@ function summarize(values) {
   const throughput = values
     .map(value => value.requestsPerSecond)
     .sort((first, second) => first - second)
+  const medianThroughput = median('requestsPerSecond')
+  const throughputRangePercent = 100 * (
+    throughput.at(-1) - throughput[0]
+  ) / medianThroughput
 
   return {
-    medianRequestsPerSecond: median('requestsPerSecond'),
+    medianRequestsPerSecond: medianThroughput,
     minRequestsPerSecond: throughput[0],
     maxRequestsPerSecond: throughput.at(-1),
+    throughputRangePercent,
+    unstableThroughput: values.length >= 5 && throughputRangePercent > 20,
     medianP50Milliseconds: median('p50Milliseconds'),
     medianP95Milliseconds: median('p95Milliseconds'),
     medianP99Milliseconds: median('p99Milliseconds')

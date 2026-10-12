@@ -191,9 +191,13 @@ versioned output filename that disagrees with it. Results from different Node.js
 versions or different build digests are separate measurements.
 Each workload is warmed with the same concurrency used for measurement; the
 default warm-up is 1,000 requests per workload and is excluded from the results.
+The default five rounds rotate execution order so each implementation occupies
+each position once. The report shows the throughput range relative to the
+median and flags ranges above 20% for investigation. Re-run flagged workloads
+under a quieter machine load before drawing conclusions from small differences.
 
 ```sh
-pnpm benchmark:libraries -- --operations 5000 --rounds 3 \
+pnpm benchmark:libraries -- --operations 5000 \
   --output benchmark-results/local-http.json
 ```
 
