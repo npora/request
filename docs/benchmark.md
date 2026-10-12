@@ -201,6 +201,18 @@ pnpm benchmark:libraries -- --operations 5000 \
   --output benchmark-results/local-http.json
 ```
 
+Compare two reports made with the same runtime, workload and dependency lock:
+
+```sh
+pnpm benchmark:libraries:compare -- \
+  benchmark-results/before.json benchmark-results/after.json
+```
+
+The comparison shows the package's raw throughput change and an estimate after
+scaling by the median shift of unchanged controls. It reports warnings for
+unstable workloads, uncommitted source, or widely differing control changes.
+Treat a warned result as a prompt to repeat the measurement.
+
 The default cache-key path normalizes configured vary-header names once and
 reuses the resulting empty header metadata for headerless requests. The cache
 miss path also reuses its registered deduplication key when handling the

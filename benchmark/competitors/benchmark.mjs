@@ -3,6 +3,7 @@ import { execFileSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { readFile, readdir, writeFile } from 'node:fs/promises'
 import { createServer } from 'node:http'
+import { cpus } from 'node:os'
 import { resolve } from 'node:path'
 import { performance } from 'node:perf_hooks'
 
@@ -14,6 +15,7 @@ import { createClient } from '../../dist/index.js'
 
 const ALL_SCENARIOS = ['get-json', 'post-json', 'query-json']
 const configuration = parseOptions(process.argv.slice(2))
+const processors = cpus()
 const versions = await readVersions()
 const output = configuration.output
   ? resolve(configuration.output)
@@ -153,7 +155,9 @@ try {
     runtime: {
       node: process.version,
       platform: process.platform,
-      architecture: process.arch
+      architecture: process.arch,
+      cpuModel: processors[0]?.model,
+      logicalCpus: processors.length
     },
     configuration,
     versions,
