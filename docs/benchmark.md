@@ -181,6 +181,22 @@ Benchmark values depend on CPU, operating system, Node.js version and current
 machine load. Compare reports produced on equivalent runners and look for
 repeated trends rather than treating a single run as a release gate.
 
+For the optional local HTTP comparison, build the package first and run the
+benchmark from the repository root so `mise.toml` selects the intended Node.js
+version. The report records the package versions, runtime, Git commit and dirty
+state, a digest of the built JavaScript, and a digest of the dependency lockfile.
+Use the version inside the report as the source of truth; the runner rejects a
+versioned output filename that disagrees with it. Results from different Node.js
+versions or different build digests are separate measurements.
+Each workload is warmed with the same concurrency used for measurement; the
+default warm-up is 1,000 requests per workload and is excluded from the results.
+
+```sh
+pnpm build
+pnpm benchmark:libraries -- --operations 5000 --rounds 3 \
+  --output benchmark-results/local-http.json
+```
+
 The default cache-key path normalizes configured vary-header names once and
 reuses the resulting empty header metadata for headerless requests. The cache
 miss path also reuses its registered deduplication key when handling the

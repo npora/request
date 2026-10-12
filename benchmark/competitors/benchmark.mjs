@@ -1,5 +1,7 @@
 import { strict as assert } from 'node:assert'
-import { readFile, writeFile } from 'node:fs/promises'
+import { execFileSync } from 'node:child_process'
+import { createHash } from 'node:crypto'
+import { readFile, readdir, writeFile } from 'node:fs/promises'
 import { createServer } from 'node:http'
 import { resolve } from 'node:path'
 import { performance } from 'node:perf_hooks'
@@ -12,6 +14,20 @@ import { createClient } from '../../dist/index.js'
 
 const ALL_SCENARIOS = ['get-json', 'post-json', 'query-json']
 const configuration = parseOptions(process.argv.slice(2))
+const versions = await readVersions()
+const output = configuration.output
+  ? resolve(configuration.output)
+  : new URL('library-comparison-result.json', import.meta.url)
+const outputVersion = /(?:^|\/)competitors-(\d+\.\d+\.\d+)\.json$/.exec(
+  String(output)
+)?.[1]
+
+assert.ok(
+  !outputVersion || outputVersion === versions['@npora/request'],
+  `Output filename version ${outputVersion} does not match ` +
+    `@npora/request ${versions['@npora/request']}`
+)
+
 const responseBody = JSON.stringify({ ok: true })
 const requestPayload = { filter: 'active', limit: 20 }
 const expectedRequestBody = JSON.stringify(requestPayload)
@@ -84,8 +100,12 @@ try {
     for (const operations of clients.values()) {
       const operation = operations[scenario]
 
-      for (let index = 0; index < configuration.warmup; index += 1) {
-        assert.equal((await operation()).ok, true)
+      if (configuration.warmup > 0) {
+        await runConcurrent(
+          configuration.warmup,
+          configuration.concurrency,
+          operation
+        )
       }
     }
 
@@ -136,16 +156,13 @@ try {
       architecture: process.arch
     },
     configuration,
-    versions: await readVersions(),
+    versions,
+    provenance: await readProvenance(),
     requestsReceived: Object.fromEntries(received),
     expectedRequestsPerScenario: requestsPerScenario,
     results,
     samples
   }
-
-  const output = configuration.output
-    ? resolve(configuration.output)
-    : new URL('library-comparison-result.json', import.meta.url)
 
   await writeFile(output, `${JSON.stringify(report, null, 2)}\n`)
   process.stdout.write(`${JSON.stringify(results, null, 2)}\n`)
@@ -282,7 +299,7 @@ function parseOptions(args) {
       'concurrency'
     ),
     warmup: nonNegativeInteger(
-      values.get('--warmup') ?? '100',
+      values.get('--warmup') ?? '1000',
       'warmup'
     ),
     rounds: positiveInteger(
@@ -333,6 +350,40 @@ async function readVersion(relativePath) {
   )
 
   return JSON.parse(contents).version
+}
+
+async function readProvenance() {
+  const root = new URL('../../', import.meta.url)
+  const dist = new URL('../../dist/', import.meta.url)
+  const files = (await readdir(dist, { recursive: true }))
+    .filter(file => /\.(?:js|cjs)$/.test(file))
+    .sort()
+  const buildHash = createHash('sha256')
+
+  assert.ok(files.length > 0, 'Build the package before benchmarking')
+
+  for (const file of files) {
+    buildHash.update(file)
+    buildHash.update('\0')
+    buildHash.update(await readFile(new URL(file, dist)))
+  }
+
+  const dependencyLock = await readFile(
+    new URL('package-lock.json', import.meta.url)
+  )
+  const git = (...args) => execFileSync('git', args, {
+    cwd: root,
+    encoding: 'utf8'
+  }).trim()
+
+  return {
+    gitCommit: git('rev-parse', 'HEAD'),
+    gitDirty: git('status', '--porcelain').length > 0,
+    buildSha256: buildHash.digest('hex'),
+    dependencyLockSha256: createHash('sha256')
+      .update(dependencyLock)
+      .digest('hex')
+  }
 }
 
 async function readBody(request) {
