@@ -2,7 +2,11 @@
 export function isReadableStream<T = Uint8Array<ArrayBufferLike>>(
   value: unknown
 ): value is ReadableStream<T> {
-  if (typeof ReadableStream === 'undefined') {
+  if (
+    typeof value !== 'object' ||
+    value === null ||
+    typeof ReadableStream === 'undefined'
+  ) {
     return false
   }
 

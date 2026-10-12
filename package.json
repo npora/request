@@ -1,6 +1,6 @@
 {
   "name": "@npora/request",
-  "version": "1.18.3",
+  "version": "1.18.4",
   "description": "A modern, TypeScript-first HTTP client powered by the Fetch API.",
   "keywords": [
     "npora",
@@ -151,6 +151,7 @@
     "test:run": "vitest run",
     "test:security": "vitest run test/security.test.ts",
     "test:docs": "node test/docs.mjs",
+    "test:benchmark:compare": "node --test test/benchmark-compare.test.mjs",
     "test:release-workflow": "node test/release-workflow.mjs",
     "test:complexity": "node scripts/check-complexity.mjs $(find src -name '*.ts' ! -path '*/types/*' ! -name 'index.ts')",
     "test:types": "pnpm build && tsc -p test/types/tsconfig.json",
@@ -170,7 +171,8 @@
     "benchmark:check": "node benchmark/check-performance.mjs",
     "benchmark:consumer-size": "node benchmark/consumer-size.mjs",
     "benchmark:consumer-size:check": "node benchmark/check-consumer-size.mjs",
-    "benchmark:libraries": "npm --prefix benchmark/competitors run benchmark",
+    "benchmark:libraries": "npm run build && node benchmark/competitors/benchmark.mjs",
+    "benchmark:libraries:compare": "node benchmark/compare-library-reports.mjs",
     "benchmark:libraries:install": "npm install --prefix benchmark/competitors --ignore-scripts --no-audit --no-fund",
     "stress": "node --expose-gc --import tsx benchmark/stress.ts",
     "benchmark:types": "tsc -p benchmark/tsconfig.json"

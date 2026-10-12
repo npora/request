@@ -1,5 +1,16 @@
 # @npora/request
 
+## 1.18.4
+
+### Patch Changes
+
+- 82e2144: Skip native body and query brand checks for ordinary records and primitive
+  values. This avoids exception construction while preparing form and query
+  requests.
+- 3551134: Skip native stream brand checks for primitive request bodies. This avoids
+  exception construction on ordinary JSON requests while preserving native and
+  cross-realm stream detection.
+
 ## 1.18.3
 
 ### Patch Changes

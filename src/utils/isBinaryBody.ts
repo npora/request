@@ -15,6 +15,10 @@ function hasNativeGetter(
   key: PropertyKey,
   value: unknown
 ): boolean {
+  if (typeof value !== 'object' || value === null) {
+    return false
+  }
+
   const getter = Object.getOwnPropertyDescriptor(prototype, key)?.get
 
   if (!getter) {
