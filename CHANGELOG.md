@@ -1,5 +1,12 @@
 # @npora/request
 
+## 1.19.1
+
+### Patch Changes
+
+- e792073: Return an empty SSE iterable for bodyless responses and stop optional
+  reconnection when the server responds with HTTP 204 No Content.
+
 ## 1.19.0
 
 ### Minor Changes
