@@ -25,6 +25,18 @@ export interface ServerSentEvent {
   retry?: number
 }
 
+/** Bounded reconnection for an SSE async iterable. */
+export interface SseReconnectOptions {
+  /** Maximum number of new connections after the initial response. */
+  maxAttempts: number
+
+  /** Delay between connections in milliseconds, unless the server supplies retry. */
+  delay?: number
+
+  /** Upper bound for the server supplied retry delay, in milliseconds. */
+  maxDelay?: number
+}
+
 /** Location of an item that failed validation in a streaming response. */
 export interface StreamingSchemaLocation {
   /** Zero-based index among emitted SSE events or non-empty NDJSON records. */

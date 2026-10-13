@@ -110,6 +110,7 @@ const publicExports = [
   'SchemaValidationError',
   'ServerSentEvent',
   'StandardSchemaV1',
+  'SseReconnectOptions',
   'StreamingSchemaLocation',
   'TieredCacheStore',
   'TieredCacheBroadcastOptions',

@@ -185,6 +185,13 @@ request.sseResponse(url, config?)
 request.ndjsonResponse<T>(url, config?)
 ```
 
+`sse()` accepts an optional `reconnect: { maxAttempts, delay?, maxDelay? }`
+setting. It creates at most `maxAttempts` additional connections after the
+initial one and resumes with the most recently observed `Last-Event-ID`.
+The setting applies only to `sse()`; `sseResponse()` continues to describe one
+HTTP response. See the [streaming workflow](workflows.md#consume-streaming-responses)
+for cancellation, retry, and error behavior.
+
 Example:
 
 ```ts

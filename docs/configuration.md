@@ -286,6 +286,12 @@ continue to expose a separately readable raw body.
 | `validateStatus` | `(status: number) => boolean` | HTTP 2xx | Decide which HTTP statuses resolve successfully. |
 | `throwHttpErrors` | `boolean` | `true` | Set to `false` to resolve parsed HTTP error responses instead of throwing `HTTP_ERROR`. |
 
+`sse()` alone also accepts `reconnect: { maxAttempts, delay?, maxDelay? }`.
+`maxAttempts` is a positive safe integer counting additional connections;
+`delay` defaults to 1000 ms. A valid SSE `retry` field overrides the delay,
+and `maxDelay` caps it. Each delay must be a non-negative safe integer within
+the platform timer limit. This option is per call and is not a client default.
+
 Use `throwHttpErrors: false` when HTTP statuses are part of the endpoint's
 normal application protocol and should be inspected through `getResponse()`:
 

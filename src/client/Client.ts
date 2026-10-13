@@ -17,6 +17,7 @@ import type {
   RequestInputConfig,
   RequestURL,
   ServerSentEvent,
+  SseReconnectOptions,
   StandardSchemaV1
 } from '../types'
 import {
@@ -25,6 +26,7 @@ import {
 import { hasOwnProperty } from '../utils/hasOwnProperty'
 import { trustDefaults } from '../core/trustedDefaults'
 import { requestToConfig } from './requestInput'
+import { createReconnectingSse } from './reconnectSse'
 
 type MethodConfig = Omit<RequestConfig, 'url' | 'method'>
 
@@ -41,6 +43,17 @@ type StreamingMethodConfig = Omit<
   RequestConfig,
   'url' | 'method' | 'responseType' | 'schema'
 >
+
+type SseMethodConfig = StreamingMethodConfig & {
+  reconnect?: SseReconnectOptions
+}
+
+type SseSchemaMethodConfig<Schema extends StandardSchemaV1> = Omit<
+  SseMethodConfig,
+  'itemSchema'
+> & {
+  itemSchema: Schema
+}
 
 type ItemSchemaMethodConfig<Schema extends StandardSchemaV1> = Omit<
   StreamingMethodConfig,
@@ -505,22 +518,36 @@ export class Client {
    */
   sse<Schema extends StandardSchemaV1>(
     url: RequestURL,
-    config: ItemSchemaMethodConfig<Schema>
+    config: SseSchemaMethodConfig<Schema>
   ): Promise<AsyncIterable<StandardSchemaV1.InferOutput<Schema>>>
 
   sse(
     url: RequestURL,
-    config?: StreamingMethodConfig
+    config?: SseMethodConfig
   ): Promise<AsyncIterable<ServerSentEvent>>
 
   sse(
     url: RequestURL,
-    config: StreamingMethodConfig = {}
+    config: SseMethodConfig = {}
   ): Promise<AsyncIterable<ServerSentEvent>> {
-    return this.get<AsyncIterable<ServerSentEvent>>(url, {
-      ...config,
-      responseType: 'sse'
-    })
+    const { reconnect, itemSchema, ...requestConfig } = config
+
+    if (reconnect === undefined) {
+      return this.get<AsyncIterable<ServerSentEvent>>(url, {
+        ...config,
+        responseType: 'sse'
+      })
+    }
+
+    return createReconnectingSse(
+      url,
+      { ...requestConfig, itemSchema },
+      reconnect,
+      next => this.getResponse<AsyncIterable<ServerSentEvent>>(url, {
+        ...next,
+        responseType: 'sse'
+      })
+    )
   }
 
   /**

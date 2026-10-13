@@ -357,11 +357,16 @@ void loggerConfig
 const eventStream: Promise<AsyncIterable<ServerSentEvent>> = client.sse(
   '/events'
 )
+const reconnectingEventStream: Promise<AsyncIterable<ServerSentEvent>> =
+  client.sse('/events', {
+    reconnect: { maxAttempts: 3, delay: 1000, maxDelay: 30000 }
+  })
 const jsonLines: Promise<AsyncIterable<{ id: number }>> = client.ndjson<{
   id: number
 }>('/records')
 
 void eventStream
+void reconnectingEventStream
 void jsonLines
 
 const cacheStore: CacheStore = {

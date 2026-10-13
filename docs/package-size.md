@@ -30,14 +30,14 @@ exports and combine shared chunks. The consumer report is checked against
 size report.
 
 On the local Node.js 24.18.0 and esbuild 0.28.2 build used for this change,
-the basic root and core imports both produced about 12.9 kB gzip. Core plus
-retry was 14.3 kB, core plus cache was 18.6 kB, and core plus both was 20.1
+the basic root and core imports both produced about 13.6 kB gzip. Core plus
+retry was 14.9 kB, core plus cache was 20.0 kB, and core plus both was 21.4
 kB. The root entry therefore had no meaningful penalty for this tree-shaken
 basic application. Cache contributed the largest optional bundle increment;
 measure it again when its implementation changes instead of assuming subpath
 imports alone will shrink an application bundle.
 
-The memory-only cache application measures 14.2 kB gzip, about 4.5 kB below
+The memory-only cache application measures 14.8 kB gzip, about 5.2 kB below
 the full cache application. It intentionally omits revalidation, stale
 serving, concurrent miss sharing, persistent stores, and tag invalidation.
 Its consumer budget also requires at least a 15% reduction from full cache.
@@ -368,6 +368,15 @@ plus narrow headroom; declarations and unrelated plugin subpaths remain fixed.
 `pnpm test:package` includes the size check, so release verification cannot
 publish a package that exceeds the checked-in budgets. CI also stores the JSON
 report for comparing changes over time.
+
+Optional SSE reconnection adds one bounded iterator coordinator and a public
+options type. Root, core, declaration, testing, tarball, and unpacked budgets
+include the measured cost with narrow headroom; plugin subpath budgets and
+runtime dependencies are unchanged. On the Node.js 24/esbuild consumer check,
+the basic root and core entries measure 13,555 and 13,554 gzip bytes; core
+plus cache measures 20,013, and the two retry-plus-cache entries measure
+21,355 and 21,425. Their consumer budgets track these measured bundles with
+narrow headroom. Retry-only and memory-cache budgets remain fixed.
 
 Origin-shared 429 cooldowns add bounded Retry-After state and timer handling to
 the existing rate-limit subpath. OpenTelemetry metrics use a separate

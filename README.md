@@ -208,6 +208,15 @@ for await (const event of events) {
   console.log(event.event, event.data, event.id)
 }
 
+// Opt in to bounded reconnection after a stream ends or disconnects.
+const liveEvents = await api.sse('/events', {
+  reconnect: { maxAttempts: 5, delay: 1000, maxDelay: 30000 }
+})
+
+for await (const event of liveEvents) {
+  console.log(event.data)
+}
+
 const records = await api.ndjson('/users/export', {
   itemSchema: userSchema
 })
@@ -222,6 +231,10 @@ the loop cancels the response reader. `maxResponseSize` remains enforced while
 the stream is consumed. `itemSchema` validates and may transform each item
 immediately before it is yielded, without buffering the rest of the stream.
 Failures expose the item index and NDJSON line or SSE event metadata.
+When SSE reconnection is enabled, the next connection sends the last observed
+event ID in `Last-Event-ID` and honors the server's `retry` delay up to
+`maxDelay`. Cancellation, schema errors, and response-size errors stop the
+iterator; each connection uses its own request timeout.
 
 Run `pnpm example:streaming` from this repository for a self-contained local
 demonstration of SSE, validated NDJSON, early termination, cancellation, and
