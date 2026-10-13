@@ -369,6 +369,11 @@ plus narrow headroom; declarations and unrelated plugin subpaths remain fixed.
 publish a package that exceeds the checked-in budgets. CI also stores the JSON
 report for comparing changes over time.
 
+Optional SSE reconnection adds one bounded iterator coordinator and a public
+options type. Root, core, declaration, testing, tarball, and unpacked budgets
+include the measured cost with narrow headroom; plugin subpath budgets and
+runtime dependencies are unchanged.
+
 Origin-shared 429 cooldowns add bounded Retry-After state and timer handling to
 the existing rate-limit subpath. OpenTelemetry metrics use a separate
 `plugins/opentelemetry-metrics` entry point and structural Meter API, so no SDK

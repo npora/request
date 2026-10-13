@@ -9,6 +9,7 @@ import type {
   StreamingSchemaLocation
 } from '../types'
 import { validateStandardSchemaValue } from './validateStandardSchema'
+import type { SseControlObserver } from './sseControl'
 
 interface StreamingParserContext {
   config: RequestConfig
@@ -20,12 +21,13 @@ interface StreamingParserContext {
  */
 export function parseServerSentEvents<T = ServerSentEvent>(
   response: Response,
-  config: RequestConfig
+  config: RequestConfig,
+  observer?: SseControlObserver
 ): AsyncIterable<T> {
   return decodeServerSentEvents<T>(response.body, {
     config,
     response
-  })
+  }, observer)
 }
 
 /**
@@ -44,12 +46,13 @@ export function parseNdjson<T>(
 
 async function* decodeServerSentEvents<T>(
   stream: ReadableStream<Uint8Array> | null,
-  context: StreamingParserContext
+  context: StreamingParserContext,
+  observer?: SseControlObserver
 ): AsyncGenerator<T> {
   let data: string[] = []
   let event = ''
-  let lastEventId = ''
-  let retry: number | undefined
+  let lastEventId = observer?.initialId ?? ''
+  let retry: number | undefined = observer?.initialRetry
   let itemIndex = 0
 
   for await (const line of decodeLines(stream, context)) {
@@ -99,6 +102,7 @@ async function* decodeServerSentEvents<T>(
       case 'id':
         if (!value.includes('\0')) {
           lastEventId = value
+          observer?.onId?.(value)
         }
         break
 
@@ -108,6 +112,7 @@ async function* decodeServerSentEvents<T>(
 
           if (Number.isSafeInteger(milliseconds)) {
             retry = milliseconds
+            observer?.onRetry?.(milliseconds)
           }
         }
         break

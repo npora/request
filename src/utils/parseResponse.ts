@@ -5,6 +5,7 @@ import {
   parseServerSentEvents
 } from './parseStreamingResponse'
 import { isArrayBuffer } from './isBinaryBody'
+import { getSseControl } from './sseControl'
 
 const TEXT_DECODER = new TextDecoder()
 
@@ -272,7 +273,11 @@ export async function parseResponse<T = unknown>(
         return response.body as T
 
       case 'sse':
-        return parseServerSentEvents(response, config) as T
+        return parseServerSentEvents(
+          response,
+          config,
+          getSseControl(config)
+        ) as T
 
       case 'ndjson':
         return parseNdjson(response, config) as T
@@ -460,7 +465,11 @@ function parseStreamingResponse<T>(
 ): T {
   switch (responseType) {
     case 'sse':
-      return parseServerSentEvents(response, config) as T
+      return parseServerSentEvents(
+        response,
+        config,
+        getSseControl(config)
+      ) as T
 
     case 'ndjson':
       return parseNdjson(response, config) as T

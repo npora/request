@@ -88,10 +88,29 @@ be released. `totalTimeout` includes consumption, and `maxResponseSize`
 counts bytes as they are read rather than buffering the whole export.
 
 The retry plugin handles failures within the request pipeline. It does not
-restart an iterator after consumption has begun. SSE `id` and `retry` fields
-are exposed as event metadata; `sse()` does not automatically reconnect or
-send `Last-Event-ID`. Applications that resume a subscription must track their
-own cursor and decide how to handle duplicate events and replayable requests.
+restart an iterator after consumption has begun. For SSE streams that should
+resume after EOF or a transient disconnect, opt in to bounded reconnection:
+
+```ts
+const events = await api.sse('/events', {
+  signal: controller.signal,
+  reconnect: { maxAttempts: 5, delay: 1000, maxDelay: 30000 }
+})
+
+for await (const event of events) {
+  console.log(event.id, event.data)
+}
+```
+
+The reconnecting iterator sends the latest server `id` as `Last-Event-ID` on
+the next connection, including an empty ID that clears an inherited cursor.
+A valid server `retry` field replaces `delay` and is capped by `maxDelay`.
+Each connection uses its own `timeout` and `totalTimeout`. The initial request
+still rejects immediately if it fails; later network, timeout, or stream read
+failures may use the remaining reconnect attempts. HTTP status, schema,
+cancellation, and size-limit failures stop the iterator. Normal EOF after the last
+attempt completes it. Applications should still decide how to handle duplicate
+events if their server replays an already delivered ID.
 
 The [runnable streaming example](../examples/streaming.ts) starts a temporary
 localhost server, consumes SSE and NDJSON, verifies cancellation and schema

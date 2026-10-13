@@ -134,6 +134,20 @@ const server = createServer(
         return
       }
 
+      if (url.pathname === '/api/reconnect-events') {
+        const cursor = request.headers['last-event-id']
+
+        response.writeHead(200, {
+          'content-type': 'text/event-stream; charset=utf-8',
+          'cache-control': 'no-store'
+        })
+        response.end(cursor === 'first'
+          ? 'id: second\ndata: two\n\n'
+          : 'id: first\ndata: one\n\n')
+
+        return
+      }
+
       if (url.pathname === '/api/records') {
         response.writeHead(200, {
           'content-type': 'application/x-ndjson; charset=utf-8',

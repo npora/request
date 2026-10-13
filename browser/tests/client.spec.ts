@@ -30,6 +30,15 @@ interface BrowserRequestClient {
     raw: Response
   }>
 
+  sse(
+    url: string,
+    config?: { reconnect?: { maxAttempts: number; delay?: number } }
+  ): Promise<AsyncIterable<{
+    data: string
+    event: string
+    id: string
+  }>>
+
   post<T>(
     url: string,
     config?: BrowserRequestConfig
@@ -2646,6 +2655,32 @@ test(
         event: 'done',
         id: ''
       }
+    ])
+  }
+)
+
+test(
+  'should resume server-sent events with the last event id',
+  async ({ page }) => {
+    await openFixture(page)
+
+    const events = await page.evaluate(async () => {
+      const request = (window as BrowserWindow).nporaRequest
+
+      if (!request) throw new Error('Npora request client is unavailable')
+
+      const stream = await request.sse('/reconnect-events', {
+        reconnect: { maxAttempts: 1, delay: 0 }
+      })
+      const items = []
+
+      for await (const event of stream) items.push(event)
+      return items
+    })
+
+    expect(events).toMatchObject([
+      { data: 'one', id: 'first' },
+      { data: 'two', id: 'second' }
     ])
   }
 )
