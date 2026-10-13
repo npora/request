@@ -89,8 +89,10 @@ export function reconnectSse(
 
     while (true) {
       if (current) {
+        if (current.status === 204) return
+
         try {
-          yield* current.data
+          if (current.data) yield* current.data
           lastError = undefined
         } catch (error) {
           if (!isRetryableDisconnect(error)) {
