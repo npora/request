@@ -19,6 +19,34 @@ async function collect<T>(items: AsyncIterable<T>): Promise<T[]> {
 }
 
 describe('optional SSE reconnection', () => {
+  it.each([204, 205])('returns an empty iterable for HTTP %i', async status => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(null, {
+      status
+    }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const events = await createClient().sse('/events')
+
+    await expect(collect(events)).resolves.toEqual([])
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('stops reconnecting when the server returns HTTP 204', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(eventResponse('data: first\n\n'))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const events = await createClient().sse('/events', {
+      reconnect: { maxAttempts: 3, delay: 0 }
+    })
+
+    await expect(collect(events)).resolves.toMatchObject([
+      { data: 'first' }
+    ])
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
   it('resumes with the latest id, including a control-only event', async () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(eventResponse(

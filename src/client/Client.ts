@@ -533,10 +533,10 @@ export class Client {
     const { reconnect, itemSchema, ...requestConfig } = config
 
     if (reconnect === undefined) {
-      return this.get<AsyncIterable<ServerSentEvent>>(url, {
+      return this.getResponse<AsyncIterable<ServerSentEvent>>(url, {
         ...config,
         responseType: 'sse'
-      })
+      }).then(response => response.data ?? emptySse())
     }
 
     return createReconnectingSse(
@@ -780,3 +780,5 @@ interface InstalledPlugin {
 function readResponseData<T>(response: NporaResponse<T>): T {
   return response.data
 }
+
+async function* emptySse(): AsyncGenerator<ServerSentEvent> {}

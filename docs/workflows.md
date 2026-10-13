@@ -109,7 +109,8 @@ Each connection uses its own `timeout` and `totalTimeout`. The initial request
 still rejects immediately if it fails; later network, timeout, or stream read
 failures may use the remaining reconnect attempts. HTTP status, schema,
 cancellation, and size-limit failures stop the iterator. Normal EOF after the last
-attempt completes it. Applications should still decide how to handle duplicate
+attempt completes it. HTTP 204 No Content also completes the iterator without
+another connection. Applications should still decide how to handle duplicate
 events if their server replays an already delivered ID.
 
 The [runnable streaming example](../examples/streaming.ts) starts a temporary
