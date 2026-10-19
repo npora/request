@@ -102,14 +102,14 @@ jobs:
       - name: Typecheck examples
         run: pnpm test:examples
 
+      - name: Run session workflow example
+        run: pnpm example:session
+
       - name: Typecheck benchmarks
         run: pnpm benchmark:types
 
       - name: Check documentation links
         run: pnpm test:docs
-
-      - name: Check benchmark report comparison
-        run: pnpm test:benchmark:compare
 
       - name: Enforce source complexity budgets
         run: pnpm test:complexity

@@ -11,6 +11,7 @@ pnpm test
 pnpm test:coverage
 pnpm test:types
 pnpm test:examples
+pnpm example:session
 pnpm benchmark:types
 pnpm benchmark:streaming
 ```

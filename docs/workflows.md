@@ -4,6 +4,35 @@ Start with `createClient()` and add only the behavior an API needs. Regular
 methods return parsed data. Use a `*Response()` method when status, headers, or
 the native `Response` matter. Node.js 22 or newer is required.
 
+## Build a session client
+
+Run the [complete session example](../examples/session.ts) without credentials,
+an external API, or additional dependencies:
+
+```sh
+pnpm example:session
+```
+
+The example asserts that an expired credential is refreshed, a transient read
+failure is retried, and a later list read uses the cache. A rejected write
+preserves the cached list; a successful write invalidates its tag so the next
+read loads updated data. It also cancels a pending request and clears session
+state on logout. CI runs the example as well as typechecking it.
+
+Create token storage, an auth plugin, and a cache for each session. In a server
+application, avoid sharing authenticated clients across users. Keep refresh
+requests on a separate client without the auth plugin to avoid recursive
+refresh. Install plugins explicitly on clients created with `extend()`:
+configuration and the adapter are inherited, but plugins and interceptors are
+not. A request option under `extensions` configures an installed plugin; it
+does not install one.
+
+When leaving a view, abort its outstanding requests. On logout, settle or
+cancel session requests, clear cached data and credentials, remove plugins,
+and discard the client. Create a new session client when another user signs in.
+Do not reuse a previous user's cache or mutate their token storage in place
+while requests remain active.
+
 ## Read and validate data
 
 Use a TypeScript generic when the response shape is already trusted. A generic

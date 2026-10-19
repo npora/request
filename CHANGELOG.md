@@ -711,9 +711,8 @@
     query parameters, forms, and FormData records.
   - Enforce raw, gzip, declaration, and npm tarball size budgets in package,
     release, and CI verification with machine-readable reports.
-  - Evaluate Axios and nine representative GitHub request libraries with
-    equivalent rotating local HTTP workloads, then remove every competitor
-    dependency and document the resulting architecture decisions.
+  - Evaluate request overhead with rotating local HTTP workloads and document
+    the resulting architecture decisions while retaining zero runtime dependencies.
 
 ### Patch Changes
 

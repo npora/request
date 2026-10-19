@@ -181,37 +181,19 @@ Benchmark values depend on CPU, operating system, Node.js version and current
 machine load. Compare reports produced on equivalent runners and look for
 repeated trends rather than treating a single run as a release gate.
 
-Run the optional local HTTP comparison from the repository root so `mise.toml`
-selects the intended Node.js version. The command rebuilds the package before
-measuring it. The report records the package versions, runtime, Git commit and
-dirty state, a digest of the built JavaScript, and a digest of the dependency
-lockfile.
-Use the version inside the report as the source of truth; the runner rejects a
-versioned output filename that disagrees with it. Results from different Node.js
-versions or different build digests are separate measurements.
-Each workload is warmed with the same concurrency used for measurement; the
-default warm-up is 1,000 requests per workload and is excluded from the results.
-The default five rounds rotate execution order so each implementation occupies
-each position once. The report shows the throughput range relative to the
-median and flags ranges above 20% for investigation. Re-run flagged workloads
-under a quieter machine load before drawing conclusions from small differences.
+Run the local HTTP benchmark to measure the native Fetch transport with a
+temporary loopback server:
 
 ```sh
-pnpm benchmark:libraries -- --operations 5000 \
-  --output benchmark-results/local-http.json
+pnpm benchmark:http
 ```
 
-Compare two reports made with the same runtime, workload and dependency lock:
-
-```sh
-pnpm benchmark:libraries:compare -- \
-  benchmark-results/before.json benchmark-results/after.json
-```
-
-The comparison shows the package's raw throughput change and an estimate after
-scaling by the median shift of unchanged controls. It reports warnings for
-unstable workloads, uncommitted source, or widely differing control changes.
-Treat a warned result as a prompt to repeat the measurement.
+Keep reports from the same runtime, workload, concurrency, and machine when
+tracking changes. Record the Git revision and whether the working tree is clean
+alongside each report. Loopback throughput measures local HTTP overhead;
+remote latency, TLS, and proxies require application-specific measurements.
+Use the internal same-process controls and regression budgets in CI to check
+request overhead separately from network behavior.
 
 The default cache-key path normalizes configured vary-header names once and
 reuses the resulting empty header metadata for headerless requests. The cache
