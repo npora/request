@@ -10,6 +10,7 @@ import { waitForRetry } from '../core/lifecycleTiming'
 import { throwIfAborted } from '../utils/createAbortError'
 import { MAX_TIMER_DELAY } from '../utils/maxTimerDelay'
 import { withSseControl } from '../utils/sseControl'
+import { withEarlyIteratorCleanup } from '../utils/withEarlyIteratorCleanup'
 
 type SseStreamResponse = NporaResponse<AsyncIterable<ServerSentEvent>>
 
@@ -82,7 +83,8 @@ export function reconnectSse(
   state: ReconnectState,
   connect: () => Promise<SseStreamResponse>
 ): AsyncIterable<ServerSentEvent> {
-  return (async function* () {
+  return withEarlyIteratorCleanup(start => (async function* () {
+    start()
     let current: SseStreamResponse | undefined = first
     let lastError: unknown
     let attempts = 0
@@ -129,7 +131,7 @@ export function reconnectSse(
         lastError = error
       }
     }
-  })()
+  })(), () => first.data?.[Symbol.asyncIterator]().return?.())
 }
 
 function isRetryableDisconnect(error: unknown): boolean {

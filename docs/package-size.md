@@ -68,6 +68,15 @@ pnpm test:size -- --output package-size-results/report.json
 
 ## Budgets
 
+The 1.19.x early-iterator cleanup fix closes response bodies and timeout/reconnect
+wrappers even when a consumer returns or throws before the first read. A shared
+initializer marks generator entry once, leaving native `next()` dispatch intact.
+Relative to 1.19.2 on the same build, root ESM/CommonJS closures grow by 620/676
+raw bytes, and core grows by 620 bytes. Consumer gzip grows by 186–202 bytes.
+Only exceeded raw, tarball, unpacked, and consumer budgets receive narrow
+headroom for this lifecycle correction. Compressed package-closure, declaration,
+individual-plugin, and testing budgets remain fixed.
+
 The 1.19.x transport-hook correction revalidates final configuration before
 adapter fallback on every attempt. Consumer gzip grows by 8–16 bytes on the same
 build. Only the root retry/cache consumer exceeds its previous budget (21,501

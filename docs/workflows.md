@@ -116,6 +116,11 @@ stream or cancel it when finished so its reader and timeout resources can
 be released. `totalTimeout` includes consumption, and `maxResponseSize`
 counts bytes as they are read rather than buffering the whole export.
 
+If an SSE or NDJSON iterator is no longer needed before the first read, close
+it explicitly with `await records[Symbol.asyncIterator]().return?.()`. This also
+releases an unopened reconnecting SSE response and its timeout resources.
+Closing an iterator does not read an item or start another connection.
+
 The retry plugin handles failures within the request pipeline. It does not
 restart an iterator after consumption has begun. For SSE streams that should
 resume after EOF or a transient disconnect, opt in to bounded reconnection:
