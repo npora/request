@@ -1,13 +1,13 @@
 {
   "files": {
     "dist/index.js": {
-      "bytes": 153000,
-      "gzipBytes": 50900,
+      "bytes": 153450,
+      "gzipBytes": 51000,
       "transitive": true
     },
     "dist/index.cjs": {
-      "bytes": 157300,
-      "gzipBytes": 51950,
+      "bytes": 157850,
+      "gzipBytes": 52050,
       "transitive": true
     },
     "dist/index.d.ts": {
@@ -21,7 +21,7 @@
       "transitive": true
     },
     "dist/core.js": {
-      "bytes": 54000,
+      "bytes": 54300,
       "gzipBytes": 17800,
       "transitive": true
     },
@@ -56,13 +56,13 @@
       "transitive": true
     },
     "dist/testing.js": {
-      "bytes": 18100,
-      "gzipBytes": 6850,
+      "bytes": 8000,
+      "gzipBytes": 3650,
       "transitive": true
     }
   },
   "package": {
     "bytes": 136200,
-    "unpackedBytes": 515000
+    "unpackedBytes": 515550
   }
 }

@@ -65,7 +65,10 @@ export interface AuthPluginOptions {
  * Authentication plugin.
  */
 export function authPlugin(options: AuthPluginOptions = {}): Plugin {
-  let refreshPromise: Promise<string | void> | undefined
+  let refreshState: {
+    promise: Promise<string | void>
+    installations: Set<object>
+  } | undefined
 
   const refreshedContexts = new WeakSet<object>()
 
@@ -74,6 +77,7 @@ export function authPlugin(options: AuthPluginOptions = {}): Plugin {
 
     install(context) {
       let active = true
+      const installation = {}
 
       context.interceptors.request.use(config => {
         return config.signal
@@ -123,7 +127,7 @@ export function authPlugin(options: AuthPluginOptions = {}): Plugin {
 
         try {
           const refreshedToken = await waitForSignal(
-            () => refreshAccessToken(refreshToken),
+            () => refreshAccessToken(refreshToken, installation),
             requestContext.config
           )
 
@@ -180,34 +184,47 @@ export function authPlugin(options: AuthPluginOptions = {}): Plugin {
 
       return () => {
         active = false
+        refreshState?.installations.delete(installation)
+        if (refreshState?.installations.size === 0) {
+          refreshState = undefined
+        }
       }
     }
   }
 
   async function refreshAccessToken(
-    refreshToken: NonNullable<AuthPluginOptions['refreshToken']>
+    refreshToken: NonNullable<AuthPluginOptions['refreshToken']>,
+    installation: object
   ): Promise<string | void> {
-    if (!refreshPromise) {
-      refreshPromise = Promise.resolve(refreshToken())
-        .then(token => {
-          if (!token) {
+    if (!refreshState) {
+      const refresh = {
+        installations: new Set([installation]),
+        promise: Promise.resolve(refreshToken())
+          .then(token => {
+            if (!token || refresh.installations.size === 0) {
+              return token
+            }
+
+            const write = options.storage?.set(token)
+
+            if (isPromiseLike(write)) {
+              return Promise.resolve(write).then(() => token)
+            }
+
             return token
-          }
-
-          const write = options.storage?.set(token)
-
-          if (isPromiseLike(write)) {
-            return Promise.resolve(write).then(() => token)
-          }
-
-          return token
-        })
-        .finally(() => {
-          refreshPromise = undefined
-        })
+          })
+          .finally(() => {
+            if (refreshState === refresh) {
+              refreshState = undefined
+            }
+          })
+      }
+      refreshState = refresh
+    } else {
+      refreshState.installations.add(installation)
     }
 
-    return refreshPromise
+    return refreshState.promise
   }
 }
 

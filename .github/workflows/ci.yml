@@ -102,14 +102,14 @@ jobs:
       - name: Typecheck examples
         run: pnpm test:examples
 
+      - name: Run session workflow example
+        run: pnpm example:session
+
       - name: Typecheck benchmarks
         run: pnpm benchmark:types
 
       - name: Check documentation links
         run: pnpm test:docs
-
-      - name: Check benchmark report comparison
-        run: pnpm test:benchmark:compare
 
       - name: Enforce source complexity budgets
         run: pnpm test:complexity
@@ -147,6 +147,9 @@ jobs:
 
       - name: Run million-item streaming schema benchmark
         run: pnpm benchmark:streaming -- --operations 1000000 --warmup 1000 --output benchmark-results/streaming-schema.json
+
+      - name: Measure fragmented long-line parsing
+        run: pnpm benchmark:streaming-lines -- --output benchmark-results/streaming-lines.json
 
       - name: Enforce stable relative performance budgets
         run: >-

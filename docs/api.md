@@ -900,6 +900,13 @@ adapter. A handler sets `context.response` when it handles an attempt; later
 transport hooks and the adapter are skipped for that attempt. Errors continue
 through normal error, authentication-refresh, and retry hooks.
 
+If no transport hook handles an attempt, the pipeline revalidates the final
+configuration and headers before invoking the configured adapter. Header
+replacement, in-place edits, and asynchronous changes therefore apply to both
+the first attempt and retries. Invalid configurations and aborted signals stop
+adapter dispatch. A hook that sends a request itself remains responsible for
+validating its configuration and honoring cancellation before its own I/O.
+
 ## Extension Configuration
 
 Plugin-owned request configuration belongs under `extensions`:
@@ -1864,6 +1871,15 @@ Cancelling one waiter does not cancel the shared refresh or other requests, and
 listener cleanup failures cannot leave that waiter pending. Removing the auth
 plugin prevents requests already waiting on refresh from injecting the new token
 or retrying after the refresh completes.
+
+Removing every installation participating in a pending refresh also prevents
+that refresh from starting a token-storage write. Reinstalling the same plugin
+then starts a separate refresh; a late result from the removed installation
+cannot overwrite its token or reset its refresh state. If another installation
+still participates, its shared refresh continues and persists the token once.
+Storage writes already started, and external state changes made by application
+callbacks, cannot be cancelled by removing the plugin. Coordinate those writes
+with session logout in the application's storage implementation.
 
 ## Logger
 

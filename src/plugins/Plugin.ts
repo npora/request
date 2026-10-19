@@ -31,6 +31,7 @@ export interface PluginHookManager {
    * Transport hooks run inside the retry loop. A hook that handles the
    * request assigns `context.response`; later transport hooks and the client
    * adapter are then skipped for that attempt.
+   * Fallthrough validates final config and headers before adapter dispatch.
    */
   onTransport(
     hook: RequestHook,

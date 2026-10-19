@@ -11,7 +11,7 @@ coverage
 # Benchmarks
 benchmark-results
 package-size-results
-benchmark/competitors/library-comparison-result.json
+benchmark/*/*-result.json
 
 # Playwright
 playwright-report

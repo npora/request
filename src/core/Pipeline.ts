@@ -162,7 +162,7 @@ export class Pipeline {
             this.interceptors.request as unknown as InternalInterceptorManager<
               RequestConfig
             >
-          ).runMaybeAsync(context.config)
+          ).runMaybeAsync(context.config, 0, context.config)
 
           context.config = isPromiseLike(intercepted)
             ? await intercepted
@@ -207,7 +207,7 @@ export class Pipeline {
 
       while (true) {
         try {
-          const headers = validatedHeaders
+          let headers = validatedHeaders
 
           validatedHeaders = undefined
 
@@ -218,6 +218,11 @@ export class Pipeline {
 
             if (isPromiseLike(hooks)) {
               await hooks
+            }
+
+            if (!context.response) {
+              headers = validateRequestConfig(context.config, headersRequired)
+              throwIfAborted(context.config)
             }
           }
 
@@ -354,6 +359,7 @@ export class Pipeline {
   private processValidatedResponse<T>(
     context: RequestContext<T>
   ): NporaResponse<T> | Promise<NporaResponse<T>> {
+    throwIfAborted(context.config)
     if (context.config.schema && context.response) {
       return this.validateResponseSchema(context).then(() => {
         return this.processResponseInterceptors(context)
@@ -371,7 +377,7 @@ export class Pipeline {
         this.interceptors.response as unknown as InternalInterceptorManager<
           NporaResponse
         >
-      ).runMaybeAsync(context.response as NporaResponse)
+      ).runMaybeAsync(context.response as NporaResponse, 0, context.config)
 
       if (isPromiseLike(intercepted)) {
         return Promise.resolve(intercepted).then(response => {
@@ -490,5 +496,5 @@ export class Pipeline {
 }
 
 interface InternalInterceptorManager<T> {
-  runMaybeAsync(value: T): T | Promise<T>
+  runMaybeAsync(value: T, startIndex?: number, config?: RequestConfig): T | Promise<T>
 }

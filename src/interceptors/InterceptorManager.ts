@@ -1,4 +1,7 @@
 import { isPromiseLike } from '../utils/isPromiseLike'
+import type { RequestConfig } from '../types'
+import { throwIfAborted } from '../utils/createAbortError'
+import { waitForPending } from '../utils/waitForSignal'
 
 export type Interceptor<T> = (value: T) => T | Promise<T>
 
@@ -61,8 +64,10 @@ export class InterceptorManager<T> {
 
   private runMaybeAsync(
     value: T,
-    startIndex = 0
+    startIndex = 0,
+    config?: RequestConfig
   ): T | Promise<T> {
+    if (config) throwIfAborted(config)
     let result = value
 
     for (
@@ -75,12 +80,13 @@ export class InterceptorManager<T> {
       const next = entry.interceptor(result)
 
       if (isPromiseLike(next)) {
-        return Promise.resolve(next).then(resolved => {
-          return this.runMaybeAsync(resolved, index + 1)
+        return waitForPending(next, config).then(resolved => {
+          return this.runMaybeAsync(resolved, index + 1, config)
         })
       }
 
       result = next
+      if (config) throwIfAborted(config)
     }
 
     return result

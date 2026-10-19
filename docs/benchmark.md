@@ -181,37 +181,19 @@ Benchmark values depend on CPU, operating system, Node.js version and current
 machine load. Compare reports produced on equivalent runners and look for
 repeated trends rather than treating a single run as a release gate.
 
-Run the optional local HTTP comparison from the repository root so `mise.toml`
-selects the intended Node.js version. The command rebuilds the package before
-measuring it. The report records the package versions, runtime, Git commit and
-dirty state, a digest of the built JavaScript, and a digest of the dependency
-lockfile.
-Use the version inside the report as the source of truth; the runner rejects a
-versioned output filename that disagrees with it. Results from different Node.js
-versions or different build digests are separate measurements.
-Each workload is warmed with the same concurrency used for measurement; the
-default warm-up is 1,000 requests per workload and is excluded from the results.
-The default five rounds rotate execution order so each implementation occupies
-each position once. The report shows the throughput range relative to the
-median and flags ranges above 20% for investigation. Re-run flagged workloads
-under a quieter machine load before drawing conclusions from small differences.
+Run the local HTTP benchmark to measure the native Fetch transport with a
+temporary loopback server:
 
 ```sh
-pnpm benchmark:libraries -- --operations 5000 \
-  --output benchmark-results/local-http.json
+pnpm benchmark:http
 ```
 
-Compare two reports made with the same runtime, workload and dependency lock:
-
-```sh
-pnpm benchmark:libraries:compare -- \
-  benchmark-results/before.json benchmark-results/after.json
-```
-
-The comparison shows the package's raw throughput change and an estimate after
-scaling by the median shift of unchanged controls. It reports warnings for
-unstable workloads, uncommitted source, or widely differing control changes.
-Treat a warned result as a prompt to repeat the measurement.
+Keep reports from the same runtime, workload, concurrency, and machine when
+tracking changes. Record the Git revision and whether the working tree is clean
+alongside each report. Loopback throughput measures local HTTP overhead;
+remote latency, TLS, and proxies require application-specific measurements.
+Use the internal same-process controls and regression budgets in CI to check
+request overhead separately from network behavior.
 
 The default cache-key path normalizes configured vary-header names once and
 reuses the resulting empty header metadata for headerless requests. The cache
@@ -374,6 +356,36 @@ relative-path fast paths while query encoding remains delegated to
 `URLSearchParams`.
 
 ## Streaming schema and regression gates
+
+Measure long SSE and NDJSON lines arriving in 64-byte chunks:
+
+```sh
+pnpm benchmark:streaming-lines -- --output benchmark-results/streaming-lines.json
+```
+
+The benchmark verifies exactly one intact record for 64, 128, and 256 KiB
+payloads, then reports three timing samples and their median per format and
+size. `--operations` changes the largest payload length and `--samples` changes
+the number of rounds. Input is generated before timing; stream reads, decoding,
+parsing, and result verification are timed. CI records the report alongside
+the existing benchmarks. Timing is diagnostic rather than an absolute gate.
+
+On a local Node.js 24.18.0 / macOS arm64 run, the median for a 256 KiB payload
+arriving in 64-byte chunks changed as follows (three rounds per format):
+
+| Format | Before | After |
+| --- | ---: | ---: |
+| NDJSON | 1,923.78 ms | 4.26 ms |
+| SSE | 1,902.46 ms | 4.02 ms |
+
+These are in-memory fragmented-line measurements, not network throughput or a
+prediction for ordinary short records. Repeat them on the target runtime.
+
+The parser scans each decoded chunk once and retains unfinished lines as
+fragments until a delimiter or EOF. This avoids repeated prefix scanning and
+flattening as a line grows across many small chunks. A complete JSON record or
+SSE data line still needs memory proportional to its length; configure
+`maxResponseSize` when the total stream needs a bound.
 
 `pnpm benchmark:streaming` generates response bodies lazily under Web Stream
 backpressure rather than allocating the complete payload. Its default run

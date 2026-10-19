@@ -17,6 +17,7 @@ has zero runtime dependencies.
 | --- | --- |
 | Send the first request | [Quick start](#quick-start) |
 | Build a client for an application | [Common workflows](docs/workflows.md) |
+| Run a complete session workflow | [Session example](docs/workflows.md#build-a-session-client) |
 | Refresh authentication tokens | [Authentication workflow](docs/workflows.md#refresh-authentication-tokens) |
 | Find a client or response API | [API reference](docs/api.md) |
 | Configure URLs, bodies, timeouts, or parsing | [Configuration reference](docs/configuration.md) |

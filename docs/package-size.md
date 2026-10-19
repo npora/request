@@ -68,6 +68,33 @@ pnpm test:size -- --output package-size-results/report.json
 
 ## Budgets
 
+The 1.19.x transport-hook correction revalidates final configuration before
+adapter fallback on every attempt. Consumer gzip grows by 8–16 bytes on the same
+build. Only the root retry/cache consumer exceeds its previous budget (21,501
+bytes against 21,500), so that limit moves to 21,550 bytes. All other consumer
+and package budgets remain fixed; requests without transport hooks retain the
+existing validation handoff.
+
+The 1.19.x interceptor/schema cancellation fix adds abort-aware waiting and
+continuation checks. Relative to the auth-removal build, root ESM, root CommonJS,
+and core closures grow by 195, 306, and 263 raw bytes respectively. The measured
+consumer gzip increment is 93–115 bytes. Only exceeded raw, unpacked, and consumer
+budgets receive narrow additional headroom; compressed package-closure,
+declaration, tarball, memory-cache consumer, and root retry/cache consumer
+budgets stay fixed.
+
+The same change extracts the bodyless-response predicate so MockAdapter does
+not load streaming parsers through its response utility import. Its testing
+entry closure falls from 18,038 to 7,831 raw bytes and from 6,816 to 3,504 gzip
+bytes on the same build. The testing-entry budgets are lowered accordingly.
+
+The 1.19.x authentication refresh-removal fix adds installation participation
+tracking and isolates replacement refresh operations from late completions.
+On the same build, root ESM and CommonJS closures each grow by 190 raw bytes;
+gzip grows by 74 and 75 bytes respectively. Only the root runtime budgets
+increase, with narrow headroom for that correctness cost. Core, individual
+subpaths, declarations, tarball, unpacked, and consumer budgets stay fixed.
+
 Budgets live in `test/package/size-budget.json`. They include deliberate
 headroom above the measured baseline so that tiny serializer or bundler
 differences do not make builds flaky.

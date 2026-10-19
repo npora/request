@@ -1,6 +1,20 @@
 import type { RequestConfig } from '../types'
 import { createAbortError } from './createAbortError'
 
+/** Observe an already-started operation even when cancellation wins first. */
+export function waitForPending<T>(
+  pending: PromiseLike<T>,
+  config?: RequestConfig
+): Promise<T> {
+  const promise = Promise.resolve(pending)
+  if (!config?.signal) return promise
+  if (config.signal.aborted) {
+    void promise.catch(() => {})
+    return waitForSignal(() => promise, config)
+  }
+  return Promise.race([promise, waitForSignal(() => promise, config)])
+}
+
 export function waitForSignal<T>(
   start: () => T | PromiseLike<T>,
   config: RequestConfig
