@@ -900,6 +900,13 @@ adapter. A handler sets `context.response` when it handles an attempt; later
 transport hooks and the adapter are skipped for that attempt. Errors continue
 through normal error, authentication-refresh, and retry hooks.
 
+If no transport hook handles an attempt, the pipeline revalidates the final
+configuration and headers before invoking the configured adapter. Header
+replacement, in-place edits, and asynchronous changes therefore apply to both
+the first attempt and retries. Invalid configurations and aborted signals stop
+adapter dispatch. A hook that sends a request itself remains responsible for
+validating its configuration and honoring cancellation before its own I/O.
+
 ## Extension Configuration
 
 Plugin-owned request configuration belongs under `extensions`:

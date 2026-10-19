@@ -4,6 +4,6 @@
   "core + retry": 15125,
   "core + cache": 20250,
   "core + memory cache": 15000,
-  "root: retry + cache": 21500,
+  "root: retry + cache": 21550,
   "core + retry + cache": 21675
 }

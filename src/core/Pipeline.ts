@@ -207,7 +207,7 @@ export class Pipeline {
 
       while (true) {
         try {
-          const headers = validatedHeaders
+          let headers = validatedHeaders
 
           validatedHeaders = undefined
 
@@ -218,6 +218,11 @@ export class Pipeline {
 
             if (isPromiseLike(hooks)) {
               await hooks
+            }
+
+            if (!context.response) {
+              headers = validateRequestConfig(context.config, headersRequired)
+              throwIfAborted(context.config)
             }
           }
 

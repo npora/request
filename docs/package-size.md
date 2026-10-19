@@ -68,6 +68,13 @@ pnpm test:size -- --output package-size-results/report.json
 
 ## Budgets
 
+The 1.19.x transport-hook correction revalidates final configuration before
+adapter fallback on every attempt. Consumer gzip grows by 8–16 bytes on the same
+build. Only the root retry/cache consumer exceeds its previous budget (21,501
+bytes against 21,500), so that limit moves to 21,550 bytes. All other consumer
+and package budgets remain fixed; requests without transport hooks retain the
+existing validation handoff.
+
 The 1.19.x interceptor/schema cancellation fix adds abort-aware waiting and
 continuation checks. Relative to the auth-removal build, root ESM, root CommonJS,
 and core closures grow by 195, 306, and 263 raw bytes respectively. The measured
