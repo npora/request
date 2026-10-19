@@ -547,6 +547,11 @@ lines are ignored, and the default event type is `message`. NDJSON ignores
 blank lines and reports malformed JSON with its one-based line number.
 
 Breaking out of either iterator cancels the underlying response reader.
+Calling its `return()` or `throw()` before the first `next()` also closes the
+response and releases timeout resources without consuming an item. Unopened
+reconnecting SSE iterators close their initial response without reconnecting.
+Concurrent closes share cleanup; cancellation failures do not replace a
+consumer's original error.
 Transport interruptions reject the next iterator operation with
 `PARSER_ERROR`; request timeouts, external cancellation, and response-size
 limits continue to apply while streaming. Long-lived SSE connections should

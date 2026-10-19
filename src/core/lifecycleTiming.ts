@@ -3,6 +3,7 @@ import type { NporaResponse, RequestConfig } from '../types'
 import { finalizeStreamingResponse } from '../utils'
 import { isReadableStream } from '../utils/isReadableStream'
 import { MAX_TIMER_DELAY } from '../utils/maxTimerDelay'
+import { withEarlyIteratorCleanup } from '../utils/withEarlyIteratorCleanup'
 
 export function waitForRetry(
   milliseconds: number,
@@ -123,13 +124,17 @@ function finalizeAsyncIterable<T>(
   iterable: AsyncIterable<T>,
   clear: () => void
 ): AsyncIterable<T> {
-  return (async function* () {
+  return withEarlyIteratorCleanup(start => (async function* () {
+    start()
     try {
       yield* iterable
     } finally {
       clear()
     }
-  })()
+  })(), () => {
+    clear()
+    return iterable[Symbol.asyncIterator]().return?.()
+  })
 }
 
 function isAsyncIterable(value: unknown): value is AsyncIterable<unknown> {

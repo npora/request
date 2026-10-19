@@ -10,10 +10,12 @@ import type {
 } from '../types'
 import { validateStandardSchemaValue } from './validateStandardSchema'
 import type { SseControlObserver } from './sseControl'
+import { withEarlyIteratorCleanup } from './withEarlyIteratorCleanup'
 
 interface StreamingParserContext {
   config: RequestConfig
   response: Response
+  start(): void
 }
 
 /**
@@ -24,10 +26,11 @@ export function parseServerSentEvents<T = ServerSentEvent>(
   config: RequestConfig,
   observer?: SseControlObserver
 ): AsyncIterable<T> {
-  return decodeServerSentEvents<T>(response.body, {
+  return withEarlyIteratorCleanup(start => decodeServerSentEvents<T>(response.body, {
     config,
-    response
-  }, observer)
+    response,
+    start
+  }, observer), () => response.body?.cancel())
 }
 
 /**
@@ -38,10 +41,11 @@ export function parseNdjson<T>(
   response: Response,
   config: RequestConfig
 ): AsyncIterable<T> {
-  return decodeNdjson<T>(response.body, {
+  return withEarlyIteratorCleanup(start => decodeNdjson<T>(response.body, {
     config,
-    response
-  })
+    response,
+    start
+  }), () => response.body?.cancel())
 }
 
 async function* decodeServerSentEvents<T>(
@@ -49,6 +53,7 @@ async function* decodeServerSentEvents<T>(
   context: StreamingParserContext,
   observer?: SseControlObserver
 ): AsyncGenerator<T> {
+  context.start()
   let data: string[] = []
   let event = ''
   let lastEventId = observer?.initialId ?? ''
@@ -124,6 +129,7 @@ async function* decodeNdjson<T>(
   stream: ReadableStream<Uint8Array> | null,
   context: StreamingParserContext
 ): AsyncGenerator<T> {
+  context.start()
   let lineNumber = 0
   let itemIndex = 0
 
