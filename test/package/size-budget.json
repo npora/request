@@ -1,13 +1,13 @@
 {
   "files": {
     "dist/index.js": {
-      "bytes": 153000,
-      "gzipBytes": 50900,
+      "bytes": 153200,
+      "gzipBytes": 51000,
       "transitive": true
     },
     "dist/index.cjs": {
-      "bytes": 157300,
-      "gzipBytes": 51950,
+      "bytes": 157550,
+      "gzipBytes": 52050,
       "transitive": true
     },
     "dist/index.d.ts": {

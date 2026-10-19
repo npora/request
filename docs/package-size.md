@@ -68,6 +68,13 @@ pnpm test:size -- --output package-size-results/report.json
 
 ## Budgets
 
+The 1.19.x authentication refresh-removal fix adds installation participation
+tracking and isolates replacement refresh operations from late completions.
+On the same build, root ESM and CommonJS closures each grow by 190 raw bytes;
+gzip grows by 74 and 75 bytes respectively. Only the root runtime budgets
+increase, with narrow headroom for that correctness cost. Core, individual
+subpaths, declarations, tarball, unpacked, and consumer budgets stay fixed.
+
 Budgets live in `test/package/size-budget.json`. They include deliberate
 headroom above the measured baseline so that tiny serializer or bundler
 differences do not make builds flaky.

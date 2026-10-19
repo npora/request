@@ -1865,6 +1865,15 @@ listener cleanup failures cannot leave that waiter pending. Removing the auth
 plugin prevents requests already waiting on refresh from injecting the new token
 or retrying after the refresh completes.
 
+Removing every installation participating in a pending refresh also prevents
+that refresh from starting a token-storage write. Reinstalling the same plugin
+then starts a separate refresh; a late result from the removed installation
+cannot overwrite its token or reset its refresh state. If another installation
+still participates, its shared refresh continues and persists the token once.
+Storage writes already started, and external state changes made by application
+callbacks, cannot be cancelled by removing the plugin. Coordinate those writes
+with session logout in the application's storage implementation.
+
 ## Logger
 
 ```ts
