@@ -1,9 +1,9 @@
 {
-  "root: basic": 13650,
-  "core: basic": 13650,
-  "core + retry": 15000,
-  "core + cache": 20150,
+  "root: basic": 13750,
+  "core: basic": 13750,
+  "core + retry": 15125,
+  "core + cache": 20250,
   "core + memory cache": 15000,
   "root: retry + cache": 21500,
-  "core + retry + cache": 21550
+  "core + retry + cache": 21675
 }

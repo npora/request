@@ -220,6 +220,16 @@ trusted as native bodies.
 
 ## Cancellation and limits
 
+An external `signal` also interrupts pending request/response interceptors and
+asynchronous Standard Schema validation without requiring `totalTimeout`.
+This includes SSE and NDJSON item validation while consuming the iterator.
+Cancellation rejects with `ABORT_ERROR`, skips later interceptors, and releases
+logical request permits through the normal settled lifecycle. Late callback
+results are ignored and late rejections remain observed. Callbacks must observe
+the signal themselves to stop their own external work or side effects. Error
+interceptors and terminal cleanup hooks still run to process the failure and
+release resources.
+
 | Option | Type | Default | Purpose |
 | --- | --- | --- | --- |
 | `timeout` | `number` | disabled | Abort after this many milliseconds (maximum `2_147_483_647`). `0` disables the timer. |

@@ -1,4 +1,7 @@
 import { SchemaValidationError } from '../errors'
+import { throwIfAborted } from './createAbortError'
+import { isPromiseLike } from './isPromiseLike'
+import { waitForPending } from './waitForSignal'
 import type {
   NporaResponse,
   StandardSchemaV1,
@@ -24,12 +27,19 @@ export async function validateStandardSchemaValue(
   >>
   let schemaVendor = 'unknown'
 
+  throwIfAborted(response.config)
+
   try {
     const standard = schema['~standard']
 
     schemaVendor = standard.vendor
-    result = await standard.validate(value)
+    const validation = standard.validate(value)
+    result = isPromiseLike(validation)
+      ? await waitForPending(validation, response.config)
+      : validation
+    throwIfAborted(response.config)
   } catch (error) {
+    throwIfAborted(response.config)
     throw new SchemaValidationError(
       messages.failed,
       response,
