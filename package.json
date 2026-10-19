@@ -168,6 +168,7 @@
     "benchmark": "tsx benchmark/request.ts",
     "benchmark:http": "tsx benchmark/http-concurrency.ts",
     "benchmark:streaming": "node --expose-gc --import tsx benchmark/streaming-schema.ts",
+    "benchmark:streaming-lines": "tsx benchmark/streaming-lines.ts",
     "benchmark:check": "node benchmark/check-performance.mjs",
     "benchmark:consumer-size": "node benchmark/consumer-size.mjs",
     "benchmark:consumer-size:check": "node benchmark/check-consumer-size.mjs",

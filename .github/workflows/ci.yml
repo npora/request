@@ -148,6 +148,9 @@ jobs:
       - name: Run million-item streaming schema benchmark
         run: pnpm benchmark:streaming -- --operations 1000000 --warmup 1000 --output benchmark-results/streaming-schema.json
 
+      - name: Measure fragmented long-line parsing
+        run: pnpm benchmark:streaming-lines -- --output benchmark-results/streaming-lines.json
+
       - name: Enforce stable relative performance budgets
         run: >-
           pnpm benchmark:check --

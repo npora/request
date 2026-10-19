@@ -357,6 +357,36 @@ relative-path fast paths while query encoding remains delegated to
 
 ## Streaming schema and regression gates
 
+Measure long SSE and NDJSON lines arriving in 64-byte chunks:
+
+```sh
+pnpm benchmark:streaming-lines -- --output benchmark-results/streaming-lines.json
+```
+
+The benchmark verifies exactly one intact record for 64, 128, and 256 KiB
+payloads, then reports three timing samples and their median per format and
+size. `--operations` changes the largest payload length and `--samples` changes
+the number of rounds. Input is generated before timing; stream reads, decoding,
+parsing, and result verification are timed. CI records the report alongside
+the existing benchmarks. Timing is diagnostic rather than an absolute gate.
+
+On a local Node.js 24.18.0 / macOS arm64 run, the median for a 256 KiB payload
+arriving in 64-byte chunks changed as follows (three rounds per format):
+
+| Format | Before | After |
+| --- | ---: | ---: |
+| NDJSON | 1,923.78 ms | 4.26 ms |
+| SSE | 1,902.46 ms | 4.02 ms |
+
+These are in-memory fragmented-line measurements, not network throughput or a
+prediction for ordinary short records. Repeat them on the target runtime.
+
+The parser scans each decoded chunk once and retains unfinished lines as
+fragments until a delimiter or EOF. This avoids repeated prefix scanning and
+flattening as a line grows across many small chunks. A complete JSON record or
+SSE data line still needs memory proportional to its length; configure
+`maxResponseSize` when the total stream needs a bound.
+
 `pnpm benchmark:streaming` generates response bodies lazily under Web Stream
 backpressure rather than allocating the complete payload. Its default run
 validates one million NDJSON records and one million SSE events with Standard

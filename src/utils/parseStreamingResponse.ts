@@ -203,74 +203,52 @@ async function* decodeLines(
 
   const reader = stream.getReader()
   const decoder = new TextDecoder('utf-8', { fatal: true })
-  let buffer = ''
+  let fragments: string[] = []
+  let skipLF = false
   let completed = false
 
   try {
     while (true) {
       const result = await reader.read()
-
-      if (result.done) {
-        completed = true
-        buffer += decoder.decode()
-        break
-      }
-
-      buffer += decoder.decode(result.value, { stream: true })
+      completed = result.done
+      const chunk = completed
+        ? decoder.decode()
+        : decoder.decode(result.value, { stream: true })
       let start = 0
 
-      for (let index = 0; index < buffer.length; index += 1) {
-        const character = buffer[index]
+      // A CR already ended the previous line. Ignore only its paired LF,
+      // preserving this state across empty chunks and partial UTF-8 reads.
+      if (skipLF && chunk.length > 0) {
+        if (chunk[0] === '\n') start = 1
+        skipLF = false
+      }
 
-        if (character === '\n') {
-          yield buffer.slice(start, index)
-          start = index + 1
-          continue
+      for (let index = start; index < chunk.length; index += 1) {
+        const character = chunk[index]
+        if (character !== '\n' && character !== '\r') continue
+
+        let line = chunk.slice(start, index)
+        if (fragments.length > 0) {
+          fragments.push(line)
+          line = fragments.join('')
+          fragments = []
         }
 
-        if (character !== '\r') {
-          continue
+        if (character === '\r') {
+          if (chunk[index + 1] === '\n') index += 1
+          else if (index + 1 === chunk.length) skipLF = true
         }
-
-        // Preserve a trailing CR until the next chunk so a split CRLF is
-        // emitted as one line ending.
-        if (index + 1 === buffer.length) {
-          break
-        }
-
-        yield buffer.slice(start, index)
-
-        if (buffer[index + 1] === '\n') {
-          index += 1
-        }
-
         start = index + 1
+        yield line
       }
 
-      buffer = buffer.slice(start)
+      // Keep unfinished lines as fragments instead of concatenating and
+      // rescanning the growing prefix on every read.
+      if (start < chunk.length) fragments.push(chunk.slice(start))
+      if (completed) break
     }
 
-    let start = 0
-
-    for (let index = 0; index < buffer.length; index += 1) {
-      const character = buffer[index]
-
-      if (character !== '\n' && character !== '\r') {
-        continue
-      }
-
-      yield buffer.slice(start, index)
-
-      if (character === '\r' && buffer[index + 1] === '\n') {
-        index += 1
-      }
-
-      start = index + 1
-    }
-
-    if (start < buffer.length) {
-      yield buffer.slice(start)
-    }
+    if (fragments.length > 0) yield fragments.join('')
   } catch (error) {
     if (isRequestError(error)) {
       throw error
