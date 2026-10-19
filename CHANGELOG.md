@@ -1,5 +1,29 @@
 # @npora/request
 
+## 1.19.2
+
+### Patch Changes
+
+- 29e5d21: Prevent pending authentication refreshes from starting token-storage writes
+  after all participating plugin installations are removed. Reinstallations start
+  an independent refresh, while other active participants retain shared refresh
+  and single-write behavior.
+- e8803d9: Honor external cancellation while waiting for asynchronous request/response
+  interceptors and response or streaming-item schema validators, without requiring
+  a total timeout. Ignore late completions, observe late rejections, and prevent
+  later interceptors from running after cancellation. Keep the testing adapter
+  independent of streaming response parsers.
+- 3d938b0: Document session-scoped client setup with an executable authentication, retry,
+  cache invalidation, cancellation, and logout workflow. Focus benchmark tooling
+  and documentation on the package's own performance and regression controls.
+- 29a6190: Parse fragmented SSE and NDJSON lines without repeatedly copying or scanning
+  the unfinished prefix. Preserve UTF-8 decoding, CR/LF/CRLF handling, streaming
+  backpressure, and cancellation. Add a reproducible long-line benchmark.
+- 3f259e5: Revalidate final request configuration and headers after transport hooks fall
+  through to the configured adapter. Apply header mutations consistently on first
+  attempts and retries, and reject invalid or cancelled requests before dispatch
+  to custom adapters.
+
 ## 1.19.1
 
 ### Patch Changes
