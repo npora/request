@@ -111,6 +111,9 @@ jobs:
       - name: Verify error-handling workflow
         run: node --import tsx examples/errors.ts
 
+      - name: Verify bounded batch workflow
+        run: node --import tsx examples/batch.ts
+
       - name: Run Axios migration example
         run: pnpm example:axios-migration
 

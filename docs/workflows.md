@@ -354,6 +354,72 @@ service or credentials:
 pnpm example:auth-refresh
 ```
 
+## Bound a batch of reads
+
+Run the [batch example](../examples/batch.ts) without a network service:
+
+```sh
+node --import tsx examples/batch.ts
+```
+
+It starts six reads with two active permits and three queue slots. One queued
+read is cancelled; another is rejected because the queue is full. A 503 read
+retries once while retaining its logical permit, and a 404 remains an item
+failure. Successful results and failures keep their input positions. Assertions
+verify the maximum active transport count, skipped network calls, and final
+empty queue. Source CI and the installed tarball consumer both run this example.
+
+For a modest batch, compose the existing client and plugins:
+
+```ts
+import { createClient } from '@npora/request/core'
+import { concurrencyPlugin } from '@npora/request/plugins/concurrency'
+import { retryPlugin } from '@npora/request/plugins/retry'
+
+const api = createClient({
+  baseURL: 'https://api.example.com', timeout: 3000, totalTimeout: 15000
+})
+  .use(concurrencyPlugin({ maxConcurrent: 4, maxQueue: 20, queueTimeout: 5000 }))
+  .use(retryPlugin({ retries: 1, delay: 200, jitter: true }))
+
+const results = await Promise.allSettled(ids.map(id => api.get(`/items/${id}`, {
+  signal: batchSignal
+})))
+```
+
+`Promise.allSettled` observes every failure and returns results in input order;
+a failure does not erase successful siblings. `Promise.all` rejects on a failure
+but does not cancel the other requests. Use an owning AbortController when the
+whole batch should stop. Combine batch/session and per-item signals when both
+must remain effective, as in [account transitions](#keep-account-transitions-isolated).
+Handle unknown application errors separately from the documented request codes.
+
+| Control | What it bounds | Important boundary |
+| --- | --- | --- |
+| `concurrencyPlugin` | Active logical requests per isolation key | Retries and their delays keep the original permit; full/expired queues produce `CONCURRENCY_LIMIT`. |
+| `rateLimitPlugin` | Actual transport attempts per rolling interval | Retries consume permits; cache hits skip transport; full/expired queues produce `RATE_LIMIT`. |
+| Application producer/worker pool | Created tasks and retained application results | Needed for very large batches; HTTP queue bounds do not limit the number of promises you allocate. |
+
+The default isolation key is the resolved origin. Calling multiple upstreams
+can therefore use multiple independent limits; use a deliberate shared key if
+the application needs a global cap. An Undici connection pool controls sockets,
+which is a separate boundary from logical requests or attempts over time.
+
+`timeout` bounds each transport attempt. Use `totalTimeout` to include queue
+waits and retry delays in a logical request's budget. Choose queue size and wait
+limits deliberately rather than launching a huge array and treating admission
+errors as an automatic retry loop. For large imports or exports, read inputs
+incrementally and keep only a bounded number of outstanding tasks/results.
+
+Concurrency permits end at the request's settled lifecycle. For SSE/NDJSON or a
+native stream, this can occur when the reader/iterable is returned, before body
+consumption finishes. To bound open live streams, the application must retain
+its own worker slot until iteration ends or the reader is cancelled.
+
+The example uses GET requests. Before applying retries to a batch of writes,
+check replayable bodies and server idempotency contracts; a timeout does not
+prove a write was not committed. See [failure handling](errors.md).
+
 ## Handle failures at the owning boundary
 
 Use the [error-handling guide](errors.md) to distinguish HTTP statuses, schema

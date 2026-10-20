@@ -44,7 +44,7 @@ try {
     await checkStreamingContract(createRequire(import.meta.url)('@npora/request/core'), 'CommonJS');
   `)
   run(process.execPath, ['streaming.mjs'], directory)
-  console.log('Installed package consumer, four workflows, and ESM/CommonJS streaming passed.')
+  console.log('Installed package consumer, onboarding workflows, and ESM/CommonJS streaming passed.')
 } finally {
   rmSync(directory, { recursive: true, force: true })
 }
