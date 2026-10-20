@@ -411,3 +411,62 @@ ordered checksums, 100 slow-consumer yields, bounded pre/post-GC heap growth,
 two validation-failure cancellations, two consumer cancellations, and
 conservative throughput floors. The parser emits lines directly from decoded
 chunks instead of allocating an intermediate array for every chunk.
+
+## Pinned library comparison
+
+Competitor measurements are optional and separate from CI's internal regression
+budgets. The private fixture has its own npm lockfile; it adds no dependencies
+to the published client or the root development dependency graph. Versions are
+fixed comparison subjects, not a claim about the latest release.
+
+```sh
+pnpm build
+npm ci --prefix benchmark/competitors --ignore-scripts --no-audit --no-fund
+pnpm benchmark:compare -- \
+  --operations 5000 --concurrency 64 --warmup 500 --rounds 6 \
+  --samples 4096 --output benchmark-results/comparison.json
+pnpm benchmark:compare:size -- --output package-size-results/comparison.json
+```
+
+Run timing benchmarks by themselves on an otherwise idle machine. The HTTP
+runner requires permission to listen on a loopback port. It imports the built
+`dist/core.js`, not TypeScript source. It compares native Fetch, Npora Request,
+Axios's Node HTTP adapter, Axios's Fetch adapter, Ky, and ofetch. The Node HTTP
+adapter is explicit and has proxy lookup disabled to avoid runner proxy settings;
+this represents the usual Node transport, not Axios's browser transport.
+
+GET JSON, POST JSON, and query JSON each run six rounds. Every client has the
+same warmup and timed operation counts and concurrency. Client order rotates
+one position per round, so each occupies each position once with the default
+six clients and six rounds. Other round counts are allowed for smoke checks;
+use multiples of six for balanced position coverage. No retry or cache plugin
+is installed; Ky and ofetch retries are explicitly disabled. Ky's default timeout
+is disabled too. All timed operations parse the same JSON response and assert
+its value. Server checks validate POST JSON and query values. Exact request
+counts are asserted for each client/run and for the complete measurement;
+failures abort report generation rather than producing a successful result.
+
+Reports retain every run, sample count, throughput, sampled p95/p99, heap delta,
+round order, actual dependency versions, Git revision and dirty state, runtime
+and CPU, and hashes of the build and both lockfiles. Summary values are medians
+across rounds (the mean of the middle two values for even round counts).
+Heap delta is the difference in process heap before and after a run, without
+forced GC: it can be negative and is not retained memory, peak memory, or a
+cross-client memory ranking. Clients share a process and some share native
+Fetch pools; rotation reduces order bias but does not provide process isolation.
+
+The browser size comparison uses esbuild's browser resolution, ESM, ES2020,
+minification, tree shaking, and gzip level 9 for every entry. Each exports a
+function fetching parsed JSON. The exact entry strings and bundler version
+are recorded. Npora resolves to the same built core entry measured by the
+regular consumer report. Different entry wrappers can change compressed sizes
+by a few bytes. The native Fetch entry is wrapper code only; the browser's
+implementation is not bundled. These are basic-use bundle costs, not equivalent
+feature sets: validation, retry, cache, hooks, and streaming capabilities differ.
+
+Loopback HTTP numbers include each client's default connection management and
+transport, server processing, JSON parsing, and benchmark assertions. They do
+not isolate wrapper overhead and do not predict TLS, remote latency, browsers,
+large responses, retries, streaming, or production performance. Keep min/max
+and raw rounds alongside medians; do not turn these results into an absolute
+"fastest client" claim or an external-library CI gate.

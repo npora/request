@@ -3,7 +3,8 @@ import { mkdir, writeFile } from 'node:fs/promises'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { gzipSync } from 'node:zlib'
-import { build } from 'esbuild'
+import { build, version as bundlerVersion } from 'esbuild'
+import { measurementMetadata } from './provenance.mjs'
 
 const root = fileURLToPath(new URL('../', import.meta.url))
 const scenarios = {
@@ -95,21 +96,29 @@ for (const [name, source] of Object.entries(scenarios)) {
   results[name] = {
     bytes: output.byteLength,
     gzipBytes: gzipSync(output, { level: 9 }).byteLength,
-    inputFiles: Object.keys(bundle.metafile.inputs).length
+    inputFiles: Object.keys(bundle.metafile.inputs).length,
+    contributions: Object.entries(bundle.metafile.outputs['consumer-bundle.js'].inputs)
+      .map(([path, input]) => ({ path, bytesInOutput: input.bytesInOutput }))
+      .sort((a, b) => b.bytesInOutput - a.bytesInOutput)
   }
 }
 
 const report = {
-  schemaVersion: 1,
+  schemaVersion: 2,
+  ...measurementMetadata(),
   generatedAt: new Date().toISOString(),
   bundler: 'esbuild',
+  bundlerVersion,
+  gzipLevel: 9,
   platform: 'browser',
   format: 'esm',
   target: 'es2020',
   results
 }
 
-console.table(results)
+console.table(Object.fromEntries(Object.entries(results).map(
+  ([name, { contributions: _contributions, ...summary }]) => [name, summary]
+)))
 
 const args = process.argv.slice(2)
 

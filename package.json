@@ -168,6 +168,8 @@
     "audit:signatures": "pnpm audit signatures",
     "benchmark": "tsx benchmark/request.ts",
     "benchmark:http": "tsx benchmark/http-concurrency.ts",
+    "benchmark:compare": "node --import tsx benchmark/competitors/compare.mjs",
+    "benchmark:compare:size": "node benchmark/competitors/size.mjs",
     "benchmark:streaming": "node --expose-gc --import tsx benchmark/streaming-schema.ts",
     "benchmark:streaming-lines": "tsx benchmark/streaming-lines.ts",
     "benchmark:check": "node benchmark/check-performance.mjs",

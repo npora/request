@@ -422,3 +422,21 @@ unpacked budgets track the measured public API; the metrics subpath has its own
 narrow transitive budget. Full stream-consumption measurement adds isolated
 ReadableStream and async-iterable wrappers to that optional subpath; updated
 budgets include their measured cost without adding a runtime dependency.
+
+## Reproducible consumer reports
+
+Consumer reports use schema version 2. In addition to the existing `results`
+measurements, they include package version, Node/CPU details, Git revision and
+dirty state, esbuild version, gzip level, and SHA-256 hashes of the complete
+`dist` tree and root lockfile. Build immediately before measuring: the hash
+identifies the actual artifacts, but does not prove that an old build matches
+the current source. Generated timestamps do not participate in build hashes.
+
+Each scenario also lists input modules ranked by `bytesInOutput`, from esbuild's
+metafile. These are uncompressed contributions after tree shaking. Gzip shares
+a dictionary across the bundle, so compressed module costs cannot be added or
+inferred from these values. Use the ranking to choose code to inspect, then
+measure the complete consumer again after an optimization.
+
+For an optional fixed-version browser comparison with Axios, Ky, ofetch, and
+native Fetch, see [pinned library comparison](benchmark.md#pinned-library-comparison).
