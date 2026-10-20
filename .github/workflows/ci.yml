@@ -108,14 +108,19 @@ jobs:
       - name: Verify session isolation
         run: node --import tsx examples/session-isolation.ts
 
+      - name: Verify error-handling workflow
+        run: node --import tsx examples/errors.ts
+
       - name: Run Axios migration example
         run: pnpm example:axios-migration
 
       - name: Typecheck benchmarks
         run: pnpm benchmark:types
 
-      - name: Check documentation links
-        run: pnpm test:docs
+      - name: Check documentation links and error contracts
+        run: |
+          node --test test/docs-contract.test.mjs
+          pnpm test:docs
 
       - name: Enforce source complexity budgets
         run: pnpm test:complexity

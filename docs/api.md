@@ -1974,7 +1974,9 @@ console.log(response.raw)
 
 # Error
 
-All request errors should be thrown as `RequestError`.
+Transport and request-policy failures use `RequestError`. Application
+interceptors, hooks, or custom adapters can throw other values; narrow an unknown
+caught value with `isRequestError()` before accessing its fields.
 
 ```ts
 import {
@@ -2014,6 +2016,9 @@ spreading the complete error object can expose `config`, `response`, `data`, or
 `cause`; use the serialized form or `loggerPlugin` when those fields may contain
 application secrets.
 
+See the [error handling workflow](errors.md) for cancellation, recovery, local
+queue limits, and retry decisions.
+
 Error codes:
 
 ```ts
@@ -2028,6 +2033,7 @@ REQUEST_TOO_LARGE
 RESPONSE_TOO_LARGE
 CIRCUIT_OPEN
 CONCURRENCY_LIMIT
+RATE_LIMIT
 ```
 
 ---

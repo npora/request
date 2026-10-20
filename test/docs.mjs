@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { checkErrorCodeDocs } from './error-code-docs.mjs'
 import {
   existsSync,
   readFileSync,
@@ -68,3 +69,5 @@ assert.deepEqual(
 console.log(
   `Documentation links passed for ${documents.length} files.`
 )
+
+console.log(`Error code documentation matches all ${checkErrorCodeDocs(root)} public codes.`)

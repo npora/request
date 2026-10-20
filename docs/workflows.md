@@ -354,6 +354,17 @@ service or credentials:
 pnpm example:auth-refresh
 ```
 
+## Handle failures at the owning boundary
+
+Use the [error-handling guide](errors.md) to distinguish HTTP statuses, schema
+failures, cancellation, and local queue admission. Catch stream failures while
+iterating, and rethrow unknown application errors. Run the
+[offline failure example](../examples/errors.ts) to verify these decisions:
+
+```sh
+node --import tsx examples/errors.ts
+```
+
 ## Cache selected reads
 
 Installing `cachePlugin()` alone does not cache requests. Enable caching for

@@ -810,14 +810,15 @@ Stable request error codes:
 - `RESPONSE_TOO_LARGE`
 - `CIRCUIT_OPEN`
 - `CONCURRENCY_LIMIT`
+- `RATE_LIMIT`
 
 `SchemaValidationError` extends `RequestError`, so applications can handle all
 request failures through the unified base class while still inspecting schema
 issues when `error.code === 'SCHEMA_ERROR'`.
 
-Prefer `isRequestError()` and `isSchemaValidationError()` when narrowing an
-unknown caught value. Their non-enumerable shared brands work across iframes
-and duplicated package instances, where `instanceof` can fail.
+Use `isRequestError()` and `isSchemaValidationError()` to narrow unknown errors
+across realms and package copies. See [error handling](docs/errors.md) for
+recovery, cancellation, and retry decisions.
 
 ## Supply-chain verification
 

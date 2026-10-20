@@ -30,6 +30,23 @@ validation have Node boundary tests and count toward these thresholds. Database
 transactions, cursor maintenance, and the store itself are exercised against
 real IndexedDB in Chromium, Firefox, and WebKit rather than a Node simulation.
 
+## Executable onboarding workflows
+
+CI runs the session, account-isolation, Axios migration, and error-handling
+examples, as well as typechecking them. The isolated examples use native Fetch
+response fixtures and need no external server or credentials. Run the failure
+workflow and documentation contract checks locally:
+
+```sh
+node --import tsx examples/errors.ts
+node --test test/docs-contract.test.mjs
+pnpm test:docs
+```
+
+The documentation check parses the source `RequestErrorCode` union and requires
+exact matching inventories in README and the API reference. Missing, duplicate,
+and obsolete entries fail even when a code is mentioned elsewhere in the prose.
+
 ## Security checks
 
 ```sh
