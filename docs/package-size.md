@@ -190,6 +190,16 @@ headers, request cache directives, `304` response restoration, and metadata
 merging without adding a runtime dependency; unrelated subpath and declaration
 budgets remain fixed.
 
+The bodyless download fix preserves `undefined` for ordinary HEAD/204/205/304
+responses with progress reporting and returns a usable empty stream for explicit
+stream output even without a progress callback. Shared stream validation and
+single-use helper removal reduce the unpacked package by 248 bytes compared
+with the preceding SSE cancellation fix. The npm tarball grows from 136648 to
+136688 bytes because compressed output also depends on generated chunk contents
+and names. Its ceiling moves from 136650 to 136750 bytes for this correctness
+change; all entrypoint, gzip, declaration, consumer and unpacked ceilings stay
+unchanged.
+
 Bounded stale-if-error recovery adds a small core fallback handoff, the public
 request option, cache directive parsing, retry-aware recovery, and strict error
 classification. The root, core, cache, declaration, tarball, and unpacked

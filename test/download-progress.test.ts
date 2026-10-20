@@ -11,6 +11,36 @@ afterEach(() => {
 })
 
 describe('downloadPlugin progress', () => {
+  it.each([204, 205, 304])('returns an empty stream without a progress callback for HTTP %i', async status => {
+    const request = createClient({
+      fetch: async () => new Response(null, { status }),
+      throwHttpErrors: false
+    }).use(downloadPlugin())
+    const stream = await request.get<ReadableStream<Uint8Array>>('/empty', {
+      extensions: { download: { output: 'stream' } }
+    })
+    expect(stream).toBeInstanceOf(ReadableStream)
+    expect(await new Response(stream).text()).toBe('')
+  })
+
+  it.each(['HEAD', '204', '205', '304'])('preserves a bodyless %s response when reporting progress', async kind => {
+    const onProgress = vi.fn()
+    const request = createClient({
+      fetch: async () => new Response(null, {
+        status: kind === 'HEAD' ? 200 : Number(kind),
+        headers: { 'content-length': '123' }
+      }),
+      throwHttpErrors: false
+    }).use(downloadPlugin())
+    const response = await request.requestResponse({
+      url: '/empty', method: kind === 'HEAD' ? 'HEAD' : 'GET',
+      extensions: { download: { onProgress } }
+    })
+    expect(response.data).toBeUndefined()
+    expect(response.raw.body).toBeNull()
+    expect(onProgress).toHaveBeenCalledExactlyOnceWith({ loaded: 0, total: 0, bytes: 0 })
+  })
+
   it('should return a progress stream without buffering the response', async () => {
     const firstChunk = new TextEncoder().encode('hello ')
     const secondChunk = new TextEncoder().encode('npora')

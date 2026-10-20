@@ -38,10 +38,13 @@ try {
     readFileSync(new URL('./streaming-contract.mjs', import.meta.url)))
   writeFileSync(join(directory, 'streaming.mjs'), `
     import * as esm from '@npora/request/core';
+    import { downloadPlugin } from '@npora/request/plugins/download';
     import { createRequire } from 'node:module';
     import { checkStreamingContract } from './streaming-contract.mjs';
-    await checkStreamingContract(esm, 'ESM');
-    await checkStreamingContract(createRequire(import.meta.url)('@npora/request/core'), 'CommonJS');
+    const require = createRequire(import.meta.url);
+    await checkStreamingContract({ ...esm, downloadPlugin }, 'ESM');
+    await checkStreamingContract({ ...require('@npora/request/core'),
+      ...require('@npora/request/plugins/download') }, 'CommonJS');
   `)
   run(process.execPath, ['streaming.mjs'], directory)
   console.log('Installed package consumer, onboarding workflows, and ESM/CommonJS streaming passed.')

@@ -132,32 +132,41 @@ export function downloadPlugin(
         }
 
         let stream = response.data
+        const streamOutput = download.output === 'stream'
 
-        if (download.output === 'stream') {
-          if (
-            stream === undefined &&
-            isBodylessResponse(
-              response.config.method,
-              response.status,
-              response.raw.type
-            )
-          ) {
-            stream = createEmptyDownloadStream()
+        if (
+          stream === undefined &&
+          isBodylessResponse(response.config.method, response.status, response.raw.type)
+        ) {
+          if (!streamOutput) {
+            onProgress?.({ loaded: 0, total: 0, bytes: 0 })
+            return
           }
+          stream = new ReadableStream({
+            start(controller) { controller.close() }
+          })
+        }
 
-          if (!isReadableStream(stream)) {
-            throw unavailableDownloadStream(response)
-          }
+        if (!streamOutput && !onProgress) return
 
-          if (onProgress) {
-            requestContext.response = {
-              ...response,
-              data: monitorDownloadStream(
+        if (!isReadableStream(stream)) {
+          throw new RequestError('Download response stream is unavailable', {
+            code: 'PARSER_ERROR',
+            status: response.status,
+            config: response.config
+          })
+        }
+
+        if (streamOutput) {
+          requestContext.response = {
+            ...response,
+            data: onProgress
+              ? monitorDownloadStream(
                 stream,
                 response,
                 onProgress
               )
-            }
+              : stream
           }
 
           return
@@ -165,10 +174,6 @@ export function downloadPlugin(
 
         if (!onProgress) {
           return
-        }
-
-        if (!isReadableStream(stream)) {
-          throw unavailableDownloadStream(response)
         }
 
         const blob = await consumeDownloadStream(
@@ -184,14 +189,6 @@ export function downloadPlugin(
       }, { requiresRawResponse: false })
     }
   }
-}
-
-function createEmptyDownloadStream(): ReadableStream<Uint8Array> {
-  return new ReadableStream({
-    start(controller) {
-      controller.close()
-    }
-  })
 }
 
 function resolveDownloadOutput(
@@ -238,19 +235,6 @@ function validateStreamOutput(
       }
     )
   }
-}
-
-function unavailableDownloadStream(
-  response: NporaResponse
-): RequestError {
-  return new RequestError(
-    'Download response stream is unavailable',
-    {
-      code: 'PARSER_ERROR',
-      status: response.status,
-      config: response.config
-    }
-  )
 }
 
 function shouldUseXHR(
