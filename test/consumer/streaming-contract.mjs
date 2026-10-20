@@ -105,6 +105,25 @@ export async function checkStreamingContract({ createClient, isRequestError, dow
       error => isRequestError(error) && error.code === 'ABORT_ERROR')
   } finally { queuedReader.releaseLock() }
 
+  for (const responseType of ['sse', 'ndjson']) {
+    const abort = new AbortController()
+    const content = responseType === 'sse' ? 'data: 1\n\ndata: 2\n\n' : '1\n2\n'
+    const iterable = await createClient({ fetch: async () => new Response(content) })
+      .get('https://example.test/decoded', { responseType, signal: abort.signal })
+    const iterator = iterable[Symbol.asyncIterator]()
+    await iterator.next()
+    abort.abort()
+    await assert.rejects(iterator.next(), error => error.code === 'ABORT_ERROR')
+  }
+  const limited = createClient({ fetch: async () => new Response('"你好"\n') })
+  await assert.rejects(collect(await limited.ndjson('https://example.test/line', {
+    maxStreamLineSize: 7
+  })), error => error.code === 'RESPONSE_TOO_LARGE')
+  const stalled = createClient({ fetch: async () => new Response(new ReadableStream()) })
+  await assert.rejects(collect(await stalled.sse('https://example.test/idle-guard', {
+    streamIdleTimeout: 10
+  })), error => error.code === 'TIMEOUT_ERROR')
+
   const inherited = new AbortController()
   let connections = 0
   const reconnecting = createClient({

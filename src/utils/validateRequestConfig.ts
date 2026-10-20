@@ -25,13 +25,11 @@ export function validateRequestConfig(
   validateContext(config)
   validateURL(config)
   validateMethod(config)
-  validateFetch(config)
+  validateFunctions(config)
   validateStructuredConfig(config)
-  validateJsonCodec(config)
   validateTimeout(config)
   validateLimits(config)
   validateRemoveHeaders(config)
-  validateQuerySerializer(config)
   validateQuery(config)
   validateResponseOptions(config)
   validateSchema(config)
@@ -100,18 +98,6 @@ function validateQuery(config: RequestConfig): void {
   }
 }
 
-function validateQuerySerializer(config: RequestConfig): void {
-  if (
-    config.querySerializer !== undefined &&
-    typeof config.querySerializer !== 'function'
-  ) {
-    throw configError(
-      'Request querySerializer must be a function',
-      config
-    )
-  }
-}
-
 function validateMethod(config: RequestConfig): void {
   switch (config.method) {
     case undefined:
@@ -130,12 +116,11 @@ function validateMethod(config: RequestConfig): void {
   }
 }
 
-function validateFetch(config: RequestConfig): void {
-  if (
-    config.fetch !== undefined &&
-    typeof config.fetch !== 'function'
-  ) {
-    throw configError('Request fetch must be a function', config)
+function validateFunctions(config: RequestConfig): void {
+  for (const key of ['fetch', 'parseJson', 'stringifyJson', 'querySerializer'] as const) {
+    if (config[key] !== undefined && typeof config[key] !== 'function') {
+      throw configError(`Request ${key} must be a function`, config)
+    }
   }
 }
 
@@ -176,22 +161,6 @@ function validateRecord(
     )
   ) {
     throw configError(`${name} must be an object`, config)
-  }
-}
-
-function validateJsonCodec(config: RequestConfig): void {
-  if (
-    config.parseJson !== undefined &&
-    typeof config.parseJson !== 'function'
-  ) {
-    throw configError('Request parseJson must be a function', config)
-  }
-
-  if (
-    config.stringifyJson !== undefined &&
-    typeof config.stringifyJson !== 'function'
-  ) {
-    throw configError('Request stringifyJson must be a function', config)
   }
 }
 
@@ -297,26 +266,12 @@ function validateStandardSchemaOption(
 }
 
 function validateLimits(config: RequestConfig): void {
-  validateLimit(
-    config.maxRequestSize,
-    'Request maxRequestSize',
-    config
-  )
-  validateLimit(
-    config.maxResponseSize,
-    'Request maxResponseSize',
-    config
-  )
-  validateLimit(
-    config.maxErrorResponseSize,
-    'Request maxErrorResponseSize',
-    config
-  )
-  validateLimit(
-    config.maxFormDataDepth,
-    'Request maxFormDataDepth',
-    config
-  )
+  for (const key of [
+    'maxRequestSize', 'maxResponseSize', 'maxErrorResponseSize',
+    'maxFormDataDepth', 'maxStreamLineSize', 'maxSseEventSize'
+  ] as const) {
+    validateLimit(config[key], `Request ${key}`, config)
+  }
 }
 
 function validateLimit(
@@ -392,12 +347,9 @@ function isMalformedHttpURL(value: string): boolean {
 }
 
 function validateTimeout(config: RequestConfig): void {
-  validateTimeoutValue(config.timeout, 'Request timeout', config)
-  validateTimeoutValue(
-    config.totalTimeout,
-    'Request totalTimeout',
-    config
-  )
+  for (const key of ['timeout', 'totalTimeout', 'streamIdleTimeout'] as const) {
+    validateTimeoutValue(config[key], `Request ${key}`, config)
+  }
 }
 
 function validateTimeoutValue(

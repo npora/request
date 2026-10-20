@@ -97,7 +97,7 @@ describe('bounded Fetch stream lifecycle', () => {
     expect(vi.getTimerCount()).toBe(0)
   })
 
-  it('can abort while an oversized stream is waiting for source cancellation', async () => {
+  it('reports an oversized stream before source cleanup settles, preserving the first error', async () => {
     vi.useFakeTimers()
     let finishCancel!: () => void
     const cancel = vi.fn(() => new Promise<void>(resolve => { finishCancel = resolve }))
@@ -112,12 +112,14 @@ describe('bounded Fetch stream lifecycle', () => {
     const reader = stream.getReader()
     try {
       const pending = reader.read()
-      const rejected = expect(pending).rejects.toMatchObject({ code: 'ABORT_ERROR' })
+      const rejected = expect(pending).rejects.toMatchObject({ code: 'RESPONSE_TOO_LARGE' })
       // Drain source pull/read continuations without resolving its cancel promise.
       await vi.advanceTimersByTimeAsync(0)
       expect(cancel).toHaveBeenCalledTimes(1)
-      controller.abort(new Error('view closed'))
       await rejected
+      expect(source.locked).toBe(false)
+      expect(vi.getTimerCount()).toBe(0)
+      controller.abort(new Error('view closed'))
       finishCancel()
       await vi.advanceTimersByTimeAsync(0)
       expect(source.locked).toBe(false)

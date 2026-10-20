@@ -502,3 +502,36 @@ throughput. Reports contain build/lockfile hashes and runtime/Git metadata.
 
 The [shared response reader snapshot](measurements/shared-response-reader/README.md)
 contains the before/after runs, bundle measurements, and validation results.
+
+## Slow responses, large bodies, cancellation, and streaming
+
+After installing the pinned comparison dependencies and building, run:
+
+```sh
+node --import tsx benchmark/competitors/edge-cases.mjs \
+  --operations 1000 --concurrency 64 \
+  --output benchmark-results/http-edge-cases.json
+```
+
+Each of the six clients uses the same loopback server. Scenarios cover a 5 ms
+server delay, a 64 KiB JSON string, cancellation after the first streaming chunk,
+and byte-verified streaming with a 2 ms consumer pause. Retries are disabled.
+Axios HTTP streams use a Node-to-Web stream bridge. Cancellation must eventually
+reject the active body; the runner does not assume all clients discard buffered
+data identically. Server disconnect notifications are asynchronous, so their
+per-client deltas can include earlier cancellations. Overall counts are retained.
+
+This is one run per scenario/client with rotated client order across scenarios,
+not a robust external-library performance ranking. The ordinary JSON comparison
+uses repeated rounds. Neither measures remote services, TLS, production capacity,
+peak/retained memory, or all browser transport behavior. Run performance suites
+sequentially to reduce cross-test CPU/GC interference.
+
+The streaming-guard change reserves 400 additional gzip bytes per consumer
+scenario for idle-timeout, per-record size accounting, and buffered-record
+cancellation checks. Distributed ESM/CommonJS declaration ceilings increase by
+750 raw bytes and 250 gzip bytes for the three documented public options.
+Tarball, unpacked-package, and executable-subpath ceilings stay unchanged.
+Internal helper names may be minified; exported functions and constructor names
+are checked in both module formats. Smaller npm artifacts do not imply a smaller
+application bundle: the application bundler already minifies internal bindings.

@@ -103,7 +103,8 @@ export interface RequestConfig {
   /**
    * Allow an absolute request URL to bypass `baseURL`.
    *
-   * Disable this when `baseURL` defines the trusted request boundary.
+   * Disabling this rejects absolute overrides, but does not constrain relative
+   * path traversal or redirects. Validate untrusted destinations separately.
    *
    * @default true
    */
@@ -165,6 +166,21 @@ export interface RequestConfig {
    * @default disabled
    */
   totalTimeout?: number
+
+  /** Maximum wait for a new streaming body chunk; disabled by default or zero.
+   * Paused while consumer backpressure prevents another source read.
+   */
+  streamIdleTimeout?: number
+
+  /** Maximum UTF-8 bytes per SSE/NDJSON line, excluding its delimiter.
+   * Unlimited by default. Includes SSE field prefixes and comments.
+   */
+  maxStreamLineSize?: number
+
+  /** Maximum UTF-8 bytes in all non-empty lines of an SSE event.
+   * Excludes line delimiters; unlimited by default.
+   */
+  maxSseEventSize?: number
 
   signal?: AbortSignal
 

@@ -63,7 +63,8 @@ export function finalizeStreamingResponse(
   signal: AbortSignal | null | undefined,
   config: RequestConfig,
   finalize: () => void,
-  maxSize = Number.POSITIVE_INFINITY
+  maxSize = Number.POSITIVE_INFINITY,
+  idleTimeout = config.streamIdleTimeout
 ): Response {
   if (!response.body) {
     finalize()
@@ -76,7 +77,8 @@ export function finalizeStreamingResponse(
     config,
     maxSize,
     signal,
-    finalize
+    finalize,
+    idleTimeout
   )
   const wrapped = new Response(stream, {
     status: response.status,
@@ -110,7 +112,7 @@ export async function parseResponse<T = unknown>(
         rejectOversizedContentLength(response, maxSize, config)
         response = new Response(limitResponseStream(response, maxSize, config), response)
       }
-      return parseStreamingResponse<T>(response, responseType, config)
+      return parseStreamingResponse<T>(response, responseType, config, readSignal)
     }
 
     if (
@@ -338,18 +340,20 @@ async function readResponseBytes(response: Response): Promise<Uint8Array> {
 function parseStreamingResponse<T>(
   response: Response,
   responseType: Extract<ResponseType, 'stream' | 'sse' | 'ndjson'>,
-  config: RequestConfig
+  config: RequestConfig,
+  signal?: AbortSignal
 ): T {
   switch (responseType) {
     case 'sse':
       return parseServerSentEvents(
         response,
         config,
-        getSseControl(config)
+        getSseControl(config),
+        signal
       ) as T
 
     case 'ndjson':
-      return parseNdjson(response, config) as T
+      return parseNdjson(response, config, signal) as T
 
     default:
       return response.body as T
@@ -416,7 +420,8 @@ function createResponseStream(
   config: RequestConfig,
   maxSize: number,
   signal?: AbortSignal | null,
-  finalize?: () => void
+  finalize?: () => void,
+  idleTimeout?: number
 ): ReadableStream<Uint8Array> {
   const reader = response.body!.getReader()
   let size = 0
@@ -424,6 +429,11 @@ function createResponseStream(
   let pendingAbortError: unknown
   let onAbort: (() => void) | undefined
   let streamController: ReadableStreamDefaultController<Uint8Array>
+  let idleTimer: ReturnType<typeof setTimeout> | undefined
+  const clearIdle = () => {
+    if (idleTimer !== undefined) clearTimeout(idleTimer)
+    idleTimer = undefined
+  }
 
   const settle = () => {
     if (settled) {
@@ -431,6 +441,7 @@ function createResponseStream(
     }
 
     settled = true
+    clearIdle()
     if (onAbort) {
       try {
         signal?.removeEventListener('abort', onAbort)
@@ -449,7 +460,14 @@ function createResponseStream(
 
     async pull(controller) {
       try {
+        if (idleTimeout) {
+          idleTimer = setTimeout(() => fail(new RequestError(
+            `Streaming response idle timeout after ${idleTimeout}ms`,
+            { code: 'TIMEOUT_ERROR', status: response.status, config }
+          )), idleTimeout)
+        }
         const result = await reader.read()
+        clearIdle()
 
         if (pendingAbortError) {
           const error = pendingAbortError
@@ -471,14 +489,7 @@ function createResponseStream(
 
         size += result.value.byteLength
         if (size > maxSize) {
-          const error = createSizeError(response, maxSize, config)
-          try {
-            await reader.cancel(error)
-          } catch {
-            // Preserve the stable size-limit error.
-          }
-          settle()
-          controller.error(error)
+          fail(createSizeError(response, maxSize, config))
           return
         }
 
@@ -493,14 +504,22 @@ function createResponseStream(
       }
     },
 
-    async cancel(reason) {
+    cancel(reason) {
       try {
-        await reader.cancel(reason)
+        return reader.cancel(reason)
       } finally {
         settle()
       }
     }
   })
+
+  function fail(error: unknown): void {
+    if (settled) return
+    pendingAbortError = error
+    void reader.cancel(error).catch(() => {})
+    settle()
+    streamController.error(error)
+  }
 
   if (signal) {
     onAbort = () => {
@@ -510,14 +529,9 @@ function createResponseStream(
 
       const error = streamingReadError(signal.reason, signal, config)
 
-      pendingAbortError = error
-      void reader.cancel(error).catch(() => {
-        // Preserve the stable cancellation error.
-      })
       // Source cleanup may never settle. Abort must still discard queued data,
       // release reader ownership, and clear request timers immediately.
-      settle()
-      streamController.error(error)
+      fail(error)
     }
 
     try {

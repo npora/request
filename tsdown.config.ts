@@ -25,11 +25,19 @@ export default defineConfig({
     compress: {
       keepNames: {
         class: true,
-        function: true
+        function: false
       }
     },
     mangle: {
-      keepNames: true
+      keepNames: { class: true, function: false },
+      // Keep the public API recognizable; internal helper bindings can shrink.
+      reserved: [
+        'createClient', 'isRequestError', 'isSchemaValidationError',
+        'authPlugin', 'cachePlugin', 'memoryCachePlugin', 'circuitBreakerPlugin',
+        'concurrencyPlugin', 'downloadPlugin', 'loggerPlugin',
+        'openTelemetryPlugin', 'openTelemetryMetricsPlugin',
+        'rateLimitPlugin', 'retryPlugin', 'uploadPlugin'
+      ]
     }
   },
   clean: true,

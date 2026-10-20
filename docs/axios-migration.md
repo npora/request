@@ -51,6 +51,7 @@ A generic such as `<User>` does not validate server data. Use an endpoint's
 | `signal` | `signal` with `AbortController` |
 | CancelToken | Replace with `AbortController`; no CancelToken API |
 | Node proxy, agent, or TLS options | Inject a Fetch implementation; see [Undici integration](undici.md) |
+| Node `maxRate` (bytes per second) | No built-in bandwidth throttle; enforce it in a transport or a backpressure-aware stream wrapper |
 
 Do not spread an Axios config object into a request. Select supported fields
 explicitly, especially body, transport, progress, and authentication settings.
@@ -148,6 +149,12 @@ Retry is opt-in. `retryPlugin()` alone defaults to zero retries. Request options
 under `extensions` configure installed plugins; they do not install them. Do
 not enable retries for writes without checking method, body replayability, and
 server idempotency contracts.
+
+`rateLimitPlugin` limits transport attempts per time window; `concurrencyPlugin`
+limits active logical requests. Neither limits upload/download bytes per second
+like Axios's Node `maxRate`. Native Fetch does not expose a portable bandwidth
+setting. Large-file applications should implement bandwidth policy in their
+transport, and keep its cancellation and backpressure behavior covered by tests.
 
 Use the [session workflow](workflows.md#build-a-session-client) for concurrent
 auth refresh, cache invalidation, cancellation, and logout. For transfer

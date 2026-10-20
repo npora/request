@@ -11,6 +11,9 @@ application.
 - Clients can reject absolute request URLs that would bypass a configured
   `baseURL` by setting `allowAbsoluteUrls: false`; validation repeats after
   request interceptors and plugin hooks.
+- `baseURL` and `allowAbsoluteUrls` do not constrain relative path traversal or
+  redirect targets. Validate resolved destinations and enforce a transport-level
+  redirect policy when accepting untrusted URLs; see [configuration](configuration.md).
 - Native `Headers` validation rejects invalid names, values, and CRLF header
   injection.
 - Query, form, and FormData builders process own properties only.

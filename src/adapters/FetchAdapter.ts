@@ -143,7 +143,8 @@ export class FetchAdapter implements Adapter {
                 parseTarget,
                 config,
                 responseType,
-                parseSizeLimit
+                parseSizeLimit,
+                streaming ? request.init.signal! : undefined
               )
 
           data = parsed === ERROR_RESPONSE_DATA_UNAVAILABLE

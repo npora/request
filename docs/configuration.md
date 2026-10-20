@@ -57,6 +57,7 @@ Optional features have additional prerequisites:
 | Persistent cache stores | Caller-supplied Web Storage or IndexedDB; storage access can be denied by browser policy. |
 | Cross-context cache invalidation | Caller-supplied BroadcastChannel. |
 | Cross-context refresh coordination | Caller-supplied Web Locks manager; omit coordination when unavailable. |
+| Streaming item validation with combined signals | Native `AbortSignal.any` when both a per-attempt signal and a separate lifecycle signal are present. |
 
 ## Core options
 
@@ -130,10 +131,16 @@ await api.get('/public', {
 })
 ```
 
-Set `allowAbsoluteUrls: false` when `baseURL` defines a trusted request
-boundary. Absolute and protocol-relative request URLs then fail with a
+Set `allowAbsoluteUrls: false` to reject absolute URL overrides of `baseURL`.
+Absolute and protocol-relative request URLs then fail with a
 `CONFIG_ERROR` before adapters run, including URLs introduced by request
 interceptors or plugin hooks. Without `baseURL`, absolute URLs remain valid.
+
+This is not a destination security boundary: relative `..` segments can leave a
+base path, and redirects can reach a different origin. Validate untrusted input
+against the final resolved origin/path before dispatch. For strict redirect
+policy, use `fetchOptions: { redirect: 'error' }` or a trusted transport that
+validates each redirect; checking `response.raw.url` is too late to prevent it.
 
 `fetchOptions` accepts native `RequestInit` fields except `method`, `headers`,
 `body`, and `signal`, which have dedicated options. Common values include
@@ -271,7 +278,27 @@ release resources.
 | `signal` | `AbortSignal` | none | Cancel the request with the platform Abort API. |
 | `maxRequestSize` | `number` | `Infinity` | Maximum serialized or streamed request bytes. |
 | `maxResponseSize` | `number` | `Infinity` | Maximum parsed or streamed response bytes. |
+| `streamIdleTimeout` | `number` | disabled | Maximum wait for a new streaming body chunk in milliseconds; `0` disables it. |
+| `maxStreamLineSize` | `number` | `Infinity` | Maximum UTF-8 bytes per decoded SSE/NDJSON line, excluding CR/LF delimiters. |
+| `maxSseEventSize` | `number` | `Infinity` | Maximum UTF-8 bytes in all non-empty lines of an SSE event, excluding delimiters. |
 | `maxErrorResponseSize` | `number` | `10 MiB` | Maximum bytes parsed into a thrown `HTTP_ERROR.data`. |
+
+The streaming guards apply to Fetch `stream`, `sse`, and `ndjson` responses;
+line/event limits apply only to the matching parsers. Size violations throw
+`RESPONSE_TOO_LARGE`, including during iteration. SSE event accounting includes
+field prefixes, comments, and ignored fields, and resets on each empty line.
+The initial UTF-8 BOM removed by decoding is not counted. Limits are checked
+incrementally across chunks; they do not prevent the transport from allocating
+one oversized chunk before it reaches the parser.
+
+`streamIdleTimeout` starts with each underlying body read and resets when that
+read delivers a chunk, including an empty chunk. It excludes time spent waiting
+for response headers and pauses when backpressure prevents another source read.
+The wrapper may prefetch one chunk. Use `timeout`/`totalTimeout` for hard elapsed
+time budgets, including servers that send heartbeat bytes indefinitely. Idle
+timeouts throw `TIMEOUT_ERROR` and release the reader without waiting for source
+cancellation hooks to finish. The options can be inherited from client defaults
+and disabled per call with `streamIdleTimeout: 0` or size limits of `Infinity`.
 
 `timeout` applies independently to each transport attempt. `totalTimeout`
 starts when the client call begins and bounds hooks, retries, retry delays,

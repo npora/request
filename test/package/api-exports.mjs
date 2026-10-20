@@ -238,11 +238,11 @@ for (const packageModule of [module, commonJSModule]) {
   for (const exportName of runtimeExports) {
     const exported = packageModule[exportName]
 
-    if (typeof exported === 'function' && /^[A-Z]/.test(exportName)) {
+    if (typeof exported === 'function') {
       assert.equal(
         exported.name,
         exportName,
-        `Exported constructor name changed for ${exportName}.`
+        `Exported function or constructor name changed for ${exportName}.`
       )
     }
   }

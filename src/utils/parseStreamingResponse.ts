@@ -11,10 +11,14 @@ import type {
 import { validateStandardSchemaValue } from './validateStandardSchema'
 import type { SseControlObserver } from './sseControl'
 import { withEarlyIteratorCleanup } from './withEarlyIteratorCleanup'
+import { createAbortError } from './createAbortError'
+
+const encoder = new TextEncoder()
 
 interface StreamingParserContext {
   config: RequestConfig
   response: Response
+  signal?: AbortSignal | null
   start(): void
 }
 
@@ -24,11 +28,13 @@ interface StreamingParserContext {
 export function parseServerSentEvents<T = ServerSentEvent>(
   response: Response,
   config: RequestConfig,
-  observer?: SseControlObserver
+  observer?: SseControlObserver,
+  signal = config.signal
 ): AsyncIterable<T> {
   return withEarlyIteratorCleanup(start => decodeServerSentEvents<T>(response.body, {
     config,
     response,
+    signal,
     start
   }, observer), () => response.body?.cancel())
 }
@@ -39,11 +45,13 @@ export function parseServerSentEvents<T = ServerSentEvent>(
  */
 export function parseNdjson<T>(
   response: Response,
-  config: RequestConfig
+  config: RequestConfig,
+  signal = config.signal
 ): AsyncIterable<T> {
   return withEarlyIteratorCleanup(start => decodeNdjson<T>(response.body, {
     config,
     response,
+    signal,
     start
   }), () => response.body?.cancel())
 }
@@ -60,7 +68,7 @@ async function* decodeServerSentEvents<T>(
   let retry: number | undefined = observer?.initialRetry
   let itemIndex = 0
 
-  for await (const line of decodeLines(stream, context)) {
+  for await (const line of decodeLines(stream, context, true)) {
     if (line === '') {
       if (data.length > 0) {
         const item: ServerSentEvent = {
@@ -168,6 +176,7 @@ async function validateStreamingItem<T>(
   location: StreamingSchemaLocation,
   kind: 'SSE' | 'NDJSON'
 ): Promise<T> {
+  checkSignal(context)
   const schema = context.config.itemSchema
 
   if (!schema) {
@@ -179,7 +188,14 @@ async function validateStreamingItem<T>(
     status: context.response.status,
     statusText: context.response.statusText,
     headers: context.response.headers,
-    config: context.config,
+    config: context.signal && context.signal !== context.config.signal
+      ? {
+          ...context.config,
+          signal: context.config.signal
+            ? AbortSignal.any([context.config.signal, context.signal])
+            : context.signal
+        }
+      : context.config,
     raw: context.response
   }
   const locationText = kind === 'NDJSON'
@@ -201,7 +217,8 @@ async function validateStreamingItem<T>(
 
 async function* decodeLines(
   stream: ReadableStream<Uint8Array> | null,
-  context: StreamingParserContext
+  context: StreamingParserContext,
+  sse = false
 ): AsyncGenerator<string> {
   if (!stream) {
     return
@@ -212,10 +229,29 @@ async function* decodeLines(
   let fragments: string[] = []
   let skipLF = false
   let completed = false
+  let fragmentSize = 0
+  let eventSize = 0
+  let streamError: unknown
+  void reader.closed.catch(error => { streamError = error })
+  const check = () => {
+    checkSignal(context)
+    if (streamError !== undefined) throw streamError
+  }
+  const lineLimit = context.config.maxStreamLineSize
+  const eventLimit = sse ? context.config.maxSseEventSize : undefined
+  const measure = (text: string) => {
+    if (Number.isFinite(lineLimit) || Number.isFinite(eventLimit)) {
+      fragmentSize += encoder.encode(text).byteLength
+      checkSize(fragmentSize, lineLimit, 'maxStreamLineSize', context)
+      checkSize(eventSize + fragmentSize, eventLimit, 'maxSseEventSize', context)
+    }
+  }
 
   try {
     while (true) {
+      check()
       const result = await reader.read()
+      check()
       completed = result.done
       const chunk = completed
         ? decoder.decode()
@@ -234,6 +270,7 @@ async function* decodeLines(
         if (character !== '\n' && character !== '\r') continue
 
         let line = chunk.slice(start, index)
+        measure(line)
         if (fragments.length > 0) {
           fragments.push(line)
           line = fragments.join('')
@@ -245,15 +282,23 @@ async function* decodeLines(
           else if (index + 1 === chunk.length) skipLF = true
         }
         start = index + 1
+        eventSize = line === '' ? 0 : eventSize + fragmentSize
+        check()
         yield line
+        fragmentSize = 0
       }
 
       // Keep unfinished lines as fragments instead of concatenating and
       // rescanning the growing prefix on every read.
-      if (start < chunk.length) fragments.push(chunk.slice(start))
+      if (start < chunk.length) {
+        const tail = chunk.slice(start)
+        measure(tail)
+        fragments.push(tail)
+      }
       if (completed) break
     }
 
+    check()
     if (fragments.length > 0) yield fragments.join('')
   } catch (error) {
     if (isRequestError(error)) {
@@ -268,13 +313,37 @@ async function* decodeLines(
   } finally {
     try {
       if (!completed) {
-        await reader.cancel()
+        // A source's cancellation hook may never settle. Release ownership
+        // and preserve the parser result without waiting for external cleanup.
+        void reader.cancel().catch(() => {})
       }
     } catch {
       // Preserve the parser result or original stream error.
     } finally {
       reader.releaseLock()
     }
+  }
+}
+
+function checkSignal(context: StreamingParserContext): void {
+  if (context.config.signal?.aborted) {
+    throw createAbortError(context.config.signal.reason, context.config)
+  }
+  if (context.signal?.aborted) {
+    throw createAbortError(context.signal.reason, context.config)
+  }
+}
+
+function checkSize(
+  size: number,
+  maximum: number | undefined,
+  option: string,
+  context: StreamingParserContext
+): void {
+  if (maximum !== undefined && size > maximum) {
+    throw new RequestError(`Streaming response exceeds ${option} ${maximum}`, {
+      code: 'RESPONSE_TOO_LARGE', status: context.response.status, config: context.config
+    })
   }
 }
 
