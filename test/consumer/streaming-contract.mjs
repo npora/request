@@ -83,5 +83,30 @@ export async function checkStreamingContract({ createClient, isRequestError }, f
     await rejected
   } finally { idleReader.releaseLock() }
   assert.equal(aborted, true)
+
+  const inherited = new AbortController()
+  let connections = 0
+  const reconnecting = createClient({
+    signal: inherited.signal,
+    totalTimeout: 5000,
+    fetch: async () => {
+      connections++
+      return new Response('data: first\n\n', {
+        headers: { 'content-type': 'text/event-stream' }
+      })
+    }
+  }).extend()
+  const iterator = (await reconnecting.sse('https://example.test/reconnect', {
+    reconnect: { maxAttempts: 1, delay: 1000 }
+  }))[Symbol.asyncIterator]()
+  assert.equal((await iterator.next()).value.data, 'first')
+  const next = iterator.next()
+  let outcome = 'pending'
+  void next.then(() => { outcome = 'resolved' }, error => { outcome = error.code })
+  await new Promise(resolve => setImmediate(resolve))
+  inherited.abort()
+  await new Promise(resolve => setImmediate(resolve))
+  assert.equal(outcome, 'ABORT_ERROR', 'inherited cancellation must interrupt the reconnect delay')
+  assert.equal(connections, 1)
   console.log(`Installed ${format} streaming contracts passed.`)
 }

@@ -211,6 +211,9 @@ for await (const event of events) {
 The reconnecting iterator sends the latest server `id` as `Last-Event-ID` on
 the next connection, including an empty ID that clears an inherited cursor.
 A valid server `retry` field replaces `delay` and is capped by `maxDelay`.
+The request signal (including one inherited from client defaults) also cancels
+the wait between connections. A request-level `signal` overrides that default;
+explicit `signal: undefined` removes it.
 Each connection uses its own `timeout` and `totalTimeout`. The initial request
 still rejects immediately if it fails; later network, timeout, or stream read
 failures may use the remaining reconnect attempts. HTTP status, schema,
