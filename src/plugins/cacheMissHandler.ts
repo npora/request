@@ -1,6 +1,6 @@
 import type { CacheOptions } from '../types'
 import type { RequestContext } from '../core/RequestContext'
-import { waitForSignal } from '../utils/waitForSignal'
+import { waitForPending, waitForSignal } from '../utils/waitForSignal'
 import type { CacheEntry, CacheRefreshLease } from './cacheStores'
 import type { CacheGeneration } from './cacheShared'
 import {
@@ -32,7 +32,7 @@ export function createCacheMissHandler(
   handleCacheRecord: CacheRecordHandler
 ): CacheMissHandler {
   const {
-    keyGenerations, recordEvent, unsharedGenerations, rawInFlight, inFlight,
+    keyGenerations, recordEvent, rawInFlight, inFlight,
     cacheHits, store, refreshLeases, forcedRevalidations, rawLeaders,
     leaders, revalidations
   } = state
@@ -56,137 +56,121 @@ export function createCacheMissHandler(
       return
     }
 
-    if (!(cache.dedupe ?? options.dedupe ?? true)) {
-      if (!requestContext.background) {
-        recordEvent('miss')
-      }
-      unsharedGenerations.set(requestContext, requestGeneration)
-      return
-    }
+    if (cache.dedupe ?? options.dedupe ?? true) {
+      const pending = requestContext.preserveRaw
+        ? rawInFlight.get(key)
+        : inFlight.get(key) ?? rawInFlight.get(key)
 
-    const pending = requestContext.preserveRaw
-      ? rawInFlight.get(key)
-      : inFlight.get(key) ?? rawInFlight.get(key)
-
-    if (pending) {
-      recordEvent('deduplicated')
-      return waitForSharedRecord(
-        getInFlightPromise(pending),
-        requestContext.config
-      ).then(sharedRecord => {
-        if (!sharedRecord) {
-          return
-        }
-
-        requestContext.response = createCachedResponse(
-          sharedRecord,
+      if (pending) {
+        recordEvent('deduplicated')
+        return waitForSharedRecord(
+          getInFlightPromise(pending),
           requestContext.config
-        )
-        cacheHits.add(requestContext)
-        requestContext.cacheHit = true
-      })
-    }
+        ).then(sharedRecord => {
+          if (!sharedRecord) {
+            return
+          }
 
-    const acquireRefreshLease = store.acquireRefreshLease
-
-    if (
-      acquireRefreshLease &&
-      !refreshLeases.has(requestContext)
-    ) {
-      let acquisition: Promise<CacheRefreshLease>
-
-      try {
-        const requested = acquireRefreshLease.call(
-          store,
-          key,
-          requestContext.config.signal
-        )
-        acquisition = requestContext.config.signal
-          ? waitForSignal(
-              () => requested,
-              requestContext.config
-            )
-          : requested
-      } catch {
-        const fallbackLease: CacheRefreshLease = {
-          contended: false,
-          release() {}
-        }
-        refreshLeases.set(requestContext, fallbackLease)
-        return handleCacheRecord(
-          requestContext,
-          cache,
-          key,
-          staleRecord,
-          requestGeneration
-        )
-      }
-
-      return acquisition.then(lease => {
-        refreshLeases.set(requestContext, lease)
-        ownedRefreshLeases.add(lease)
-
-        if (lease.contended) {
-          forcedRevalidations.delete(requestContext)
-          recordEvent('deduplicated')
-        }
-
-        return Promise.resolve(readStore(store, key)).then(record => {
-          return handleCacheRecord(
-            requestContext,
-            cache,
-            key,
-            record,
-            requestGeneration
+          requestContext.response = createCachedResponse(
+            sharedRecord,
+            requestContext.config
           )
+          cacheHits.add(requestContext)
+          requestContext.cacheHit = true
         })
-      }, error => {
-        if (requestContext.config.signal?.aborted) {
-          throw error
-        }
-
-        const fallbackLease: CacheRefreshLease = {
-          contended: false,
-          release() {}
-        }
-        refreshLeases.set(requestContext, fallbackLease)
-        return handleCacheRecord(
-          requestContext,
-          cache,
-          key,
-          staleRecord,
-          requestGeneration
-        )
-      })
-    }
-
-    if (requestContext.preserveRaw) {
-      const dataPending = inFlight.get(key)
-
-      if (dataPending) {
-        dataPending.rawDemanded = true
       }
-    }
 
-    const created = createInFlightRequest(
-      requestContext,
-      key,
-      requestGeneration
-    )
+      const acquireRefreshLease = store.acquireRefreshLease
 
-    if (requestContext.preserveRaw) {
-      rawInFlight.set(key, created)
-      rawLeaders.add(requestContext)
-    } else {
-      inFlight.set(key, created)
+      if (
+        acquireRefreshLease &&
+        !refreshLeases.has(requestContext)
+      ) {
+        let acquisition: Promise<CacheRefreshLease>
+        const fallback = () => {
+          refreshLeases.set(requestContext, { contended: false, release() {} })
+          return handleCacheRecord(
+            requestContext, cache, key, staleRecord, requestGeneration
+          )
+        }
+
+        try {
+          const requested = acquireRefreshLease.call(
+            store,
+            key,
+            requestContext.config.signal
+          ).then(lease => {
+            // Observe the original acquisition even when cancellation wins the wait.
+            if (!installation.active || requestContext.config.signal?.aborted) {
+              lease.release()
+            } else {
+              refreshLeases.set(requestContext, lease)
+              ownedRefreshLeases.add(lease)
+            }
+            return lease
+          })
+          acquisition = waitForPending(requested, requestContext.config)
+        } catch {
+          return fallback()
+        }
+
+        return acquisition.then(lease => {
+          if (!installation.active) return
+
+          if (lease.contended) {
+            forcedRevalidations.delete(requestContext)
+            recordEvent('deduplicated')
+          }
+
+          return waitForSignal(
+            () => readStore(store, key), requestContext.config
+          ).then(record => {
+            return handleCacheRecord(
+              requestContext,
+              cache,
+              key,
+              record,
+              requestGeneration
+            )
+          })
+        }, error => {
+          if (requestContext.config.signal?.aborted) {
+            throw error
+          }
+
+          return fallback()
+        })
+      }
+
+      if (requestContext.preserveRaw) {
+        const dataPending = inFlight.get(key)
+
+        if (dataPending) {
+          dataPending.rawDemanded = true
+        }
+      }
+
+      const created = createInFlightRequest(
+        requestContext,
+        key,
+        requestGeneration
+      )
+
+      if (requestContext.preserveRaw) {
+        rawInFlight.set(key, created)
+        rawLeaders.add(requestContext)
+      } else {
+        inFlight.set(key, created)
+      }
+      leaders.set(requestContext, created)
+      ownedLeaders.add(requestContext)
     }
-    leaders.set(requestContext, created)
-    ownedLeaders.add(requestContext)
 
     if (!requestContext.background) {
       recordEvent('miss')
     }
 
+    // Sharing and conditional revalidation are independent cache policies.
     if (
       staleRecord &&
       prepareConditionalRevalidation(

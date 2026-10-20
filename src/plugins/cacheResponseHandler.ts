@@ -3,7 +3,6 @@ import { isPromiseLike } from '../utils/isPromiseLike'
 import { waitForSignal } from '../utils/waitForSignal'
 import { resolveExtensionConfig } from './resolveExtensionConfig'
 import { isCacheableRequest, isAsyncIterable } from './cacheLifecycle'
-import { createCacheKey } from './cacheKey'
 import {
   isCurrentCacheGeneration,
   deleteStore,
@@ -28,10 +27,6 @@ export function createCacheResponseHandler(state: CacheState) {
     methods,
     noStoreRequests,
     revalidations,
-    varyHeaders,
-    emptyHeaderValues,
-    keyMemo,
-    unsharedGenerations,
     requestGenerations,
     keyGenerations,
     completedRecords,
@@ -96,23 +91,18 @@ export function createCacheResponseHandler(state: CacheState) {
     }
 
     const leader = leaders.get(requestContext)
-    const key = leader?.key ?? createCacheKey(
-      requestContext.config,
-      cache,
-      varyHeaders,
-      emptyHeaderValues,
-      keyMemo
-    )
+    const generation = leader?.generation ??
+      requestGenerations.get(requestContext)
+    if (!generation) return
+
+    // Retain the original identity when conditional headers change the config.
+    const key = generation.key
     const currentGeneration = isCurrentCacheGeneration(
-      leader?.generation ??
-        unsharedGenerations.get(requestContext) ??
-        requestGenerations.get(requestContext),
+      generation,
       state.generation,
       keyGenerations
     )
-    const generationTags = (
-      leader?.generation ?? requestGenerations.get(requestContext)
-    )?.token.tags
+    const generationTags = generation.token.tags
     const entryTags = generationTags && generationTags.size > 0
       ? [...generationTags]
       : revalidation?.tags
