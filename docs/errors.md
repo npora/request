@@ -110,6 +110,13 @@ resources. Merely inspecting an already parsed JSON `error.data` object does not
 consume a stream. Reading `error.response.raw` or iterating stream-valued data
 does consume it, so assign one owner to that operation.
 
+Abort signals and request deadlines discard queued stream data and release the
+library's reader/timer resources without waiting for a source's pending cleanup
+promise. Source cancellation is still requested and late cancellation failures
+are observed. This does not make an uncooperative custom source finish its own
+external cleanup, or change the native promise contract of an explicit reader
+`cancel()` call.
+
 ## Log selected metadata
 
 `error.toJSON()` includes name, message, code, and optional status, omitting

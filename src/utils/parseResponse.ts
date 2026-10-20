@@ -513,12 +513,11 @@ function createResponseStream(
       pendingAbortError = error
       void reader.cancel(error).catch(() => {
         // Preserve the stable cancellation error.
-      }).finally(() => {
-        if (!settled) {
-          settle()
-          streamController.error(error)
-        }
       })
+      // Source cleanup may never settle. Abort must still discard queued data,
+      // release reader ownership, and clear request timers immediately.
+      settle()
+      streamController.error(error)
     }
 
     try {
@@ -527,7 +526,7 @@ function createResponseStream(
       })
 
       if (signal.aborted) {
-        onAbort()
+        onAbort?.()
       }
     } catch (error) {
       void reader.cancel(error).catch(() => {

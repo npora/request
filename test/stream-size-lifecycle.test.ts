@@ -4,6 +4,54 @@ import { createClient } from '../src'
 afterEach(() => { vi.useRealTimers() })
 
 describe('bounded Fetch stream lifecycle', () => {
+  it.each((['stream', 'sse', 'ndjson'] as const).flatMap(responseType =>
+    (['abort', 'timeout', 'totalTimeout'] as const).flatMap(kind =>
+      [false, true].map(lateReject => ({ responseType, kind, lateReject }))
+    )
+  ))(
+    'releases idle $responseType on $kind before source cleanup settles (late reject: $lateReject)', async ({ responseType, kind, lateReject }) => {
+      vi.useFakeTimers()
+      let finishCancel!: () => void
+      const cancel = vi.fn(() => new Promise<void>((resolve, reject) => {
+        finishCancel = lateReject ? () => reject(new Error('late cleanup failure')) : resolve
+      }))
+      const controller = new AbortController()
+      const source = new ReadableStream<Uint8Array>({
+        pull(stream) { stream.enqueue(new TextEncoder().encode('data: queued\n\n')) },
+        cancel
+      }, { highWaterMark: 0 })
+      const response = await createClient({ fetch: async () => new Response(source) })
+        .getResponse<ReadableStream<Uint8Array> | AsyncIterable<unknown>>('https://example.test/idle', {
+          responseType, signal: controller.signal, maxResponseSize: 100,
+          timeout: kind === 'totalTimeout' ? 0 : 1000,
+          totalTimeout: kind === 'totalTimeout' ? 1000 : undefined
+        })
+      try {
+        // Allow one prefetched chunk to fill the wrapper, leaving no pending read.
+        await vi.advanceTimersByTimeAsync(0)
+        if (kind === 'abort') controller.abort()
+        await vi.advanceTimersByTimeAsync(kind === 'abort' ? 0 : 1000)
+        expect(cancel).toHaveBeenCalledTimes(1)
+        expect(source.locked).toBe(false)
+        expect(vi.getTimerCount()).toBe(0)
+        const consume = async () => {
+          if (response.data instanceof ReadableStream) {
+            const reader = response.data.getReader()
+            try { await reader.read() } finally { reader.releaseLock() }
+          } else {
+            for await (const value of response.data) void value
+          }
+        }
+        await expect(consume()).rejects.toMatchObject({
+          code: kind === 'abort' ? 'ABORT_ERROR' : 'TIMEOUT_ERROR'
+        })
+      } finally {
+        finishCancel?.()
+        await vi.advanceTimersByTimeAsync(0)
+      }
+    }
+  )
+
   it.each(['stream', 'sse', 'ndjson'] as const)(
     'keeps %s size errors authoritative when source cancellation rejects', async responseType => {
       vi.useFakeTimers()
