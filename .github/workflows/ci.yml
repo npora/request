@@ -105,6 +105,9 @@ jobs:
       - name: Run session workflow example
         run: pnpm example:session
 
+      - name: Run Axios migration example
+        run: pnpm example:axios-migration
+
       - name: Typecheck benchmarks
         run: pnpm benchmark:types
 
