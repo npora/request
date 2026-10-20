@@ -251,11 +251,10 @@ function finalizeRetryDecision(
     }
   }
 
-  const elapsedTime = Math.max(0, Date.now() - startTime)
   const pendingEvent = {
     attempt: attempt + 1,
     delay: baseDelay,
-    elapsedTime,
+    elapsedTime: Math.max(0, Date.now() - startTime),
     error
   }
   const jitteredDelay =
@@ -265,30 +264,29 @@ function finalizeRetryDecision(
 
   if (isPromiseLike(jitteredDelay)) {
     return Promise.resolve(jitteredDelay).then(delay => {
-      return completeRetryDecision(options, pendingEvent, delay)
+      return completeRetryDecision(options, pendingEvent, delay, startTime)
     })
   }
 
-  return completeRetryDecision(options, pendingEvent, jitteredDelay)
+  return completeRetryDecision(options, pendingEvent, jitteredDelay, startTime)
 }
 
 function completeRetryDecision(
   options: NormalizedRetryOptions,
   pendingEvent: Readonly<RetryEvent>,
-  jitteredDelay: number
+  jitteredDelay: number,
+  startTime: number
 ): { retry: true; delay: number } | undefined {
   const delay = normalizeRetryDelay(jitteredDelay, options.maxDelay)
   const event = {
     ...pendingEvent,
-    delay
+    delay,
+    elapsedTime: Math.max(0, Date.now() - startTime)
   }
 
   if (
-    exceedsElapsedTimeBudget(
-      pendingEvent.elapsedTime,
-      delay,
-      options.maxElapsedTime
-    )
+    event.elapsedTime >= options.maxElapsedTime ||
+    event.elapsedTime + delay > options.maxElapsedTime
   ) {
     return undefined
   }
@@ -440,17 +438,6 @@ function applyJitter(
   }
 
   return jitter(event)
-}
-
-function exceedsElapsedTimeBudget(
-  elapsedTime: number,
-  delay: number,
-  maxElapsedTime: number
-): boolean {
-  return (
-    elapsedTime >= maxElapsedTime ||
-    elapsedTime + delay > maxElapsedTime
-  )
 }
 
 function notifyRetry(

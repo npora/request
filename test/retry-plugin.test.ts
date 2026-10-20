@@ -12,6 +12,50 @@ afterEach(() => {
 })
 
 describe('retryPlugin', () => {
+  it.each([false, true])('counts custom jitter work against the retry budget (async: %s)', async asynchronous => {
+    vi.useFakeTimers()
+    vi.setSystemTime(1000)
+    const fetchMock = vi.fn(async () => new Response('Busy', { status: 503 }))
+    const onRetry = vi.fn()
+    const request = createClient({ fetch: fetchMock }).use(retryPlugin({
+      retries: 1,
+      delay: 0,
+      maxElapsedTime: 50,
+      jitter: () => {
+        vi.setSystemTime(1100)
+        return asynchronous ? Promise.resolve(0) : 0
+      },
+      onRetry
+    }))
+
+    await expect(request.get('/busy')).rejects.toMatchObject({ code: 'HTTP_ERROR', status: 503 })
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(onRetry).not.toHaveBeenCalled()
+  })
+
+  it('reports elapsed time after asynchronous jitter when a retry remains within budget', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(1000)
+    const onRetry = vi.fn()
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response('Busy', { status: 503 }))
+      .mockResolvedValueOnce(new Response('OK'))
+    const request = createClient({ fetch: fetchMock }).use(retryPlugin({
+      retries: 1,
+      delay: 0,
+      maxElapsedTime: 50,
+      jitter: async () => {
+        vi.setSystemTime(1020)
+        return 0
+      },
+      onRetry
+    }))
+
+    await expect(request.get('/busy')).resolves.toBe('OK')
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    expect(onRetry).toHaveBeenCalledWith(expect.objectContaining({ elapsedTime: 20, delay: 0 }))
+  })
+
   it('should retry when request fails with 500', async () => {
     const fetchMock = vi
       .fn()

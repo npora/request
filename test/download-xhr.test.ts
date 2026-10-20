@@ -106,6 +106,24 @@ afterEach(() => {
 })
 
 describe('downloadPlugin XMLHttpRequest fallback', () => {
+  it.each(['json', 'text', 'stream'] as const)('keeps HEAD responses bodyless with responseType %s', async responseType => {
+    scenario = xhr => {
+      xhr.response = new Blob([])
+      xhr.responseHeaders = 'content-type: application/json\r\ncontent-length: 100\r\n'
+      xhr.load()
+    }
+    const request = createClient().use(downloadPlugin({ transport: 'xhr' }))
+    const response = await request.headResponse('/metadata', {
+      responseType,
+      maxResponseSize: 0,
+      extensions: { download: { onProgress() {} } }
+    })
+
+    expect(response.data).toBeUndefined()
+    expect(response.raw.body).toBeNull()
+    expect(response.headers.get('content-length')).toBe('100')
+  })
+
   it('should parse buffered XHR bytes as Uint8Array', async () => {
     scenario = xhr => {
       xhr.response = new Blob([new Uint8Array([1, 2, 3, 4])])

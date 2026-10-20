@@ -26,6 +26,51 @@ afterEach(() => {
 })
 
 describe('authPlugin refresh token', () => {
+  it.each([false, true])('does not replay a consumed upload after 401 (custom refresh policy: %s)', async customPolicy => {
+    const refreshToken = vi.fn(() => 'new-token')
+    const shouldRefresh = vi.fn(() => true)
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      await new Response(init?.body).text()
+      return createJsonResponse({ error: 'unauthorized' }, 401)
+    })
+    const request = createClient({ fetch: fetchMock }).use(authPlugin({
+      token: 'old-token',
+      refreshToken,
+      ...(customPolicy ? { shouldRefresh } : {})
+    }))
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode('upload'))
+        controller.close()
+      }
+    })
+
+    await expect(request.post('/upload', { body })).rejects.toMatchObject({ code: 'HTTP_ERROR', status: 401 })
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(refreshToken).not.toHaveBeenCalled()
+    expect(shouldRefresh).not.toHaveBeenCalled()
+  })
+
+  it('does not replay the body of a native Request after 401', async () => {
+    const refreshToken = vi.fn(() => 'new-token')
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const body = input instanceof Request ? input.body : init?.body
+      expect(await new Response(body).text()).toBe('upload')
+      return createJsonResponse({ error: 'unauthorized' }, 401)
+    })
+    const request = createClient({ fetch: fetchMock }).use(authPlugin({
+      token: 'old-token',
+      refreshToken
+    }))
+
+    await expect(request.request(new Request('https://example.test/upload', {
+      method: 'POST',
+      body: 'upload'
+    }))).rejects.toMatchObject({ code: 'HTTP_ERROR', status: 401 })
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(refreshToken).not.toHaveBeenCalled()
+  })
+
   it('should pass bare authorization headers to custom adapters', async () => {
     let receivedHeaders: Headers | undefined
     const adapter: Adapter = {

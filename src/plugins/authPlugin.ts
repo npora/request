@@ -6,6 +6,7 @@ import { createAbortError } from '../utils/createAbortError'
 import { isPromiseLike } from '../utils/isPromiseLike'
 import { waitForSignal } from '../utils/waitForSignal'
 import { resolveExtensionConfig } from './resolveExtensionConfig'
+import { isReadableStream } from '../utils/isReadableStream'
 
 type MaybePromise<T> = T | Promise<T>
 
@@ -91,7 +92,12 @@ export function authPlugin(options: AuthPluginOptions = {}): Plugin {
       context.hooks.onRetry(requestContext => {
         const refreshToken = options.refreshToken
 
-        if (!refreshToken || !requestContext.error) {
+        // A Fetch upload stream cannot be replayed after the first attempt.
+        if (
+          !refreshToken ||
+          !requestContext.error ||
+          isReadableStream(requestContext.config.body)
+        ) {
           return undefined
         }
 

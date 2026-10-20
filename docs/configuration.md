@@ -663,7 +663,10 @@ Requires `authPlugin()`.
 | `scheme` | `Bearer` | Authorization scheme. |
 
 The built-in refresh decision handles HTTP 401. A successful refresh retries
-the logical request once, including XHR progress transfers.
+the logical request once, including XHR progress transfers. Requests with a
+`ReadableStream` body (including bodies inherited from a native `Request`)
+are not refreshed or retried because the upload cannot be replayed. Their
+original HTTP error is preserved; create a fresh body for an application retry.
 
 ### `extensions.logger`
 
