@@ -33,6 +33,78 @@ and discard the client. Create a new session client when another user signs in.
 Do not reuse a previous user's cache or mutate their token storage in place
 while requests remain active.
 
+## Keep account transitions isolated
+
+Run the [session isolation example](../examples/session-isolation.ts):
+
+```sh
+node --import tsx examples/session-isolation.ts
+```
+
+It exercises two accounts against the same URLs through the real FetchAdapter
+with an in-memory Fetch function. Overlapping 401 responses for different
+endpoints share one refresh. Cached profiles stay private to each session.
+Logging out cancels an active old-session request, clears its cache and token,
+and rejects further use; the other account's token and cached profile survive.
+The example runs in CI without a server or credentials.
+
+Give each session its own AbortController, client, auth plugin, token storage,
+and cache. Combine the session signal with any view/query signal:
+
+```ts
+const effectiveSignal = AbortSignal.any([sessionSignal, viewSignal])
+await api.get('/profile', { signal: effectiveSignal })
+```
+
+A per-call signal replaces an inherited signal. Passing only a view's signal
+can therefore bypass a client-default logout signal. Compose both explicitly.
+Refresh requests should use the session signal and their own deadline, so one
+view can cancel independently while logout still stops session-owned work.
+Close the application-facing session facade first, abort requests, wait for its
+tracked requests to settle, clear cached data and credentials, and remove its
+plugins. Do not hand a discarded client's instance to the next account.
+
+## Use an application query cache
+
+When TanStack Query, SWR, or another application data layer owns server state,
+start with Npora's HTTP cache disabled. Keep authentication, transport errors,
+runtime validation, and request cancellation in the request layer; keep UI query
+identity, subscriptions, refresh policy, and mutation-driven UI invalidation in
+the application layer. HTTP cache tags do not invalidate an application's query
+entries, and invalidating a UI query does not necessarily invalidate an HTTP TTL
+entry. Enabling both needs an explicit invalidation policy for both stores.
+
+Use an account-scoped query identity, such as `['profile', accountId]`, rather
+than only the endpoint URL. Include tenant or other representation identity
+when needed; never put access tokens into UI query keys. Clear user-specific
+query state on logout in addition to disposing the request session. On the
+server, isolate both the query state and request client per user/request.
+
+A query function can forward the data layer's signal without adding a framework
+dependency to the client:
+
+```ts
+import type { Client } from '@npora/request/core'
+
+function profileLoader(api: Client, sessionSignal: AbortSignal) {
+  return ({ signal }: { signal: AbortSignal }) => api.get('/profile', {
+    signal: AbortSignal.any([sessionSignal, signal]),
+    extensions: { cache: { enabled: false } }
+  })
+}
+```
+
+Choose which layer owns retries too. If the query layer retries the whole call
+and the HTTP plugin retries each attempt, their attempt counts multiply. Set
+one retry policy deliberately and use `totalTimeout` to bound each logical HTTP
+call. A stream is a live resource rather than a reusable parsed snapshot; own
+its reader/iterator in a view or session effect, abort it on teardown, and keep
+only derived application data in a query cache.
+
+The isolation example intentionally enables HTTP caching to verify session
+boundaries. It is not a framework query-cache configuration or a promise that
+cancelling a query automatically clears either cache.
+
 ## Read and validate data
 
 Use a TypeScript generic when the response shape is already trusted. A generic
@@ -280,6 +352,17 @@ service or credentials:
 
 ```sh
 pnpm example:auth-refresh
+```
+
+## Handle failures at the owning boundary
+
+Use the [error-handling guide](errors.md) to distinguish HTTP statuses, schema
+failures, cancellation, and local queue admission. Catch stream failures while
+iterating, and rethrow unknown application errors. Run the
+[offline failure example](../examples/errors.ts) to verify these decisions:
+
+```sh
+node --import tsx examples/errors.ts
 ```
 
 ## Cache selected reads

@@ -62,117 +62,22 @@ export function finalizeStreamingResponse(
   response: Response,
   signal: AbortSignal | null | undefined,
   config: RequestConfig,
-  finalize: () => void
+  finalize: () => void,
+  maxSize = Number.POSITIVE_INFINITY
 ): Response {
   if (!response.body) {
     finalize()
     return response
   }
 
-  const reader = response.body.getReader()
-  let settled = false
-  let pendingAbortError: unknown
-  let onAbort: (() => void) | undefined
-  let streamController: ReadableStreamDefaultController<Uint8Array>
-
-  const settle = () => {
-    if (settled) {
-      return
-    }
-
-    settled = true
-    if (onAbort) {
-      try {
-        signal?.removeEventListener('abort', onAbort)
-      } catch {
-        // Cleanup must continue if a custom signal rejects removal.
-      }
-      onAbort = undefined
-    }
-    reader.releaseLock()
-    finalize()
-  }
-  const stream = new ReadableStream<Uint8Array>({
-    start(controller) {
-      streamController = controller
-    },
-
-    async pull(controller) {
-      try {
-        const result = await reader.read()
-
-        if (pendingAbortError) {
-          const error = pendingAbortError
-
-          settle()
-          controller.error(error)
-          return
-        }
-
-        if (settled) {
-          return
-        }
-
-        if (result.done) {
-          settle()
-          controller.close()
-          return
-        }
-
-        controller.enqueue(result.value)
-      } catch (error) {
-        if (settled) {
-          return
-        }
-
-        settle()
-        controller.error(streamingReadError(error, signal, config))
-      }
-    },
-
-    async cancel(reason) {
-      try {
-        await reader.cancel(reason)
-      } finally {
-        settle()
-      }
-    }
-  })
-
-  if (signal) {
-    onAbort = () => {
-      if (settled || pendingAbortError !== undefined) {
-        return
-      }
-
-      const error = streamingReadError(signal.reason, signal, config)
-
-      pendingAbortError = error
-      void reader.cancel(error).catch(() => {
-        // Preserve the stable cancellation error.
-      }).finally(() => {
-        if (!settled) {
-          settle()
-          streamController.error(error)
-        }
-      })
-    }
-
-    try {
-      signal.addEventListener('abort', onAbort, {
-        once: true
-      })
-
-      if (signal.aborted) {
-        onAbort()
-      }
-    } catch (error) {
-      void reader.cancel(error).catch(() => {
-        // Preserve the listener registration error.
-      }).finally(settle)
-      throw error
-    }
-  }
+  rejectOversizedContentLength(response, maxSize, config)
+  const stream = createResponseStream(
+    response,
+    config,
+    maxSize,
+    signal,
+    finalize
+  )
   const wrapped = new Response(stream, {
     status: response.status,
     statusText: response.statusText,
@@ -200,6 +105,14 @@ export async function parseResponse<T = unknown>(
   const maxSize = responseSizeLimit
 
   try {
+    if (isStreamingResponseType(responseType)) {
+      if (maxSize !== undefined && Number.isFinite(maxSize)) {
+        rejectOversizedContentLength(response, maxSize, config)
+        response = new Response(limitResponseStream(response, maxSize, config), response)
+      }
+      return parseStreamingResponse<T>(response, responseType, config)
+    }
+
     if (
       readSignal ||
       (maxSize !== undefined && Number.isFinite(maxSize))
@@ -209,16 +122,6 @@ export async function parseResponse<T = unknown>(
         : Number.POSITIVE_INFINITY
 
       rejectOversizedContentLength(response, limit, config)
-
-      if (isStreamingResponseType(responseType)) {
-        const stream = limitResponseStream(response, limit, config)
-
-        return parseStreamingResponse<T>(
-          new Response(stream, response),
-          responseType,
-          config
-        )
-      }
 
       const bytes = await readLimitedBody(
         response,
@@ -255,19 +158,6 @@ export async function parseResponse<T = unknown>(
 
       case 'formData':
         return (await response.formData()) as T
-
-      case 'stream':
-        return response.body as T
-
-      case 'sse':
-        return parseServerSentEvents(
-          response,
-          config,
-          getSseControl(config)
-        ) as T
-
-      case 'ndjson':
-        return parseNdjson(response, config) as T
 
       default:
         return (await response.text()) as T
@@ -517,47 +407,89 @@ function limitResponseStream(
     })
   }
 
-  const reader = response.body.getReader()
+  return createResponseStream(response, config, maxSize)
+}
+
+/** Share reader ownership, size accounting, and cancellation cleanup. */
+function createResponseStream(
+  response: Response,
+  config: RequestConfig,
+  maxSize: number,
+  signal?: AbortSignal | null,
+  finalize?: () => void
+): ReadableStream<Uint8Array> {
+  const reader = response.body!.getReader()
   let size = 0
-  let released = false
+  let settled = false
+  let pendingAbortError: unknown
+  let onAbort: (() => void) | undefined
+  let streamController: ReadableStreamDefaultController<Uint8Array>
 
-  const release = () => {
-    if (!released) {
-      released = true
-      reader.releaseLock()
+  const settle = () => {
+    if (settled) {
+      return
     }
-  }
 
-  return new ReadableStream<Uint8Array>({
+    settled = true
+    if (onAbort) {
+      try {
+        signal?.removeEventListener('abort', onAbort)
+      } catch {
+        // Cleanup must continue if a custom signal rejects removal.
+      }
+      onAbort = undefined
+    }
+    reader.releaseLock()
+    finalize?.()
+  }
+  const stream = new ReadableStream<Uint8Array>({
+    start(controller) {
+      streamController = controller
+    },
+
     async pull(controller) {
       try {
         const result = await reader.read()
 
+        if (pendingAbortError) {
+          const error = pendingAbortError
+
+          settle()
+          controller.error(error)
+          return
+        }
+
+        if (settled) {
+          return
+        }
+
         if (result.done) {
-          release()
+          settle()
           controller.close()
           return
         }
 
         size += result.value.byteLength
-
         if (size > maxSize) {
           const error = createSizeError(response, maxSize, config)
-
           try {
             await reader.cancel(error)
           } catch {
             // Preserve the stable size-limit error.
           }
-          release()
+          settle()
           controller.error(error)
           return
         }
 
         controller.enqueue(result.value)
       } catch (error) {
-        release()
-        controller.error(error)
+        if (settled) {
+          return
+        }
+
+        settle()
+        controller.error(streamingReadError(error, signal, config))
       }
     },
 
@@ -565,10 +497,46 @@ function limitResponseStream(
       try {
         await reader.cancel(reason)
       } finally {
-        release()
+        settle()
       }
     }
   })
+
+  if (signal) {
+    onAbort = () => {
+      if (settled || pendingAbortError !== undefined) {
+        return
+      }
+
+      const error = streamingReadError(signal.reason, signal, config)
+
+      pendingAbortError = error
+      void reader.cancel(error).catch(() => {
+        // Preserve the stable cancellation error.
+      }).finally(() => {
+        if (!settled) {
+          settle()
+          streamController.error(error)
+        }
+      })
+    }
+
+    try {
+      signal.addEventListener('abort', onAbort, {
+        once: true
+      })
+
+      if (signal.aborted) {
+        onAbort()
+      }
+    } catch (error) {
+      void reader.cancel(error).catch(() => {
+        // Preserve the listener registration error.
+      }).finally(settle)
+      throw error
+    }
+  }
+  return stream
 }
 
 function createSizeError(

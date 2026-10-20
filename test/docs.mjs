@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { checkErrorCodeDocs } from './error-code-docs.mjs'
 import {
   existsSync,
   readFileSync,
@@ -18,7 +19,7 @@ const documents = [
   'README.md',
   'CONTRIBUTING.md',
   'SECURITY.md',
-  ...readdirSync(join(root, 'docs'))
+  ...readdirSync(join(root, 'docs'), { recursive: true })
     .filter(file => file.endsWith('.md'))
     .map(file => join('docs', file))
 ]
@@ -68,3 +69,5 @@ assert.deepEqual(
 console.log(
   `Documentation links passed for ${documents.length} files.`
 )
+
+console.log(`Error code documentation matches all ${checkErrorCodeDocs(root)} public codes.`)

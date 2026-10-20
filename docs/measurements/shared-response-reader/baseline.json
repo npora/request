@@ -1,0 +1,101 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-10-20T03:23:25.197Z",
+  "package": {
+    "name": "@npora/request",
+    "version": "1.19.3"
+  },
+  "runtime": {
+    "node": "v24.18.0",
+    "platform": "darwin",
+    "architecture": "arm64",
+    "cpuModel": "Apple M3",
+    "logicalCpus": 8
+  },
+  "provenance": {
+    "gitCommit": "5540154f3bbc5aaddd85ecd34000d29d2e16d023",
+    "gitDirty": true,
+    "buildSha256": "1ff7c87afa34a621c809c2bb6afdfb7ad224d9ba618a9caba4f057563efe4602",
+    "dependencyLockSha256": "3674fb534986655a0dc397a5c6a1953651dfe8b1f9a806072b66c5594b7116ea"
+  },
+  "configuration": {
+    "operations": 200000,
+    "concurrency": 1,
+    "warmup": 10000,
+    "output": "benchmark-results/shared-response-baseline.json",
+    "chunkBytes": 256,
+    "rounds": 5
+  },
+  "results": {
+    "data": {
+      "medianDurationMs": 160.13254100000003,
+      "samples": [
+        {
+          "durationMs": 160.956208,
+          "chunksPerSecond": 1242574.0049740733,
+          "bytes": 51200000,
+          "chunks": 200000
+        },
+        {
+          "durationMs": 160.13254100000003,
+          "chunksPerSecond": 1248965.3804968968,
+          "bytes": 51200000,
+          "chunks": 200000
+        },
+        {
+          "durationMs": 160.36999999999995,
+          "chunksPerSecond": 1247116.0441479082,
+          "bytes": 51200000,
+          "chunks": 200000
+        },
+        {
+          "durationMs": 159.42312500000003,
+          "chunksPerSecond": 1254523.143991814,
+          "bytes": 51200000,
+          "chunks": 200000
+        },
+        {
+          "durationMs": 158.880625,
+          "chunksPerSecond": 1258806.7298954797,
+          "bytes": 51200000,
+          "chunks": 200000
+        }
+      ]
+    },
+    "response": {
+      "medianDurationMs": 218.03920799999992,
+      "samples": [
+        {
+          "durationMs": 218.85704099999998,
+          "chunksPerSecond": 913838.5454091926,
+          "bytes": 51200000,
+          "chunks": 200000
+        },
+        {
+          "durationMs": 218.03920799999992,
+          "chunksPerSecond": 917266.219385644,
+          "bytes": 51200000,
+          "chunks": 200000
+        },
+        {
+          "durationMs": 221.56691699999988,
+          "chunksPerSecond": 902661.8355663635,
+          "bytes": 51200000,
+          "chunks": 200000
+        },
+        {
+          "durationMs": 216.03429200000005,
+          "chunksPerSecond": 925778.9499455945,
+          "bytes": 51200000,
+          "chunks": 200000
+        },
+        {
+          "durationMs": 214.80370800000014,
+          "chunksPerSecond": 931082.6235830149,
+          "bytes": 51200000,
+          "chunks": 200000
+        }
+      ]
+    }
+  }
+}

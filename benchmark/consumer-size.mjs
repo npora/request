@@ -3,7 +3,9 @@ import { mkdir, writeFile } from 'node:fs/promises'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { gzipSync } from 'node:zlib'
-import { build } from 'esbuild'
+import { build, version as bundlerVersion } from 'esbuild'
+import { measurementMetadata } from './provenance.mjs'
+import { summarizeBrowserBundle } from './browser-bundle.mjs'
 
 const root = fileURLToPath(new URL('../', import.meta.url))
 const scenarios = {
@@ -64,6 +66,7 @@ const scenarios = {
 }
 
 const results = {}
+const splitResults = {}
 
 for (const [name, source] of Object.entries(scenarios)) {
   const bundle = await build({
@@ -92,24 +95,54 @@ for (const [name, source] of Object.entries(scenarios)) {
     `No bundle metadata produced for ${name}`
   )
 
+  const splitBundle = await build({
+    stdin: {
+      contents: source, resolveDir: root,
+      sourcefile: 'consumer-entry.js', loader: 'js'
+    },
+    bundle: true, minify: true, treeShaking: true,
+    platform: 'browser', format: 'esm', target: 'es2020',
+    splitting: true, outdir: 'consumer-split',
+    metafile: true, write: false, logLevel: 'silent'
+  })
+  splitResults[name] = summarizeBrowserBundle(splitBundle)
+
   results[name] = {
     bytes: output.byteLength,
     gzipBytes: gzipSync(output, { level: 9 }).byteLength,
-    inputFiles: Object.keys(bundle.metafile.inputs).length
+    inputFiles: Object.keys(bundle.metafile.inputs).length,
+    contributions: Object.entries(bundle.metafile.outputs['consumer-bundle.js'].inputs)
+      .map(([path, input]) => ({ path, bytesInOutput: input.bytesInOutput }))
+      .sort((a, b) => b.bytesInOutput - a.bytesInOutput)
   }
 }
 
 const report = {
-  schemaVersion: 1,
+  schemaVersion: 3,
+  ...measurementMetadata(),
   generatedAt: new Date().toISOString(),
   bundler: 'esbuild',
+  bundlerVersion,
+  gzipLevel: 9,
   platform: 'browser',
   format: 'esm',
   target: 'es2020',
-  results
+  results,
+  splitResults
 }
 
-console.table(results)
+console.table(Object.fromEntries(Object.entries(results).map(
+  ([name, { contributions: _contributions, ...summary }]) => [name, summary]
+)))
+
+console.table(Object.fromEntries(Object.entries(splitResults).map(
+  ([name, result]) => [name, {
+    initialGzipBytes: result.initial.gzipBytes,
+    lazyGzipBytes: result.lazy.gzipBytes,
+    totalGzipBytes: result.total.gzipBytes,
+    files: result.total.files
+  }]
+)))
 
 const args = process.argv.slice(2)
 

@@ -16,7 +16,8 @@ has zero runtime dependencies.
 | Goal | Documentation |
 | --- | --- |
 | Send the first request | [Quick start](#quick-start) |
-| Build a client for an application | [Common workflows](docs/workflows.md) |
+| Move an existing Axios client | [Axios migration guide](docs/axios-migration.md) |
+| Consume SSE or NDJSON | [Streaming responses](#streaming-responses) |
 | Run a complete session workflow | [Session example](docs/workflows.md#build-a-session-client) |
 | Refresh authentication tokens | [Authentication workflow](docs/workflows.md#refresh-authentication-tokens) |
 | Find a client or response API | [API reference](docs/api.md) |
@@ -237,10 +238,9 @@ event ID in `Last-Event-ID` and honors the server's `retry` delay up to
 `maxDelay`. Cancellation, schema errors, and response-size errors stop the
 iterator; each connection uses its own request timeout.
 
-Run `pnpm example:streaming` from this repository for a self-contained local
-demonstration of SSE, validated NDJSON, early termination, cancellation, and
-schema errors. See [streaming workflows](docs/workflows.md#consume-streaming-responses)
-for consumption and error-handling contracts.
+Run `pnpm example:streaming` for a local demonstration. See
+[streaming workflows](docs/workflows.md#consume-streaming-responses) for
+consumption and error-handling contracts.
 
 Native `FormData`, `Blob`, `ArrayBuffer`, and `ReadableStream` request bodies
 also work when created by another same-origin window or iframe. Detection does
@@ -810,14 +810,15 @@ Stable request error codes:
 - `RESPONSE_TOO_LARGE`
 - `CIRCUIT_OPEN`
 - `CONCURRENCY_LIMIT`
+- `RATE_LIMIT`
 
 `SchemaValidationError` extends `RequestError`, so applications can handle all
 request failures through the unified base class while still inspecting schema
 issues when `error.code === 'SCHEMA_ERROR'`.
 
-Prefer `isRequestError()` and `isSchemaValidationError()` when narrowing an
-unknown caught value. Their non-enumerable shared brands work across iframes
-and duplicated package instances, where `instanceof` can fail.
+Use `isRequestError()` and `isSchemaValidationError()` to narrow unknown errors
+across realms and package copies. See [error handling](docs/errors.md) for
+recovery, cancellation, and retry decisions.
 
 ## Supply-chain verification
 

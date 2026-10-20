@@ -1,5 +1,19 @@
 # @npora/request
 
+## 1.19.4
+
+### Patch Changes
+
+- 9f9fd69: Add an Axios migration entry and task-oriented next steps to the README, with a
+  linked migration guide and executable offline example covering request and
+  response contracts, cancellation, and interceptor isolation.
+- e40e5b0: Include RATE_LIMIT in the complete documented error inventories and link an
+  error-handling workflow covering cancellation, runtime validation, HTTP status,
+  and local request admission. Verify inventories against source during docs checks.
+- 50f03fb: Enforce Fetch stream size limits in the same reader wrapper that owns abort and
+  timeout cleanup, avoiding repeated wrapping of stream, SSE, and NDJSON responses.
+  Preserve cancellation, size errors, response metadata, and buffered parsing.
+
 ## 1.19.3
 
 ### Patch Changes

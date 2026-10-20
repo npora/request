@@ -144,3 +144,13 @@ src/
 
 New top-level modules require a clear responsibility that cannot fit an
 existing layer. New product behavior should normally begin as a plugin.
+
+## Streaming reader ownership
+
+FetchAdapter resolves the response type before wrapping its body. For streaming
+responses, one reader wrapper owns byte limits, cancellation, and per-attempt
+timeout cleanup. Parsing receives an already-bounded body and does not install
+another size wrapper. SSE and NDJSON remain incremental consumers of that body.
+Direct internal parser calls still enforce their configured limit. Buffered
+responses retain their existing pre-clone and parsing limits. Total-timeout
+wrappers and other plugins may add their own lifecycle boundaries.

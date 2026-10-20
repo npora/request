@@ -105,11 +105,22 @@ jobs:
       - name: Run session workflow example
         run: pnpm example:session
 
+      - name: Verify session isolation
+        run: node --import tsx examples/session-isolation.ts
+
+      - name: Verify error-handling workflow
+        run: node --import tsx examples/errors.ts
+
+      - name: Run Axios migration example
+        run: pnpm example:axios-migration
+
       - name: Typecheck benchmarks
         run: pnpm benchmark:types
 
-      - name: Check documentation links
-        run: pnpm test:docs
+      - name: Check documentation links and error contracts
+        run: |
+          node --test test/docs-contract.test.mjs
+          pnpm test:docs
 
       - name: Enforce source complexity budgets
         run: pnpm test:complexity
@@ -128,6 +139,9 @@ jobs:
 
       - name: Record package size
         run: pnpm test:size -- --output package-size-results/report.json
+
+      - name: Verify consumer bundle graph accounting
+        run: pnpm test:consumer-bundle
 
       - name: Measure consumer bundles
         run: pnpm benchmark:consumer-size -- --output package-size-results/consumer.json

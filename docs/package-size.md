@@ -422,3 +422,49 @@ unpacked budgets track the measured public API; the metrics subpath has its own
 narrow transitive budget. Full stream-consumption measurement adds isolated
 ReadableStream and async-iterable wrappers to that optional subpath; updated
 budgets include their measured cost without adding a runtime dependency.
+
+## Reproducible consumer reports
+
+Current consumer reports use schema version 3; archived schema 2 reports remain
+readable by the budget checker. In addition to the existing `results`
+measurements, they include package version, Node/CPU details, Git revision and
+dirty state, esbuild version, gzip level, and SHA-256 hashes of the complete
+`dist` tree and root lockfile. Build immediately before measuring: the hash
+identifies the actual artifacts, but does not prove that an old build matches
+the current source. Generated timestamps do not participate in build hashes.
+
+Each scenario also lists input modules ranked by `bytesInOutput`, from esbuild's
+metafile. These are uncompressed contributions after tree shaking. Gzip shares
+a dictionary across the bundle, so compressed module costs cannot be added or
+inferred from these values. Use the ranking to choose code to inspect, then
+measure the complete consumer again after an optimization.
+
+For an optional fixed-version browser comparison with Axios, Ky, ofetch, and
+native Fetch, see [pinned library comparison](benchmark.md#pinned-library-comparison).
+
+The [1.19.3 measurement snapshot](measurements/1.19.3/README.md) contains current
+consumer and fixed-version browser comparison reports. Its basic core consumer
+is 13,889 gzip bytes; full cache is 20,364 and memory cache is 15,104. Existing
+budgets pass unchanged. Historical measurements above describe their own builds
+and should not be substituted for this versioned report.
+
+## Initial and complete split bundles
+
+Schema 3 adds `splitResults` for each consumer, using the same entry source,
+target, and minifier as the existing single-bundle `results`. With esbuild
+splitting enabled, `initial` counts the application entry and its transitive
+static imports once, `lazy` counts the remaining emitted chunks, and `total`
+counts all emitted files. Each contains `bytes`, `gzipBytes`, and `files`.
+Gzip values sum each file compressed independently; they do not represent one
+concatenated gzip stream. HTTP request overhead and load latency are excluded.
+
+CI checks that initial and lazy costs sum to total, and applies each existing
+consumer gzip ceiling to the complete split output as well as the single bundle.
+This prevents moving code into async chunks from hiding growth. Graph-accounting
+tests cover shared chunks, static cycles, external dependencies, missing metadata,
+and oversized lazy output behind a passing initial bundle.
+
+The [streaming parser experiment](measurements/streaming-split/README.md) saved
+only 227 initial gzip bytes while adding 981 bytes to all split chunks and 251
+bytes to a single bundle. The experimental patch was not adopted, and existing
+budgets remain fixed.
