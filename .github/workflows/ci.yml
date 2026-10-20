@@ -105,6 +105,9 @@ jobs:
       - name: Run session workflow example
         run: pnpm example:session
 
+      - name: Verify session isolation
+        run: node --import tsx examples/session-isolation.ts
+
       - name: Run Axios migration example
         run: pnpm example:axios-migration
 
