@@ -20,6 +20,7 @@ await api.get('/users', {
 
 | Need | Section |
 | --- | --- |
+| Supported environments and deployment prerequisites | [Runtime support](#runtime-support) |
 | URL, headers, query, JSON codecs, or custom Fetch | [Core options](#core-options) |
 | JSON, form, binary, or streaming request data | [Request body](#request-body) |
 | Cancellation, timeout, and size limits | [Cancellation and limits](#cancellation-and-limits) |
@@ -31,6 +32,31 @@ Start with client defaults for policy shared by one API, then override only the
 values that differ on an individual request. Plugin-owned settings always live
 under `extensions`; installing a plugin enables its lifecycle behavior, while
 its documented request extension controls that behavior per call.
+
+## Runtime support
+
+Node.js 22 or newer is the supported baseline for development, CI/build tooling,
+and server execution. Runtime CI exercises Node.js 22, 24, and 26. Earlier Node
+releases are outside that support contract; [Node 18 already exposed Fetch and
+Web Streams](https://nodejs.org/download/release/v18.18.0/docs/api/globals.html),
+so lack of those APIs is not the reason for the version floor.
+
+Modern Chromium, Firefox, Safari/WebKit, and Web Workers use native Fetch,
+Request/Response, AbortController, and the streaming/encoding APIs required by
+the selected response type. The browser regression suite verifies current
+Playwright engines; it does not establish a minimum version for every older
+browser or embedded WebView. Internet Explorer is not supported. Replacing
+Fetch alone does not establish compatibility for missing stream, signal,
+encoding, or platform APIs.
+
+Optional features have additional prerequisites:
+
+| Feature | Prerequisite |
+| --- | --- |
+| XHR upload/download progress | `XMLHttpRequest`, exposed to browser windows and dedicated/shared workers, but not Service Workers or Node. See the [XHR standard](https://xhr.spec.whatwg.org/). |
+| Persistent cache stores | Caller-supplied Web Storage or IndexedDB; storage access can be denied by browser policy. |
+| Cross-context cache invalidation | Caller-supplied BroadcastChannel. |
+| Cross-context refresh coordination | Caller-supplied Web Locks manager; omit coordination when unavailable. |
 
 ## Core options
 
@@ -211,6 +237,14 @@ Only one of `body`, `json`, `form`, and `formData` may be present. `GET` and
 `maxFormDataDepth` fail before network I/O. Do not set the multipart
 `Content-Type` manually because the runtime must add its boundary.
 
+Body-bearing GET/HEAD configurations fail with `CONFIG_ERROR` before dispatch.
+For complex reads, first consider query parameters or an agreed POST endpoint.
+`api.query()` sends the actual HTTP `QUERY` method; the origin server, gateways,
+and cross-origin method policy must support it. It does not make an unchanged
+GET-only endpoint accept a request body. Object `query` merges with defaults;
+use `searchParams: new URLSearchParams(...)` to replace inherited query values
+and preserve repeated-key order.
+
 Native `FormData`, `Blob`, `ArrayBuffer`, and `ReadableStream` values are
 recognized across iframe and window realms using platform brand checks rather
 than `instanceof`. This preserves multipart fields, request-size enforcement,
@@ -287,6 +321,15 @@ metadata; its body has already been consumed. Successful complete responses
 continue to expose a separately readable raw body.
 
 ## Response handling
+
+`api.get<User>()` supplies a TypeScript type, not runtime validation. Use
+`schema` when the application needs a checked boundary, whether the service is
+internal or external. A rejected schema produces `SCHEMA_ERROR`; the request
+promise rejects and the application chooses its fallback or error UI. This
+does not automatically crash or block the page. Mark fields optional or nullable
+when the endpoint contract permits those values, rather than weakening every
+schema to hide a backend contract regression. Handle rejection at the query,
+view, or application error boundary. See [error handling](errors.md).
 
 | Option | Type | Default | Purpose |
 | --- | --- | --- | --- |
@@ -590,6 +633,14 @@ Requires `circuitBreakerPlugin()`.
 | `key` | resolved request origin | Override circuit isolation. |
 
 Open circuits fail with `CIRCUIT_OPEN` before transport I/O.
+
+The built-in breaker counts the final logical request result in `onSettled`,
+after retries finish. A transient failure followed by a successful retry does
+not open the circuit. Exhausted retries count as one final failure. These
+semantics hold for both `.use(breaker).use(retry)` and
+`.use(retry).use(breaker)`; installation order does not turn the breaker into
+a per-attempt failure counter. Custom plugins and explicit priorities can still
+change other hook interactions. See the [lifecycle model](architecture.md#plugins).
 
 ### `extensions.concurrency`
 

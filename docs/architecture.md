@@ -68,6 +68,12 @@ authentication, logging, and transfer progress through scoped interceptors
 and hooks. A plugin may declare dependencies and conflicts, return cleanup
 logic, and be removed with `unuse()`.
 
+Both the root entry and `/core` require explicit plugin installation; choosing
+an entrypoint does not automatically enable retry, caching, or circuit breaking.
+The pipeline uses named lifecycle stages rather than generic nested middleware.
+Built-in circuit breaking counts final settled failures after retry decisions,
+so a recovered attempt does not open a circuit in either installation order.
+
 Alternative network transports register an `onTransport` hook. It runs inside
 each attempt after request coordination and before the default adapter, so XHR
 progress transfers retain the same error, authentication-refresh, retry,

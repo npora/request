@@ -84,6 +84,27 @@ export async function checkStreamingContract({ createClient, isRequestError, dow
   } finally { idleReader.releaseLock() }
   assert.equal(aborted, true)
 
+  const queuedController = new AbortController()
+  let queuedCancellations = 0
+  const queuedSource = new ReadableStream({
+    pull(stream) { stream.enqueue(bytes('queued')) },
+    cancel() { queuedCancellations++; return new Promise(() => {}) }
+  }, { highWaterMark: 0 })
+  const queued = await createClient({ fetch: async () => new Response(queuedSource) })
+    .get('https://example.test/queued', {
+      responseType: 'stream', signal: queuedController.signal,
+      timeout: 1000, totalTimeout: 5000
+    })
+  await new Promise(resolve => setImmediate(resolve))
+  queuedController.abort()
+  assert.equal(queuedSource.locked, false, 'abort must release an idle reader before source cleanup settles')
+  assert.equal(queuedCancellations, 1)
+  const queuedReader = queued.getReader()
+  try {
+    await assert.rejects(queuedReader.read(),
+      error => isRequestError(error) && error.code === 'ABORT_ERROR')
+  } finally { queuedReader.releaseLock() }
+
   const inherited = new AbortController()
   let connections = 0
   const reconnecting = createClient({

@@ -202,6 +202,37 @@ structural adapters are not validated only against duck-typed test doubles.
 growth; the package contract and size suites continue to gate public API and
 root-entry transitive gzip growth.
 
+## Layered stress checks
+
+Run correctness tests and browser checks first, then run the following workloads
+sequentially so simultaneous benchmark processes do not distort each other's
+latency and throughput:
+
+```sh
+pnpm stress -- --operations 10000000 --concurrency 64 --output benchmark-results/stress-10m-c64.json
+pnpm stress -- --operations 1000000 --concurrency 256 --output benchmark-results/stress-1m-c256.json
+pnpm benchmark:http -- --operations 100000 --concurrency 256 --output benchmark-results/http-100k-c256.json
+pnpm benchmark:streaming -- --operations 1000000 --output benchmark-results/streaming-schema.json
+pnpm benchmark:streaming-lines -- --output benchmark-results/streaming-lines.json
+```
+
+The mixed stress runner distributes logical operations across 28 scenarios:
+core/configuration, interceptors, cache hits/shared misses/clear races,
+concurrency queues, rate limits, tracing/metrics, circuit transitions, retry,
+auth refresh, cancellation, schemas, uploads/downloads, streaming, and mixed or
+disabled plugins. It asserts operation counts and zero unexpected failures.
+It uses controlled adapters and Fetch/XHR fixtures, so its logical-operation
+throughput is not an HTTP network-throughput claim. Some scenarios constrain
+their own concurrency to verify a specific lifecycle contract.
+
+The HTTP benchmark uses a real loopback server and checks the received request
+count, including warmup. Streaming checks ordered checksums, slow consumers,
+schema/consumer cancellation, and pre/post-GC heap growth. Fragmented long-line
+checks verify content at multiple sizes and report timings without imposing an
+absolute latency ceiling. Retained heap and sampled latency/RSS metrics are
+diagnostic evidence; a single finite stress run cannot prove absence of leaks
+or predict production latency across remote services and machines.
+
 ## Release process
 
 Every user-visible change includes a Changesets entry. CI verifies Node.js 22,

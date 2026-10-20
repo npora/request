@@ -84,7 +84,7 @@ export function finalizeTotalTimeout<T>(
         })
     const raw = finalizeStreamingResponse(
       source,
-      undefined,
+      response.config.signal,
       response.config,
       clear
     )
