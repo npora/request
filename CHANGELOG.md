@@ -1,5 +1,14 @@
 # @npora/request
 
+## 1.19.5
+
+### Patch Changes
+
+- 9b398c9: Release cache refresh leases granted after cancellation or plugin removal, make post-acquisition cache reads cancellable, and preserve conditional revalidation and cache identity when request deduplication is disabled. Remove redundant cache generation tracking and response key serialization.
+- 4ad44eb: Return usable empty download streams without progress callbacks and preserve bodyless responses with zero-byte progress reporting. Add HEAD/204/205/304 regression coverage and a feature-by-feature test inventory.
+- ffada1a: Count custom jitter execution against retry time budgets, avoid authentication refresh retries for non-replayable upload streams, and preserve bodyless HEAD semantics in the XHR transport.
+- ae4eba8: Honor inherited client cancellation signals while waiting to reconnect SSE streams, including extended clients. Preserve request-level signal overrides and explicit signal removal.
+
 ## 1.19.4
 
 ### Patch Changes
