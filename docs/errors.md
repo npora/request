@@ -102,6 +102,14 @@ Breaking out of iteration cancels the reader. Use explicit SSE reconnection only
 when the application's event protocol supports replay/resumption; generic HTTP
 retry does not resume already-consumed stream items.
 
+Lazy SSE/NDJSON and returned ReadableStream failures can happen after the request
+promise and pipeline error interceptors have completed. A request-level error
+interceptor does not catch these later failures; keep the catch around iteration
+or reader operations. ReadableStreams and these iterators are single-consumer
+resources. Merely inspecting an already parsed JSON `error.data` object does not
+consume a stream. Reading `error.response.raw` or iterating stream-valued data
+does consume it, so assign one owner to that operation.
+
 ## Log selected metadata
 
 `error.toJSON()` includes name, message, code, and optional status, omitting
@@ -110,6 +118,12 @@ Avoid spreading or directly logging the entire error. Use `error.data` for HTTP
 error payloads; Fetch error bodies are consumed once and `error.response.raw`
 is not guaranteed to remain separately readable. Error bodies have a default
 10 MiB parsing cap, so metadata can be available while payload data is absent.
+
+The cap omits an oversized buffered error payload instead of returning truncated
+JSON. It does not limit successful downloads or all streaming responses; configure
+`maxResponseSize` explicitly where a total byte limit is required. Prefer bounded
+server diagnostics and a request identifier over raising the error cap merely
+to retrieve a large stack trace.
 
 Run the [offline error-handling example](../examples/errors.ts):
 

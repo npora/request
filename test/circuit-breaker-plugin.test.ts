@@ -12,6 +12,27 @@ afterEach(() => {
 })
 
 describe('circuitBreakerPlugin', () => {
+  it.each([false, true])('keeps the circuit closed after retry recovery (breaker installed first: %s)', async breakerFirst => {
+    let attempts = 0
+    const breaker = circuitBreakerPlugin({ failureThreshold: 1 })
+    const retry = retryPlugin({ retries: 1, delay: 0 })
+    const request = createClient({ fetch: async () => {
+      attempts++
+      return new Response(attempts === 1 ? 'busy' : 'recovered', {
+        status: attempts === 1 ? 503 : 200
+      })
+    } })
+    for (const plugin of breakerFirst ? [breaker, retry] : [retry, breaker]) {
+      request.use(plugin)
+    }
+
+    await expect(request.get('https://example.test/retry')).resolves.toBe('recovered')
+    expect(attempts).toBe(2)
+    expect(breaker.getState('https://example.test')).toBe('closed')
+    await expect(request.get('https://example.test/retry')).resolves.toBe('recovered')
+    expect(attempts).toBe(3)
+  })
+
   it('should evict the least recently used inactive circuit at capacity', async () => {
     const adapter = new MockAdapter()
     const breaker = circuitBreakerPlugin({
@@ -547,17 +568,16 @@ describe('circuitBreakerPlugin', () => {
     expect(adapter.history).toHaveLength(3)
   })
 
-  it('should count one failure after retries are exhausted', async () => {
+  it.each([false, true])('counts one failure after retries are exhausted (breaker installed first: %s)', async breakerFirst => {
     const adapter = new MockAdapter()
     const breaker = circuitBreakerPlugin({
       failureThreshold: 2
     })
+    const retry = retryPlugin({ retries: 1, delay: 0 })
     const request = createClient({ adapter })
-      .use(retryPlugin({
-        retries: 1,
-        delay: 0
-      }))
-      .use(breaker)
+    for (const plugin of breakerFirst ? [breaker, retry] : [retry, breaker]) {
+      request.use(plugin)
+    }
 
     adapter.onGet('/retry').reply(503)
 
@@ -572,6 +592,8 @@ describe('circuitBreakerPlugin', () => {
     })
     expect(adapter.history).toHaveLength(4)
     expect(breaker.getState('default')).toBe('open')
+    await expect(request.get('/retry')).rejects.toMatchObject({ code: 'CIRCUIT_OPEN' })
+    expect(adapter.history).toHaveLength(4)
   })
 
   it('should ignore ordinary 4xx responses but count 429', async () => {
