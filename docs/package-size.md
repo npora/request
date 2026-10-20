@@ -440,3 +440,9 @@ measure the complete consumer again after an optimization.
 
 For an optional fixed-version browser comparison with Axios, Ky, ofetch, and
 native Fetch, see [pinned library comparison](benchmark.md#pinned-library-comparison).
+
+The [1.19.3 measurement snapshot](measurements/1.19.3/README.md) contains current
+consumer and fixed-version browser comparison reports. Its basic core consumer
+is 13,889 gzip bytes; full cache is 20,364 and memory cache is 15,104. Existing
+budgets pass unchanged. Historical measurements above describe their own builds
+and should not be substituted for this versioned report.

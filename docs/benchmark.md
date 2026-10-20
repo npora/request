@@ -470,3 +470,11 @@ not isolate wrapper overhead and do not predict TLS, remote latency, browsers,
 large responses, retries, streaming, or production performance. Keep min/max
 and raw rounds alongside medians; do not turn these results into an absolute
 "fastest client" claim or an external-library CI gate.
+
+### Versioned evidence
+
+The [1.19.3 snapshot](measurements/1.19.3/README.md) records a clean-commit run,
+all six HTTP rounds, request-count validation, consumer bundle contributions,
+fixed dependency versions, and browser comparison entry strings. It also records
+limitations and the next bundle-cost investigation. Keep versioned evidence
+separate from ignored scratch reports under `benchmark-results`.

@@ -18,7 +18,7 @@ const documents = [
   'README.md',
   'CONTRIBUTING.md',
   'SECURITY.md',
-  ...readdirSync(join(root, 'docs'))
+  ...readdirSync(join(root, 'docs'), { recursive: true })
     .filter(file => file.endsWith('.md'))
     .map(file => join('docs', file))
 ]
