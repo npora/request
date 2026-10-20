@@ -32,9 +32,9 @@ real IndexedDB in Chromium, Firefox, and WebKit rather than a Node simulation.
 
 ## Executable onboarding workflows
 
-CI runs the session, account-isolation, Axios migration, and error-handling
-examples, as well as typechecking them. The isolated examples use native Fetch
-response fixtures and need no external server or credentials. Run the failure
+CI runs the session, account-isolation, Axios migration, error-handling, and
+bounded-batch examples, as well as typechecking them. The isolated examples use
+native Fetch response fixtures and need no external server or credentials. Run the failure
 workflow and documentation contract checks locally:
 
 ```sh
@@ -77,9 +77,9 @@ Package verification covers:
 - npm tarball file allowlist.
 - A local tarball installed offline into an isolated Node application, exercising
   native Fetch, retry, cache invalidation, errors, and cancellation.
-- Four onboarding workflows compiled to import only public package entries,
+- Five onboarding workflows compiled to import only public package entries,
   then executed against that installed tarball: Axios migration, session setup,
-  account isolation, and error recovery.
+  account isolation, error recovery, and bounded batches.
 - Installed ESM and CommonJS stream contracts covering SSE/NDJSON, item schema
   failures, response size limits, early iteration exit, and cancellation.
 - Raw, gzip, declaration, packed, and unpacked size budgets.

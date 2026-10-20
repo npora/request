@@ -11,13 +11,15 @@ const publicImports = {
   '../src/plugins/authPlugin': '@npora/request/plugins/auth',
   '../src/plugins/cachePlugin': '@npora/request/plugins/cache',
   '../src/plugins/retryPlugin': '@npora/request/plugins/retry',
-  '../src/plugins/rateLimitPlugin': '@npora/request/plugins/rate-limit'
+  '../src/plugins/rateLimitPlugin': '@npora/request/plugins/rate-limit',
+  '../src/plugins/concurrencyPlugin': '@npora/request/plugins/concurrency'
 }
 
 /** Transpile example fixtures without bundling the implementation under test. */
 export async function buildInstalledWorkflows(directory) {
   const paths = []
-  for (const name of ['axios-migration', 'session', 'session-isolation', 'errors']) {
+  const workflows = ['axios-migration', 'session', 'session-isolation', 'errors', 'batch']
+  for (const name of workflows) {
     const sourcefile = `${name}.ts`
     const outfile = join(directory, `${name}.mjs`)
     const result = await build({
