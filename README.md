@@ -17,7 +17,7 @@ has zero runtime dependencies.
 | --- | --- |
 | Send the first request | [Quick start](#quick-start) |
 | Move an existing Axios client | [Axios migration guide](docs/axios-migration.md) |
-| Build a client for an application | [Common workflows](docs/workflows.md) |
+| Consume SSE or NDJSON | [Streaming responses](#streaming-responses) |
 | Run a complete session workflow | [Session example](docs/workflows.md#build-a-session-client) |
 | Refresh authentication tokens | [Authentication workflow](docs/workflows.md#refresh-authentication-tokens) |
 | Find a client or response API | [API reference](docs/api.md) |
@@ -116,19 +116,6 @@ console.log(response.raw)
 - **Portable, verifiable delivery.** Browser, Web Worker, Node.js, ESM, and
   CommonJS behavior is checked alongside public exports, security regressions,
   and package-size budgets.
-
-## Choose your next step
-
-- **Regular API calls:** start with the client above. Retry, cache, and auth
-  plugins are optional; request options do not install plugins.
-- **Authenticated applications:** follow the [session workflow](docs/workflows.md#build-a-session-client)
-  for token refresh, cache invalidation, cancellation, and logout.
-- **Streaming APIs:** see [streaming responses](#streaming-responses) for SSE
-  and NDJSON consumption, validation, and bounded reconnection.
-
-Coming from Axios? Start with the [migration guide](docs/axios-migration.md)
-for argument, return-value, error, and interceptor differences. Run
-`pnpm example:axios-migration` in this repository for an offline example.
 
 ## Version support
 
@@ -251,10 +238,9 @@ event ID in `Last-Event-ID` and honors the server's `retry` delay up to
 `maxDelay`. Cancellation, schema errors, and response-size errors stop the
 iterator; each connection uses its own request timeout.
 
-Run `pnpm example:streaming` from this repository for a self-contained local
-demonstration of SSE, validated NDJSON, early termination, cancellation, and
-schema errors. See [streaming workflows](docs/workflows.md#consume-streaming-responses)
-for consumption and error-handling contracts.
+Run `pnpm example:streaming` for a local demonstration. See
+[streaming workflows](docs/workflows.md#consume-streaming-responses) for
+consumption and error-handling contracts.
 
 Native `FormData`, `Blob`, `ArrayBuffer`, and `ReadableStream` request bodies
 also work when created by another same-origin window or iframe. Detection does
@@ -846,7 +832,6 @@ allowlist, and size budgets.
 - [Configuration reference](https://github.com/npora/request/blob/main/docs/configuration.md)
 - [API reference](https://github.com/npora/request/blob/main/docs/api.md)
 - [Architecture](https://github.com/npora/request/blob/main/docs/architecture.md)
-- [Migration from Axios](docs/axios-migration.md)
 - [Migration from 0.x](https://github.com/npora/request/blob/main/docs/migration.md)
 - [Common workflows](https://github.com/npora/request/blob/main/docs/workflows.md)
 - [Security model](https://github.com/npora/request/blob/main/docs/security.md)

@@ -482,3 +482,23 @@ separate from ignored scratch reports under `benchmark-results`.
 The [streaming parser split investigation](measurements/streaming-split/README.md)
 includes an unapplied candidate patch and before/after single-bundle, initial,
 and total split costs. It explains why parser-only dynamic loading was rejected.
+
+## Bounded response reader benchmark
+
+```sh
+pnpm build
+pnpm benchmark:response-stream -- --output benchmark-results/response-stream.json
+```
+
+This runner imports the built core entry and consumes 200,000 chunks of 256
+bytes, with a 10,000-chunk warmup and five rounds per interface. Both the direct
+data API and complete-response API use a 30-second timeout and a response limit
+exactly equal to the expected byte count. It asserts every chunk and byte count,
+normal completion without source cancellation, and reader-lock release. It uses
+a zero-high-water-mark source and reuses one immutable byte array to isolate
+reader-wrapper overhead. Concurrency is one; timings are diagnostic and do not
+represent remote networking, payload allocation, JSON parsing, or large-chunk
+throughput. Reports contain build/lockfile hashes and runtime/Git metadata.
+
+The [shared response reader snapshot](measurements/shared-response-reader/README.md)
+contains the before/after runs, bundle measurements, and validation results.

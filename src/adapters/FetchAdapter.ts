@@ -78,14 +78,15 @@ export class FetchAdapter implements Adapter {
         response.type
       )
 
-      if (!bodyless && (preserveRaw || !validStatus)) {
-        response = limitResponseSize(response, config)
-      }
-
       const responseType = bodyless
         ? undefined
         : resolveResponseType(response, config)
       const streaming = isStreamingResponseType(responseType)
+
+      if (!bodyless && !streaming && (preserveRaw || !validStatus)) {
+        response = limitResponseSize(response, config)
+      }
+
       const errorResponseSizeLimit =
         !validStatus && !bodyless && !streaming
           ? resolveErrorResponseSizeLimit(config)
@@ -96,11 +97,15 @@ export class FetchAdapter implements Adapter {
           response,
           request.init.signal,
           config,
-          request.clear
+          request.clear,
+          config.maxResponseSize
         )
         deferCleanup = Boolean(response.body)
       }
 
+      const parseSizeLimit = parsingSizeLimit(
+        config, streaming, errorResponseSizeLimit
+      )
       const knownErrorBodyTooLarge =
         errorResponseSizeLimit !== undefined &&
         exceedsContentLength(response, errorResponseSizeLimit)
@@ -129,7 +134,7 @@ export class FetchAdapter implements Adapter {
                   parseTarget,
                   config,
                   responseType,
-                  errorResponseSizeLimit ?? config.maxResponseSize,
+                  parseSizeLimit,
                   signal
                 ),
                 () => cancelResponseBody(response)
@@ -137,7 +142,8 @@ export class FetchAdapter implements Adapter {
             : await parseResponse<T>(
                 parseTarget,
                 config,
-                responseType
+                responseType,
+                parseSizeLimit
               )
 
           data = parsed === ERROR_RESPONSE_DATA_UNAVAILABLE
@@ -239,4 +245,13 @@ function cancelResponseBody(response: Response): void {
   void response.body?.cancel().catch(() => {
     // The HTTP error and its metadata remain authoritative.
   })
+}
+
+/** Streaming bytes are already bounded by the transport's lifecycle wrapper. */
+function parsingSizeLimit(
+  config: RequestConfig,
+  streaming: boolean,
+  errorLimit: number | undefined
+): number | undefined {
+  return streaming ? Number.POSITIVE_INFINITY : errorLimit ?? config.maxResponseSize
 }
