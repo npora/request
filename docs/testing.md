@@ -30,6 +30,45 @@ validation have Node boundary tests and count toward these thresholds. Database
 transactions, cursor maintenance, and the store itself are exercised against
 real IndexedDB in Chromium, Firefox, and WebKit rather than a Node simulation.
 
+## Feature regression matrix
+
+Run the complete Node suite with `pnpm test:coverage`, then the complete
+three-browser suite with `pnpm test:browser`. The rows below identify executable
+behavior checks for each feature family; a passing overall coverage percentage
+does not replace these checks. Browser-only platform behavior must pass in all
+three engines. This inventory covers feature families, not every possible
+combination of application callbacks and plugins.
+
+| Feature | Node regression entrypoints | Additional verification |
+| --- | --- | --- |
+| HTTP methods, data/full responses, client extension | [client](../test/client.test.ts) | Browser client suite; installed Node consumer |
+| Native Request/URL and transport options | [request config](../test/request-config.test.ts), [transport config](../test/transport-config.test.ts), [origin](../test/request-origin.test.ts) | Browser native and cross-realm inputs |
+| Defaults, headers, queries, JSON/form/multipart bodies | [config merge](../test/config-merger.test.ts), [body guards](../test/body-init-guards.test.ts) | Example typechecks; browser serialization |
+| Fetch adapter, parsing and raw response cloning | [Fetch](../test/fetch-adapter.test.ts), [cloning](../test/response-clone.test.ts), [adapter validation](../test/adapter-validation.test.ts) | Installed ESM/CommonJS contracts |
+| Request/response size limits | [request size](../test/request-size.test.ts), [stream size](../test/stream-size-lifecycle.test.ts) | Browser limits; installed stream contracts |
+| Attempt/total timeout, cancellation and cleanup | [timeout](../test/timeout.test.ts), [signals](../test/timeout-signal.test.ts), [lifecycle cancellation](../test/lifecycle-cancellation.test.ts) | Browser cancellation and early iterator closure |
+| Errors and interceptor ordering/failure handling | [errors](../test/request-error.test.ts), [interceptors](../test/interceptor.test.ts), [pipeline errors](../test/pipeline-error.test.ts) | Error workflow; exact documented error-code inventory |
+| Plugin installation, removal, dependencies and composition | [plugins](../test/plugin.test.ts), [composition](../test/plugin-composition.test.ts) | Session and batch workflows |
+| Authentication, refresh coalescing and token storage | [auth](../test/auth-plugin.test.ts), [storage](../test/auth-storage.test.ts) | Account isolation and installed session workflows |
+| Retry policy, Retry-After, jitter and retry budgets | [retry](../test/retry-plugin.test.ts) | Installed Node consumer and bounded batch workflow |
+| HTTP cache, deduplication, validators, stale policies and invalidation | [cache](../test/cache-plugin.test.ts), [unshared revalidation](../test/cache-unshared-revalidation.test.ts) | Browser cache; installed cache consumer |
+| Cache refresh lease cancellation/removal | [lease lifecycle](../test/cache-lease-lifecycle.test.ts) | Browser cross-context Web Locks coordination |
+| Compact memory cache | [memory cache](../test/memory-cache-plugin.test.ts) | Installed Node consumer |
+| Memory/Web Storage/IndexedDB/tiered stores | [cache stores](../test/cache-plugin.test.ts), [IndexedDB boundaries](../test/indexeddb-cache-helpers.test.ts), [tiered stores](../test/tiered-cache-store.test.ts) | Real browser storage, migrations, quotas, broadcast and locks |
+| Concurrency, queue overflow, cancellation and permit release | [concurrency](../test/concurrency-plugin.test.ts) | Installed bounded batch workflow |
+| Rate limits, rolling windows and shared cooldowns | [rate limits](../test/rate-limit-plugin.test.ts) | Browser client suite |
+| Circuit breaker transitions and probes | [circuit breaker](../test/circuit-breaker-plugin.test.ts) | Deterministic state/probe, reset and plugin-removal checks |
+| Structured logging and redaction | [logger](../test/logger-plugin.test.ts), [security](../test/security.test.ts) | Observer failures and sensitive-data omission |
+| OpenTelemetry spans, propagation and metrics | [traces](../test/opentelemetry-plugin.test.ts), [metrics](../test/opentelemetry-metrics-plugin.test.ts), [official SDK integration](../test/opentelemetry-sdk.integration.test.ts) | Browser W3C propagation and metrics |
+| Downloads, progress, stream output and empty bodies | [downloads](../test/download-plugin.test.ts), [progress](../test/download-progress.test.ts), [XHR](../test/download-xhr.test.ts) | Browser Fetch/XHR and stream downloads |
+| Uploads, multipart and progress | [uploads](../test/upload-plugin.test.ts), [progress](../test/upload-progress.test.ts) | Native browser XHR uploads |
+| SSE/NDJSON parsing, item schema and early closure | [streaming](../test/streaming-response.test.ts), [line parsing](../test/streaming-lines.test.ts), [early closure](../test/stream-early-close.test.ts) | Installed dual-format stream contracts; three-browser streaming |
+| SSE reconnect, cursor/retry controls and inherited cancellation | [reconnect](../test/sse-reconnect.test.ts) | Installed dual-format and browser default-signal checks |
+| Response/item schema validation and transformation | [schema](../test/schema-validation.test.ts) | Type consumers; browser validators |
+| Mock adapter and testing entrypoint | [mock adapter](../test/mock-adapter.test.ts) | Public API/type contracts for testing subpaths |
+| Security boundaries and bounded retained state | [security](../test/security.test.ts), [capacity stress](../test/state-capacity-stress.test.ts) | Browser cross-realm and cross-context cases |
+| Public exports, package contents and bundling | [package checks](../test/package/manifest.mjs), [API contract](../test/package/api-contract.mjs), [bundle accounting](../test/package/browser-bundle.test.mjs) | Offline installed consumers; runtime CI on Node 22/24/26 |
+
 ## Executable onboarding workflows
 
 CI runs the session, account-isolation, Axios migration, error-handling, and
@@ -81,7 +120,8 @@ Package verification covers:
   then executed against that installed tarball: Axios migration, session setup,
   account isolation, error recovery, and bounded batches.
 - Installed ESM and CommonJS stream contracts covering SSE/NDJSON, item schema
-  failures, response size limits, early iteration exit, and cancellation.
+  failures, response size limits, early iteration exit, cancellation, and
+  bodyless download streams/progress.
 - Raw, gzip, declaration, packed, and unpacked size budgets.
 
 The installed-workflow compiler removes TypeScript syntax and maps each example's

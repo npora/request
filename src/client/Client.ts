@@ -541,7 +541,7 @@ export class Client {
 
     return createReconnectingSse(
       url,
-      { ...requestConfig, itemSchema },
+      { signal: this.defaults.signal, ...requestConfig, itemSchema },
       reconnect,
       next => this.getResponse<AsyncIterable<ServerSentEvent>>(url, {
         ...next,

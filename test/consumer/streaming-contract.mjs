@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 
 /** Black-box contracts shared by installed ESM and CommonJS consumers. */
-export async function checkStreamingContract({ createClient, isRequestError }, format) {
+export async function checkStreamingContract({ createClient, isRequestError, downloadPlugin }, format) {
   const bytes = text => new TextEncoder().encode(text)
   const schema = {
     '~standard': {
@@ -83,5 +83,47 @@ export async function checkStreamingContract({ createClient, isRequestError }, f
     await rejected
   } finally { idleReader.releaseLock() }
   assert.equal(aborted, true)
+
+  const inherited = new AbortController()
+  let connections = 0
+  const reconnecting = createClient({
+    signal: inherited.signal,
+    totalTimeout: 5000,
+    fetch: async () => {
+      connections++
+      return new Response('data: first\n\n', {
+        headers: { 'content-type': 'text/event-stream' }
+      })
+    }
+  }).extend()
+  const iterator = (await reconnecting.sse('https://example.test/reconnect', {
+    reconnect: { maxAttempts: 1, delay: 1000 }
+  }))[Symbol.asyncIterator]()
+  assert.equal((await iterator.next()).value.data, 'first')
+  const next = iterator.next()
+  let outcome = 'pending'
+  void next.then(() => { outcome = 'resolved' }, error => { outcome = error.code })
+  await new Promise(resolve => setImmediate(resolve))
+  inherited.abort()
+  await new Promise(resolve => setImmediate(resolve))
+  assert.equal(outcome, 'ABORT_ERROR', 'inherited cancellation must interrupt the reconnect delay')
+  assert.equal(connections, 1)
+
+  for (const status of [204, 205, 304]) {
+    const downloads = createClient({
+      throwHttpErrors: false,
+      fetch: async () => new Response(null, { status })
+    }).use(downloadPlugin())
+    const emptyStream = await downloads.get('https://example.test/empty', {
+      extensions: { download: { output: 'stream' } }
+    })
+    assert.ok(emptyStream instanceof ReadableStream)
+    assert.equal(await new Response(emptyStream).text(), '')
+    const progress = []
+    assert.equal(await downloads.get('https://example.test/empty', {
+      extensions: { download: { onProgress: event => progress.push(event) } }
+    }), undefined)
+    assert.deepEqual(progress, [{ loaded: 0, total: 0, bytes: 0 }])
+  }
   console.log(`Installed ${format} streaming contracts passed.`)
 }

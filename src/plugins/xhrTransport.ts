@@ -241,7 +241,7 @@ async function processResponse<T>(
               type: headers.get('content-type') ?? ''
             }
           )
-    const bodyless = isBodylessResponse(undefined, xhr.status)
+    const bodyless = isBodylessResponse(config.method, xhr.status)
     const validStatus = validateResponseStatus(xhr.status, config)
     const responseInit = {
       status: xhr.status,
