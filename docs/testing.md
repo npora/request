@@ -75,9 +75,34 @@ Package verification covers:
 - Exact runtime and TypeScript export contracts.
 - Black-box public behavior.
 - npm tarball file allowlist.
-- A local tarball installed into an isolated Node application, exercising
+- A local tarball installed offline into an isolated Node application, exercising
   native Fetch, retry, cache invalidation, errors, and cancellation.
+- Four onboarding workflows compiled to import only public package entries,
+  then executed against that installed tarball: Axios migration, session setup,
+  account isolation, and error recovery.
+- Installed ESM and CommonJS stream contracts covering SSE/NDJSON, item schema
+  failures, response size limits, early iteration exit, and cancellation.
 - Raw, gzip, declaration, packed, and unpacked size budgets.
+
+The installed-workflow compiler removes TypeScript syntax and maps each example's
+source import to an explicit public entrypoint. Package imports remain external;
+metadata checks reject bundled implementation code or unexpected runtime
+dependencies. Each child program runs from the temporary installation, so the
+repository's source and local package exports cannot accidentally satisfy its
+imports. A missing public entry or distribution chunk used by these workflows
+fails this check. The existing runtime CI matrix runs the same package suite on Node.js 22, 24,
+and 26. Examples continue to run directly against source in the quality job too.
+
+To rerun only the installed consumer checks after building:
+
+```sh
+node test/consumer/install.mjs
+```
+
+This uses the local tarball and offline installation; the HTTP fixture needs a
+loopback listener but does not contact an external service. Child commands have
+a 60-second timeout so a broken lifecycle fails instead of hanging indefinitely.
+ESM and CommonJS stream checks use injected Fetch response fixtures and the built FetchAdapter.
 
 The published `latest` package can be tested in an isolated temporary project:
 

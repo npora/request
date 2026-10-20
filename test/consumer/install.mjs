@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { buildInstalledWorkflows } from './build-workflows.mjs'
 import { spawnSync } from 'node:child_process'
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -30,16 +31,30 @@ try {
     readFileSync(new URL('./node-app.mjs', import.meta.url))
   )
   run(process.execPath, ['app.mjs'], directory)
-  console.log('Installed package consumer passed.')
+  for (const workflow of await buildInstalledWorkflows(directory)) {
+    run(process.execPath, [workflow], directory)
+  }
+  writeFileSync(join(directory, 'streaming-contract.mjs'),
+    readFileSync(new URL('./streaming-contract.mjs', import.meta.url)))
+  writeFileSync(join(directory, 'streaming.mjs'), `
+    import * as esm from '@npora/request/core';
+    import { createRequire } from 'node:module';
+    import { checkStreamingContract } from './streaming-contract.mjs';
+    await checkStreamingContract(esm, 'ESM');
+    await checkStreamingContract(createRequire(import.meta.url)('@npora/request/core'), 'CommonJS');
+  `)
+  run(process.execPath, ['streaming.mjs'], directory)
+  console.log('Installed package consumer, four workflows, and ESM/CommonJS streaming passed.')
 } finally {
   rmSync(directory, { recursive: true, force: true })
 }
 
 function run(command, args, cwd) {
-  const result = spawnSync(command, args, { cwd, encoding: 'utf8' })
+  const result = spawnSync(command, args, { cwd, encoding: 'utf8', timeout: 60000 })
 
   assert.equal(result.status, 0, [
-    `${command} ${args.join(' ')} failed.`, result.stdout, result.stderr
+    `${command} ${args.join(' ')} failed.`, result.error?.message,
+    result.signal && `Terminated by ${result.signal}`, result.stdout, result.stderr
   ].filter(Boolean).join('\n'))
 
   return result
