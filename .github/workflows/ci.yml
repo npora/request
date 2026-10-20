@@ -132,6 +132,9 @@ jobs:
       - name: Record package size
         run: pnpm test:size -- --output package-size-results/report.json
 
+      - name: Verify consumer bundle graph accounting
+        run: pnpm test:consumer-bundle
+
       - name: Measure consumer bundles
         run: pnpm benchmark:consumer-size -- --output package-size-results/consumer.json
 

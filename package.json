@@ -160,6 +160,7 @@
     "test:package": "node test/package/esm.mjs && node test/package/cjs.cjs && node test/package/subpaths.mjs && node test/package/subpaths.cjs && node test/package/api-exports.mjs && node test/package/api-contract.mjs && node test/package/npm-pack-result.test.mjs && node test/package/manifest.mjs && node test/consumer/install.mjs && pnpm test:size",
     "test:registry": "node test/package/registry-install.mjs",
     "test:size": "node test/package/size.mjs",
+    "test:consumer-bundle": "node --test test/package/browser-bundle.test.mjs",
     "test:browser": "playwright test --config=browser/playwright.config.ts",
     "test:browser:ui": "playwright test --config=browser/playwright.config.ts --ui",
     "test:browser:report": "playwright show-report playwright-report",

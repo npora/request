@@ -1,0 +1,57 @@
+diff --git a/src/utils/parseResponse.ts b/src/utils/parseResponse.ts
+index 0e8cd01..1f49ed8 100644
+--- a/src/utils/parseResponse.ts
++++ b/src/utils/parseResponse.ts
+@@ -1,9 +1,5 @@
+ import { isRequestError, RequestError } from '../errors'
+ import type { RequestConfig, ResponseType } from '../types'
+-import {
+-  parseNdjson,
+-  parseServerSentEvents
+-} from './parseStreamingResponse'
+ import { isArrayBuffer } from './isBinaryBody'
+ import { getSseControl } from './sseControl'
+ 
+@@ -213,7 +209,7 @@ export async function parseResponse<T = unknown>(
+       if (isStreamingResponseType(responseType)) {
+         const stream = limitResponseStream(response, limit, config)
+ 
+-        return parseStreamingResponse<T>(
++        return await parseStreamingResponse<T>(
+           new Response(stream, response),
+           responseType,
+           config
+@@ -260,14 +256,8 @@ export async function parseResponse<T = unknown>(
+         return response.body as T
+ 
+       case 'sse':
+-        return parseServerSentEvents(
+-          response,
+-          config,
+-          getSseControl(config)
+-        ) as T
+-
+       case 'ndjson':
+-        return parseNdjson(response, config) as T
++        return await parseStreamingResponse<T>(response, responseType, config)
+ 
+       default:
+         return (await response.text()) as T
+@@ -445,11 +435,15 @@ async function readResponseBytes(response: Response): Promise<Uint8Array> {
+     : new Uint8Array(await response.arrayBuffer())
+ }
+ 
+-function parseStreamingResponse<T>(
++async function parseStreamingResponse<T>(
+   response: Response,
+   responseType: Extract<ResponseType, 'stream' | 'sse' | 'ndjson'>,
+   config: RequestConfig
+-): T {
++): Promise<T> {
++  if (responseType === 'stream') return response.body as T
++
++  const { parseServerSentEvents, parseNdjson } = await import('./parseStreamingResponse')
++
+   switch (responseType) {
+     case 'sse':
+       return parseServerSentEvents(

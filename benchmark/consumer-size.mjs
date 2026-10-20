@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url'
 import { gzipSync } from 'node:zlib'
 import { build, version as bundlerVersion } from 'esbuild'
 import { measurementMetadata } from './provenance.mjs'
+import { summarizeBrowserBundle } from './browser-bundle.mjs'
 
 const root = fileURLToPath(new URL('../', import.meta.url))
 const scenarios = {
@@ -65,6 +66,7 @@ const scenarios = {
 }
 
 const results = {}
+const splitResults = {}
 
 for (const [name, source] of Object.entries(scenarios)) {
   const bundle = await build({
@@ -93,6 +95,18 @@ for (const [name, source] of Object.entries(scenarios)) {
     `No bundle metadata produced for ${name}`
   )
 
+  const splitBundle = await build({
+    stdin: {
+      contents: source, resolveDir: root,
+      sourcefile: 'consumer-entry.js', loader: 'js'
+    },
+    bundle: true, minify: true, treeShaking: true,
+    platform: 'browser', format: 'esm', target: 'es2020',
+    splitting: true, outdir: 'consumer-split',
+    metafile: true, write: false, logLevel: 'silent'
+  })
+  splitResults[name] = summarizeBrowserBundle(splitBundle)
+
   results[name] = {
     bytes: output.byteLength,
     gzipBytes: gzipSync(output, { level: 9 }).byteLength,
@@ -104,7 +118,7 @@ for (const [name, source] of Object.entries(scenarios)) {
 }
 
 const report = {
-  schemaVersion: 2,
+  schemaVersion: 3,
   ...measurementMetadata(),
   generatedAt: new Date().toISOString(),
   bundler: 'esbuild',
@@ -113,11 +127,21 @@ const report = {
   platform: 'browser',
   format: 'esm',
   target: 'es2020',
-  results
+  results,
+  splitResults
 }
 
 console.table(Object.fromEntries(Object.entries(results).map(
   ([name, { contributions: _contributions, ...summary }]) => [name, summary]
+)))
+
+console.table(Object.fromEntries(Object.entries(splitResults).map(
+  ([name, result]) => [name, {
+    initialGzipBytes: result.initial.gzipBytes,
+    lazyGzipBytes: result.lazy.gzipBytes,
+    totalGzipBytes: result.total.gzipBytes,
+    files: result.total.files
+  }]
 )))
 
 const args = process.argv.slice(2)

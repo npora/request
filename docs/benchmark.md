@@ -478,3 +478,7 @@ all six HTTP rounds, request-count validation, consumer bundle contributions,
 fixed dependency versions, and browser comparison entry strings. It also records
 limitations and the next bundle-cost investigation. Keep versioned evidence
 separate from ignored scratch reports under `benchmark-results`.
+
+The [streaming parser split investigation](measurements/streaming-split/README.md)
+includes an unapplied candidate patch and before/after single-bundle, initial,
+and total split costs. It explains why parser-only dynamic loading was rejected.
