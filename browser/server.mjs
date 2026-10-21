@@ -54,6 +54,22 @@ const server = createServer(
         return
       }
 
+      if (url.pathname === '/api/cache-identity') {
+        sendJson(response, 200, {
+          cookie: request.headers.cookie ?? ''
+        }, { 'cache-control': 'max-age=60', vary: 'Cookie' })
+        return
+      }
+
+      if (url.pathname === '/api/cache-redirect') {
+        response.writeHead(302, {
+          location: '/api/cache-identity',
+          'cache-control': 'no-store'
+        })
+        response.end()
+        return
+      }
+
       if (url.pathname === '/api/user') {
         sendJson(response, 200, {
           id: 1,

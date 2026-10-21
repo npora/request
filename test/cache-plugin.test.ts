@@ -56,6 +56,36 @@ afterEach(() => {
 })
 
 describe('cachePlugin', () => {
+  it('should isolate credential modes while sharing default and same-origin', async () => {
+    const fetchMock = vi.fn().mockImplementation((_url, init) =>
+      Response.json({ credentials: init.credentials ?? 'same-origin' }))
+    vi.stubGlobal('fetch', fetchMock)
+    const request = createClient().use(cachePlugin())
+    const extensions = { cache: { enabled: true, ttl: 60000 } }
+    for (const credentials of ['include', 'omit', undefined, 'same-origin', 'include', 'omit'] as const) {
+      await expect(request.get('https://api.example.com/me', {
+        extensions, fetchOptions: { credentials }
+      })).resolves.toEqual({ credentials: credentials ?? 'same-origin' })
+    }
+    expect(fetchMock).toHaveBeenCalledTimes(3)
+  })
+
+  it.each([
+    { integrity: 'sha256-invalid' },
+    { redirect: 'error' as const }
+  ])('should bypass cached responses for transport constraints %j', async fetchOptions => {
+    const fetchMock = vi.fn().mockImplementation(() => Response.json({ ok: true }))
+    vi.stubGlobal('fetch', fetchMock)
+    const request = createClient().use(cachePlugin())
+    const extensions = { cache: { enabled: true, ttl: 60000 } }
+    await request.get('https://api.example.com/data', { extensions })
+    fetchMock.mockRejectedValue(new TypeError('Transport constraint failed'))
+    await expect(request.get('https://api.example.com/data', {
+      extensions, fetchOptions
+    })).rejects.toMatchObject({ code: 'NETWORK_ERROR' })
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
   it('should normalize equivalent URL objects to one cache key', async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       new Response('{"source":"network"}', {
@@ -2019,7 +2049,7 @@ describe('cachePlugin', () => {
     expect(second.config.context).toEqual({ traceId: 'second' })
   })
 
-  it('should preserve the default headerless cache key', async () => {
+  it('should include effective credentials in the headerless cache key', async () => {
     const capturedKeys: string[] = []
     const store: CacheStore = {
       get(key) {
@@ -2073,6 +2103,7 @@ describe('cachePlugin', () => {
       url: '/headerless',
       query: [],
       responseType: 'auto',
+      credentials: 'same-origin',
       headers: [
         ['accept', null],
         ['accept-language', null],

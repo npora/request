@@ -69,6 +69,7 @@ export interface RetryOptions {
 
   /**
    * Maximum retry delay in milliseconds.
+   * Server retry delays above this limit stop retries instead of being shortened.
    *
    * @default 60000
    */

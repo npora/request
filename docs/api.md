@@ -1009,8 +1009,8 @@ Asynchronous `shouldRetry`, delay and jitter results observe the same signal,
 so application retry policies cannot keep an aborted request pending.
 Valid `Retry-After`, `RateLimit-Reset`, `X-RateLimit-Retry-After`,
 `X-RateLimit-Reset`, and `X-Rate-Limit-Reset` response headers take precedence
-over the configured delay and are capped by `maxDelay`. `Retry-After` is
-authoritative when present. Reset values may be delay seconds or current-era
+over the configured delay. Server delays above `maxDelay` stop retries rather
+than being shortened. `Retry-After` is authoritative when present. Reset values may be delay seconds or current-era
 Unix timestamps. Server delays are not randomized. HTTP 413 is retried by
 default only when a valid timing header is present.
 

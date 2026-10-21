@@ -17,6 +17,7 @@ export function createCacheKey(
   const method = config.method ?? 'GET'
   const url = String(config.url)
   const responseType = config.responseType ?? 'auto'
+  const credentials = config.fetchOptions?.credentials ?? 'same-origin'
   const bare = !config.headers && !config.query && !config.searchParams
 
   if (
@@ -25,7 +26,8 @@ export function createCacheKey(
     memo.method === method &&
     memo.baseURL === config.baseURL &&
     memo.url === url &&
-    memo.responseType === responseType
+    memo.responseType === responseType &&
+    memo.credentials === credentials
   ) {
     return memo.key
   }
@@ -38,6 +40,7 @@ export function createCacheKey(
       ? EMPTY_QUERY
       : normalizeQuery(config.searchParams ?? config.query),
     responseType,
+    credentials,
     headers: config.headers
       ? normalizeCacheHeaders(
           new Headers(config.headers),
@@ -51,6 +54,7 @@ export function createCacheKey(
     memo.baseURL = config.baseURL
     memo.url = url
     memo.responseType = responseType
+    memo.credentials = credentials
     memo.key = key
   }
 
@@ -61,6 +65,7 @@ export interface CacheKeyMemo {
   method?: HttpMethod
   baseURL?: string
   url?: string
+  credentials?: RequestCredentials
   responseType?: string
   key?: string
 }

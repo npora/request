@@ -51,7 +51,7 @@ combination of application callbacks and plugins.
 | Plugin installation, removal, dependencies and composition | [plugins](../test/plugin.test.ts), [composition](../test/plugin-composition.test.ts) | Session and batch workflows |
 | Authentication, refresh coalescing and token storage | [auth](../test/auth-plugin.test.ts), [storage](../test/auth-storage.test.ts) | Account isolation and installed session workflows |
 | Retry policy, Retry-After, jitter and retry budgets | [retry](../test/retry-plugin.test.ts) | Installed Node consumer and bounded batch workflow |
-| HTTP cache, deduplication, validators, stale policies and invalidation | [cache](../test/cache-plugin.test.ts), [unshared revalidation](../test/cache-unshared-revalidation.test.ts) | Browser cache; installed cache consumer |
+| HTTP cache, deduplication, validators, stale policies and invalidation | [cache](../test/cache-plugin.test.ts), [unshared revalidation](../test/cache-unshared-revalidation.test.ts) | [Browser credential/integrity/redirect isolation](../browser/tests/cache-transport.spec.ts); browser cache; installed cache consumer |
 | Cache refresh lease cancellation/removal | [lease lifecycle](../test/cache-lease-lifecycle.test.ts) | Browser cross-context Web Locks coordination |
 | Compact memory cache | [memory cache](../test/memory-cache-plugin.test.ts) | Installed Node consumer |
 | Memory/Web Storage/IndexedDB/tiered stores | [cache stores](../test/cache-plugin.test.ts), [IndexedDB boundaries](../test/indexeddb-cache-helpers.test.ts), [tiered stores](../test/tiered-cache-store.test.ts) | Real browser storage, migrations, quotas, broadcast and locks |

@@ -21,7 +21,13 @@ application.
 - Logger output omits headers, bodies, auth configuration, response bodies,
   causes, URL credentials, and sensitive query values.
 - Default cache keys vary by authorization, cookie, accept, and language
-  headers to prevent cross-session cache reuse.
+  headers, and by effective Fetch credential mode (omitted means `same-origin`).
+  Ambient cookie changes still require account-scoped stores or cache
+  invalidation at login/logout. Explicit keys remain caller-owned and must
+  include the appropriate credential and account scope. The generated key
+  format changes, so previously persisted automatic entries are not reused.
+- Requests with explicit integrity or non-follow redirect policies bypass the
+  full cache to preserve transport checks.
 - Responses marked `Cache-Control: no-store` or `Vary: *` are not persisted
   by the cache plugin.
 - Cache freshness never exceeds the configured TTL or a valid response
