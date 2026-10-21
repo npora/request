@@ -52,6 +52,26 @@ describe('streaming parser guards', () => {
     expect(vi.getTimerCount()).toBe(0)
   })
 
+  it.each(['sse', 'ndjson'] as const)('interrupts pending %s item validation when the body idles', async responseType => {
+    vi.useFakeTimers()
+    let finish!: (value: { value: unknown }) => void
+    const schema: StandardSchemaV1 = {
+      '~standard': { version: 1, vendor: 'pending', validate: () => new Promise(resolve => { finish = resolve }) }
+    }
+    const source = new ReadableStream<Uint8Array>({
+      start(c) { c.enqueue(bytes(responseType === 'sse' ? 'data: 1\n\n' : '1\n')) }
+    })
+    const iterable = await createClient({ fetch: async () => new Response(source) })
+      .get<AsyncIterable<unknown>>('https://example.test/', { responseType, streamIdleTimeout: 50, itemSchema: schema })
+    const assertion = expect(iterable[Symbol.asyncIterator]().next()).rejects.toMatchObject({ code: 'TIMEOUT_ERROR' })
+    await vi.advanceTimersByTimeAsync(50)
+    await assertion
+    expect(source.locked).toBe(false)
+    expect(vi.getTimerCount()).toBe(0)
+    finish({ value: 'late' })
+    await vi.advanceTimersByTimeAsync(0)
+  })
+
   it('keeps total timeout active during schema validation after transport EOF', async () => {
     vi.useFakeTimers()
     const schema: StandardSchemaV1 = {

@@ -19,6 +19,7 @@ interface StreamingParserContext {
   config: RequestConfig
   response: Response
   signal?: AbortSignal | null
+  schemaConfig?: RequestConfig
   start(): void
 }
 
@@ -188,14 +189,7 @@ async function validateStreamingItem<T>(
     status: context.response.status,
     statusText: context.response.statusText,
     headers: context.response.headers,
-    config: context.signal && context.signal !== context.config.signal
-      ? {
-          ...context.config,
-          signal: context.config.signal
-            ? AbortSignal.any([context.config.signal, context.signal])
-            : context.signal
-        }
-      : context.config,
+    config: context.schemaConfig ?? context.config,
     raw: context.response
   }
   const locationText = kind === 'NDJSON'
@@ -232,7 +226,24 @@ async function* decodeLines(
   let fragmentSize = 0
   let eventSize = 0
   let streamError: unknown
-  void reader.closed.catch(error => { streamError = error })
+  // One combined signal per stream, rather than per item. Body failures must
+  // also interrupt a pending schema validator instead of leaving iteration hung.
+  const failure = context.config.itemSchema ? new AbortController() : undefined
+  if (failure) {
+    const signals = [failure.signal]
+    if (context.config.signal) signals.push(context.config.signal)
+    if (context.signal && context.signal !== context.config.signal) signals.push(context.signal)
+    context.schemaConfig = {
+      ...context.config,
+      signal: signals.length === 1 ? failure.signal : AbortSignal.any(signals)
+    }
+  }
+  void reader.closed.catch(error => {
+    streamError = error
+    failure?.abort(isRequestError(error)
+      ? error
+      : parserError('Failed to parse streaming response', context, error))
+  })
   const check = () => {
     checkSignal(context)
     if (streamError !== undefined) throw streamError

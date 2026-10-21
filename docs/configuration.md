@@ -57,7 +57,7 @@ Optional features have additional prerequisites:
 | Persistent cache stores | Caller-supplied Web Storage or IndexedDB; storage access can be denied by browser policy. |
 | Cross-context cache invalidation | Caller-supplied BroadcastChannel. |
 | Cross-context refresh coordination | Caller-supplied Web Locks manager; omit coordination when unavailable. |
-| Streaming item validation with combined signals | Native `AbortSignal.any` when both a per-attempt signal and a separate lifecycle signal are present. |
+| Streaming item validation with request cancellation/deadlines | Native `AbortSignal.any` combines the request signals with body-failure cancellation. |
 
 ## Core options
 

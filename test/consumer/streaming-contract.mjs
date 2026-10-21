@@ -125,6 +125,15 @@ export async function checkStreamingContract({ createClient, isRequestError, dow
   })), error => error.code === 'TIMEOUT_ERROR')
 
   const inherited = new AbortController()
+  const pendingValidation = createClient({ fetch: async () => new Response(new ReadableStream({
+    start(c) { c.enqueue(bytes('1\n')) }
+  })) })
+  await assert.rejects(collect(await pendingValidation.ndjson('https://example.test/pending-validation', {
+    streamIdleTimeout: 10,
+    itemSchema: { '~standard': {
+      version: 1, vendor: 'pending-consumer', validate: () => new Promise(() => {})
+    } }
+  })), error => error.code === 'TIMEOUT_ERROR')
   let connections = 0
   const reconnecting = createClient({
     signal: inherited.signal,

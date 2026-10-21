@@ -75,10 +75,22 @@ test('enforces decoded-record cancellation and streaming guards', async ({ page 
         results.push('unexpected-timeout')
       } catch (error) { results.push((error as { code: string }).code) }
     }
+    for (const responseType of ['sse', 'ndjson'] as const) {
+      const data = await createClient({ fetch: async () => new Response(new ReadableStream({
+        start(c) { c.enqueue(new TextEncoder().encode(responseType === 'sse' ? 'data: 1\n\n' : '1\n')) }
+      })) }).get<AsyncIterable<unknown>>('/unused', {
+        responseType, streamIdleTimeout: 10,
+        itemSchema: { '~standard': {
+          version: 1, vendor: 'browser-pending', validate: () => new Promise(() => {})
+        } }
+      })
+      try { for await (const item of data) void item; results.push('unexpected-validation') }
+      catch (error) { results.push((error as { code: string }).code) }
+    }
     return results
   })
   expect(results).toEqual([
     'ABORT_ERROR', 'ABORT_ERROR', 'RESPONSE_TOO_LARGE', 'RESPONSE_TOO_LARGE',
-    'TIMEOUT_ERROR', 'TIMEOUT_ERROR', 'TIMEOUT_ERROR'
+    'TIMEOUT_ERROR', 'TIMEOUT_ERROR', 'TIMEOUT_ERROR', 'TIMEOUT_ERROR', 'TIMEOUT_ERROR'
   ])
 })
