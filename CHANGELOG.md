@@ -1,5 +1,11 @@
 # @npora/request
 
+## 1.20.1
+
+### Patch Changes
+
+- ccfac72: Isolate full-cache entries by effective Fetch credential mode and bypass caching for integrity and non-follow redirect constraints. Stop retries when server-provided retry delays exceed maxDelay instead of retrying before the requested time.
+
 ## 1.20.0
 
 ### Minor Changes
