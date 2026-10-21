@@ -468,7 +468,8 @@ the built-in decision; return `undefined` to fall back to `statusCodes`,
 `Retry-After` takes precedence over `RateLimit-Reset`,
 `X-RateLimit-Retry-After`, `X-RateLimit-Reset`, and
 `X-Rate-Limit-Reset`. Reset values accept delay seconds or current-era Unix
-timestamps. Server delays are capped by `maxDelay` and are never jittered.
+timestamps. Server delays above `maxDelay` stop retries rather than being
+shortened; server delays are never jittered.
 
 ### `extensions.memoryCache`
 

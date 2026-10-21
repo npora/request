@@ -235,6 +235,10 @@ function finalizeRetryDecision(
   const serverDelay = options.respectRetryAfter
     ? parseServerRetryDelay(error)
     : undefined
+  if (serverDelay !== undefined && serverDelay > options.maxDelay) {
+    return undefined
+  }
+
   const baseDelay = normalizeRetryDelay(
     serverDelay ?? configuredDelay,
     options.maxDelay

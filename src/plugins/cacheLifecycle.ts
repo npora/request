@@ -27,7 +27,9 @@ export function isCacheableRequest(
     config.responseType !== 'bytes' &&
     config.responseType !== 'formData' &&
     config.fetchOptions?.mode !== 'no-cors' &&
-    config.fetchOptions?.redirect !== 'manual'
+    config.fetchOptions?.integrity === undefined &&
+    (config.fetchOptions?.redirect === undefined ||
+      config.fetchOptions.redirect === 'follow')
   )
 }
 

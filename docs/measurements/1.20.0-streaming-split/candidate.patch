@@ -1,0 +1,66 @@
+--- a/src/utils/parseResponse.ts
++++ b/src/utils/parseResponse.ts
+@@ -1,9 +1,5 @@
+ import { isRequestError, RequestError } from '../errors'
+ import type { RequestConfig, ResponseType } from '../types'
+-import {
+-  parseNdjson,
+-  parseServerSentEvents
+-} from './parseStreamingResponse'
+ import { isArrayBuffer } from './isBinaryBody'
+ import { getSseControl } from './sseControl'
+ 
+@@ -112,7 +108,7 @@
+         rejectOversizedContentLength(response, maxSize, config)
+         response = new Response(limitResponseStream(response, maxSize, config), response)
+       }
+-      return parseStreamingResponse<T>(response, responseType, config, readSignal)
++      return await parseStreamingResponse<T>(response, responseType, config, readSignal)
+     }
+ 
+     if (
+@@ -337,12 +333,14 @@
+     : new Uint8Array(await response.arrayBuffer())
+ }
+ 
+-function parseStreamingResponse<T>(
++async function parseStreamingResponse<T>(
+   response: Response,
+   responseType: Extract<ResponseType, 'stream' | 'sse' | 'ndjson'>,
+   config: RequestConfig,
+   signal?: AbortSignal
+-): T {
++): Promise<T> {
++  if (responseType === 'stream') return response.body as T
++  const { parseServerSentEvents, parseNdjson } = await import('./parseStreamingResponse')
+   switch (responseType) {
+     case 'sse':
+       return parseServerSentEvents(
+--- a/src/client/Client.ts
++++ b/src/client/Client.ts
+@@ -26,7 +26,6 @@
+ import { hasOwnProperty } from '../utils/hasOwnProperty'
+ import { trustDefaults } from '../core/trustedDefaults'
+ import { requestToConfig } from './requestInput'
+-import { createReconnectingSse } from './reconnectSse'
+ 
+ type MethodConfig = Omit<RequestConfig, 'url' | 'method'>
+ 
+@@ -539,7 +538,7 @@
+       }).then(response => response.data ?? emptySse())
+     }
+ 
+-    return createReconnectingSse(
++    return import('./reconnectSse').then(({ createReconnectingSse }) => createReconnectingSse(
+       url,
+       { signal: this.defaults.signal, ...requestConfig, itemSchema },
+       reconnect,
+@@ -547,7 +546,7 @@
+         ...next,
+         responseType: 'sse'
+       })
+-    )
++    ))
+   }
+ 
+   /**
