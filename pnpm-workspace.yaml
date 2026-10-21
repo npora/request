@@ -8,6 +8,8 @@ minimumReleaseAgeStrict: true
 trustPolicy: no-downgrade
 
 overrides:
+  "vite@>=8.0.0 <8.1.6": "8.1.6"
+  "launch-editor@<2.14.2": "2.14.2"
   "esbuild@>=0.27.3 <0.28.1": "^0.28.1"
   "postcss@<=8.5.17": "^8.5.18"
   "postcss>nanoid": "3.3.18"

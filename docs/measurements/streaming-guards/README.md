@@ -131,3 +131,17 @@ Mixed stress uses fixtures, rather than millions of real network calls. Results
 are local Node measurements with no TLS or remote service and do not prove
 production capacity, leak freedom, or behavior on every supported runtime.
 Earlier-day snapshots are not paired baselines for a regression claim.
+
+## Development-tooling security follow-up
+
+PR #148's initial dependency audit identified
+[GHSA-587h-7wmj-h5pm](https://github.com/advisories/GHSA-587h-7wmj-h5pm).
+Targeted workspace overrides update Vite to 8.1.6 and launch-editor to 2.14.2,
+including the Rolldown patch required by that Vite release. The release-age and
+trust policies remain enabled. The frozen-lockfile install and audit passed
+with no known vulnerabilities; all 930 tests passed again with the patched tools.
+
+Rebuilding after that lockfile change produced exactly the same distribution
+SHA-256 shown above, and package/export/size checks passed. The archived reports
+retain the original measurement commit and lockfile identity; they are historical
+evidence, rather than a claim that the final development lockfile is identical.
