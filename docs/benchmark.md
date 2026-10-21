@@ -473,6 +473,12 @@ and raw rounds alongside medians; do not turn these results into an absolute
 
 ### Versioned evidence
 
+The [unreleased streaming-guards candidate](measurements/streaming-guards/README.md)
+records the fixed implementation commit, before/after package and consumer
+costs, all six HTTP rounds, adverse HTTP scenarios, serialized stress/streaming
+checks, and the explicit budget tradeoff for the new guards. Its manifest still
+says 1.19.6; it is distinct from the already published 1.19.6 build.
+
 The [1.19.3 snapshot](measurements/1.19.3/README.md) records a clean-commit run,
 all six HTTP rounds, request-count validation, consumer bundle contributions,
 fixed dependency versions, and browser comparison entry strings. It also records
