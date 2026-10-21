@@ -1,0 +1,113 @@
+{
+  "sourceCommit": "10292db7f89605bb78512f121c7e60dd9ef05229",
+  "baselineCommit": "085e55d05ca75ffae6833277ae6a44b5dcc65191",
+  "state": "Unreleased candidate based on 1.19.6; the manifest version has not been bumped.",
+  "runtime": {
+    "node": "v24.18.0",
+    "platform": "darwin",
+    "architecture": "arm64",
+    "cpuModel": "Apple M3",
+    "logicalCpus": 8
+  },
+  "provenance": {
+    "gitCommit": "10292db7f89605bb78512f121c7e60dd9ef05229",
+    "gitDirty": false,
+    "buildSha256": "cb0f5c8cc237ceb05ed5815d114f14239a10fe8cd589daa1350fa4d34a11fec0",
+    "dependencyLockSha256": "3674fb534986655a0dc397a5c6a1953651dfe8b1f9a806072b66c5594b7116ea"
+  },
+  "validation": {
+    "unitAndIntegrationTests": 930,
+    "browserTests": 207,
+    "browserEngines": [
+      "Chromium",
+      "Firefox",
+      "WebKit"
+    ],
+    "installedConsumers": [
+      "ESM",
+      "CommonJS"
+    ],
+    "performanceBudgetChecks": 8,
+    "typeChecks": [
+      "source",
+      "public API",
+      "examples",
+      "benchmarks"
+    ],
+    "packageContracts": "passed",
+    "complexityBudget": "passed",
+    "documentationLinks": "passed"
+  },
+  "stress": {
+    "operations": 11000000,
+    "unexpectedFailures": 0,
+    "scenariosPerRun": 28,
+    "concurrency": [
+      64,
+      256
+    ],
+    "runs": [
+      "stress-10m.json",
+      "stress-c256.json"
+    ]
+  },
+  "streaming": {
+    "recordsValidated": 2000000,
+    "validationFailuresVerified": 2,
+    "cancellationPropagationsVerified": 2
+  },
+  "http": {
+    "comparisonRequests": 594000,
+    "invalidComparisonRequests": 0,
+    "edgeRequests": 24240,
+    "edgeServerDisconnects": 6060,
+    "concurrencyRequests": 100500,
+    "totalRequests": 718740
+  },
+  "sizes": {
+    "before": {
+      "bytes": 136674,
+      "unpackedBytes": 516524,
+      "budget": {
+        "bytes": 136750,
+        "unpackedBytes": 517100
+      }
+    },
+    "after": {
+      "bytes": 131899,
+      "unpackedBytes": 478824,
+      "budget": {
+        "bytes": 136750,
+        "unpackedBytes": 517100
+      }
+    },
+    "coreConsumerGzipBefore": 13888,
+    "coreConsumerGzipAfter": 14287
+  },
+  "limitations": [
+    "Local Node.js/darwin arm64 measurements, not production capacity or universal rankings.",
+    "Mixed logical-operation stress uses fixtures and is separate from real loopback HTTP counts.",
+    "Cancellation includes intentional disconnects; only unexpected failures count as failures.",
+    "HTTP heap deltas are uncollected process differences, not retained/peak memory or leak proofs.",
+    "Fixed competitor versions, different transports/features, shared process, no TLS/remote service.",
+    "Performance runners were serialized; earlier-day snapshots are not paired regression baselines."
+  ],
+  "artifactSha256": {
+    "browser-after.json": "a05aeb5b723f1f4e5acd0d471c983f2ef47ac2c11e34128929da3f74c05bd453",
+    "browser-before.json": "68b6daa89f89f36210daaaa611126785f60c09418f66196274cb6e02d57ae1df",
+    "consumer-after.json": "258c96f3a7a8b4437f474f4d70ccd08353f6c1f934aa29ff1f5ac51a1ddc934c",
+    "consumer-before.json": "f643050b341612cebe0dc80a9a40f12c566125ba13ff7e98af29f3d506891372",
+    "coverage.json": "2f5f15c9913e3fb880eb0c304438cd3e085c6d86e7e92e87e66e8b9d276a40b8",
+    "http-c256.json": "4b0e2b45edeb6a39d5102acea5a57b2c8a439095fb7c153f7cf9216bcd882de1",
+    "http-comparison.json": "3a922188606529f32b04b138c1d499d3885bcacc2bcbd5b0086a4007589bfbf2",
+    "http-edge-cases.json": "fdf538d67554598a3a2e1fbbfe8345fcee640063369f5dab59090af24c661754",
+    "package-after.json": "fb8b97ffb8cddae92ed22be4d0105fb3e3ef4a1af5e4b0460c1a39bde359326a",
+    "package-before.json": "c87301186f76f2f4c2ef318b5651dc9cb28887f457c53dbbaa0da78d4a1554e3",
+    "reproduce-baseline-size.mjs": "b1cadde40b7e213df909d5da1f54af8fd6605f7fa5b88c0fef2b2bd0c98e8702",
+    "request.json": "afb05c0b1349a386b6b3813afc213eaba7168de45b96a8555743d81c9f86ffcd",
+    "streaming-lines.json": "0c78fd3b1a42fe967d714b7d335213735396d43c0b0bd5f6d2bf06e34d3e1f0a",
+    "streaming-schema.json": "95e7db6b0913b34bb1ce4b5060b08356adc1b5132d794e899c46b122225d47ee",
+    "stress-10m.json": "0bf6dbb5b137bc9ed28849d09ff75e7859a5648266acbb7193d5caf384af2d8e",
+    "stress-c256.json": "9608b8718189afa77ef0094000e28fab012da87952ad7d707ea4c0ca14bdf017"
+  }
+}

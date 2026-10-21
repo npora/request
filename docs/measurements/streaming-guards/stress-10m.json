@@ -1,0 +1,483 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-10-21T02:01:24.936Z",
+  "runtime": {
+    "node": "v24.18.0",
+    "platform": "darwin",
+    "architecture": "arm64"
+  },
+  "configuration": {
+    "requestedOperations": 10000000,
+    "completedOperations": 10000000,
+    "concurrency": 64,
+    "warmup": 200,
+    "latencySampleLimit": 4096,
+    "forcedGarbageCollection": true
+  },
+  "summary": {
+    "durationMs": 50578.518833999995,
+    "unexpectedFailures": 0,
+    "adapterAttempts": {
+      "retries": 1200000,
+      "cacheDedupe": 18184
+    },
+    "progressEvents": {
+      "uploadXhr": 100000,
+      "downloadFetch": 100000,
+      "downloadXhr": 200000
+    },
+    "traceContextInjections": 200200,
+    "telemetryMetricMeasurements": 1200600,
+    "streamRecords": 150000
+  },
+  "scenarios": {
+    "coreBare": {
+      "operations": 1000000,
+      "durationMs": 384.993833,
+      "operationsPerSecond": 2597444.2037361152,
+      "failures": 0,
+      "heapDeltaBytes": -32672,
+      "peakRssBytes": 112230400,
+      "latencySampleSize": 4096,
+      "latencyMs": {
+        "mean": 0.024725356445311847,
+        "p50": 0.023957999999993262,
+        "p95": 0.025666000000001077,
+        "p99": 0.04216699999994944,
+        "max": 0.12820799999997234
+      }
+    },
+    "configSerialization": {
+      "operations": 800000,
+      "durationMs": 1153.9359160000001,
+      "operationsPerSecond": 693279.400448092,
+      "failures": 0,
+      "heapDeltaBytes": 138280,
+      "peakRssBytes": 137232384,
+      "latencySampleSize": 4096,
+      "latencyMs": {
+        "mean": 0.09252791259765644,
+        "p50": 0.08983400000010988,
+        "p95": 0.10062500000003638,
+        "p99": 0.16754199999991215,
+        "max": 0.7314590000000862
+      }
+    },
+    "interceptorLifecycle": {
+      "operations": 600000,
+      "durationMs": 749.6853330000001,
+      "operationsPerSecond": 800335.785680897,
+      "failures": 0,
+      "heapDeltaBytes": 111384,
+      "peakRssBytes": 137510912,
+      "latencySampleSize": 4096,
+      "latencyMs": {
+        "mean": 0.07997457080078019,
+        "p50": 0.07704200000034689,
+        "p95": 0.08524999999985994,
+        "p99": 0.16499999999996362,
+        "max": 0.42666699999995217
+      }
+    },
+    "cacheHit": {
+      "operations": 600000,
+      "durationMs": 2626.216958,
+      "operationsPerSecond": 228465.51126413068,
+      "failures": 0,
+      "heapDeltaBytes": 496128,
+      "peakRssBytes": 165298176,
+      "latencySampleSize": 4096,
+      "latencyMs": {
+        "mean": 0.2799020153808647,
+        "p50": 0.26399999999966894,
+        "p95": 0.3188749999999345,
+        "p99": 0.7729580000004717,
+        "max": 1.960790999999972
+      }
+    },
+    "cacheDedupe": {
+      "operations": 400000,
+      "durationMs": 1737.6305410000004,
+      "operationsPerSecond": 230198.5321746252,
+      "failures": 0,
+      "heapDeltaBytes": 469936,
+      "peakRssBytes": 177094656,
+      "latencySampleSize": 4096,
+      "latencyMs": {
+        "mean": 0.2789414865722668,
+        "p50": 0.2699160000001939,
+        "p95": 0.31362499999977445,
+        "p99": 0.9293330000000424,
+        "max": 1.2552920000007362
+      }
+    },
+    "cacheClearRaces": {
+      "operations": 100000,
+      "durationMs": 1299.8249160000005,
+      "operationsPerSecond": 76933.43831854964,
+      "failures": 0,
+      "heapDeltaBytes": 551288,
+      "peakRssBytes": 364986368,
+      "latencySampleSize": 4096,
+      "latencyMs": {
+        "mean": 0.8294345090332054,
+        "p50": 0.7605839999996533,
+        "p95": 0.9281659999996918,
+        "p99": 5.173125000000255,
+        "max": 6.352958000000399
+      }
+    },
+    "concurrencyImmediate": {
+      "operations": 700000,
+      "durationMs": 769.989458,
+      "operationsPerSecond": 909103.3555423041,
+      "failures": 0,
+      "heapDeltaBytes": 74160,
+      "peakRssBytes": 365019136,
+      "latencySampleSize": 4096,
+      "latencyMs": {
+        "mean": 0.07043364038083721,
+        "p50": 0.06891599999835307,
+        "p95": 0.07504200000039418,
+        "p99": 0.09437500000058208,
+        "max": 0.37745800000084273
+      }
+    },
+    "rateLimitImmediate": {
+      "operations": 200000,
+      "durationMs": 208.18725000000086,
+      "operationsPerSecond": 960673.6243453871,
+      "failures": 0,
+      "heapDeltaBytes": 2167312,
+      "peakRssBytes": 369819648,
+      "latencySampleSize": 4096,
+      "latencyMs": {
+        "mean": 0.06662597583008756,
+        "p50": 0.06129200000032142,
+        "p95": 0.11237500000061118,
+        "p99": 0.13133399999969697,
+        "max": 0.4156669999993028
+      }
+    },
+    "openTelemetryImmediate": {
+      "operations": 200000,
+      "durationMs": 919.515625,
+      "operationsPerSecond": 217505.8199799487,
+      "failures": 0,
+      "heapDeltaBytes": 152008,
+      "peakRssBytes": 367198208,
+      "latencySampleSize": 4096,
+      "latencyMs": {
+        "mean": 0.29436755615234,
+        "p50": 0.28445800000008603,
+        "p95": 0.3524170000000595,
+        "p99": 0.4160830000000715,
+        "max": 1.3222500000010768
+      }
+    },
+    "openTelemetryMetricsImmediate": {
+      "operations": 200000,
+      "durationMs": 329.17170799999985,
+      "operationsPerSecond": 607585.6312657347,
+      "failures": 0,
+      "heapDeltaBytes": 112568,
+      "peakRssBytes": 367460352,
+      "latencySampleSize": 4096,
+      "latencyMs": {
+        "mean": 0.10499768603515447,
+        "p50": 0.0982079999994312,
+        "p95": 0.13708299999962037,
+        "p99": 0.16283300000031886,
+        "max": 2.3520840000001044
+      }
+    },
+    "concurrencyContended": {
+      "operations": 600000,
+      "durationMs": 1579.0755419999987,
+      "operationsPerSecond": 379969.15539586043,
+      "failures": 0,
+      "heapDeltaBytes": 107496,
+      "peakRssBytes": 367460352,
+      "latencySampleSize": 4096,
+      "latencyMs": {
+        "mean": 0.16835471801757018,
+        "p50": 0.16437500000029104,
+        "p95": 0.17670800000087183,
+        "p99": 0.24024999999892316,
+        "max": 0.6332500000007713
+      }
+    },
+    "queueCancellation": {
+      "operations": 200000,
+      "durationMs": 1625.4498749999984,
+      "operationsPerSecond": 123042.85913461355,
+      "failures": 0,
+      "heapDeltaBytes": 523296,
+      "peakRssBytes": 368443392,
+      "latencySampleSize": 4096,
+      "latencyMs": {
+        "mean": 0.5211036562499873,
+        "p50": 0.72020799999882,
+        "p95": 1.0380410000016127,
+        "p99": 1.7999999999992724,
+        "max": 3.491707999999562
+      }
+    },
+    "circuitClosed": {
+      "operations": 600000,
+      "durationMs": 658.1718330000003,
+      "operationsPerSecond": 911616.0399407424,
+      "failures": 0,
+      "heapDeltaBytes": 75928,
+      "peakRssBytes": 368312320,
+      "latencySampleSize": 4096,
+      "latencyMs": {
+        "mean": 0.07069701245115123,
+        "p50": 0.06866599999921164,
+        "p95": 0.07529199999953562,
+        "p99": 0.09633299999950395,
+        "max": 0.36266600000089966
+      }
+    },
+    "circuitTransitions": {
+      "operations": 300000,
+      "durationMs": 2067.3906669999997,
+      "operationsPerSecond": 145110.45483016106,
+      "failures": 0,
+      "heapDeltaBytes": 181544,
+      "peakRssBytes": 368328704,
+      "latencySampleSize": 4096,
+      "latencyMs": {
+        "mean": 0.00706882104492923,
+        "p50": 0.011042000000088592,
+        "p95": 0.012083999999958905,
+        "p99": 0.02449999999953434,
+        "max": 0.3175420000006852
+      }
+    },
+    "circuitAsyncPolicy": {
+      "operations": 100000,
+      "durationMs": 1305.0799579999984,
+      "operationsPerSecond": 76623.65772074796,
+      "failures": 0,
+      "heapDeltaBytes": 98064,
+      "peakRssBytes": 368345088,
+      "latencySampleSize": 4096,
+      "latencyMs": {
+        "mean": 0.8339285646972519,
+        "p50": 0.7545410000020638,
+        "p95": 1.5417919999999867,
+        "p99": 1.6034579999977723,
+        "max": 3.5004169999992882
+      }
+    },
+    "retryOnce": {
+      "operations": 600000,
+      "durationMs": 6128.188167,
+      "operationsPerSecond": 97908.22077412232,
+      "failures": 0,
+      "heapDeltaBytes": -1359280,
+      "peakRssBytes": 368705536,
+      "latencySampleSize": 4096,
+      "latencyMs": {
+        "mean": 0.6536067470703681,
+        "p50": 0.6472080000021379,
+        "p95": 0.6745829999999842,
+        "p99": 0.8461669999996957,
+        "max": 2.3428749999984575
+      }
+    },
+    "authAndLogger": {
+      "operations": 400000,
+      "durationMs": 1230.5134580000013,
+      "operationsPerSecond": 325067.55403564195,
+      "failures": 0,
+      "heapDeltaBytes": 684024,
+      "peakRssBytes": 370393088,
+      "latencySampleSize": 4096,
+      "latencyMs": {
+        "mean": 0.19768449365230367,
+        "p50": 0.17466699999931734,
+        "p95": 0.1975830000010319,
+        "p99": 0.2655410000006668,
+        "max": 7.592624999997497
+      }
+    },
+    "authRefreshCancellation": {
+      "operations": 100000,
+      "durationMs": 1699.163292000001,
+      "operationsPerSecond": 58852.495502239195,
+      "failures": 0,
+      "heapDeltaBytes": 398488,
+      "peakRssBytes": 371572736,
+      "latencySampleSize": 4096,
+      "latencyMs": {
+        "mean": 1.0885988967285227,
+        "p50": 1.0567920000030426,
+        "p95": 1.539082999999664,
+        "p99": 2.0308750000003783,
+        "max": 4.1060839999991
+      }
+    },
+    "asyncExtensionCancellation": {
+      "operations": 100000,
+      "durationMs": 2928.873374999999,
+      "operationsPerSecond": 34142.82121363476,
+      "failures": 0,
+      "heapDeltaBytes": 361696,
+      "peakRssBytes": 371884032,
+      "latencySampleSize": 4096,
+      "latencyMs": {
+        "mean": 1.8744604416504158,
+        "p50": 1.6019999999989523,
+        "p95": 2.6110420000004524,
+        "p99": 3.7943340000019816,
+        "max": 5.222958999998809
+      }
+    },
+    "standardSchema": {
+      "operations": 400000,
+      "durationMs": 407.9282080000012,
+      "operationsPerSecond": 980564.6977960368,
+      "failures": 0,
+      "heapDeltaBytes": 122768,
+      "peakRssBytes": 371949568,
+      "latencySampleSize": 4096,
+      "latencyMs": {
+        "mean": 0.06508896582031998,
+        "p50": 0.0630410000012489,
+        "p95": 0.07437500000014552,
+        "p99": 0.09741700000085984,
+        "max": 0.6060839999991003
+      }
+    },
+    "errorsAndPreAbortedSignals": {
+      "operations": 300000,
+      "durationMs": 2683.964750000003,
+      "operationsPerSecond": 111774.94041231342,
+      "failures": 0,
+      "heapDeltaBytes": 386656,
+      "peakRssBytes": 372768768,
+      "latencySampleSize": 4096,
+      "latencyMs": {
+        "mean": 0.5730192141113237,
+        "p50": 0.5632079999995767,
+        "p95": 0.6075419999979204,
+        "p99": 0.663457999999082,
+        "max": 3.1743340000030003
+      }
+    },
+    "uploadFetchFormData": {
+      "operations": 200000,
+      "durationMs": 4871.448707999996,
+      "operationsPerSecond": 41055.548767568005,
+      "failures": 0,
+      "heapDeltaBytes": 685040,
+      "peakRssBytes": 377143296,
+      "latencySampleSize": 4096,
+      "latencyMs": {
+        "mean": 0.780313772949258,
+        "p50": 0.7693329999965499,
+        "p95": 0.824958000004699,
+        "p99": 1.0544999999983702,
+        "max": 5.746666999999434
+      }
+    },
+    "uploadXhrProgress": {
+      "operations": 100000,
+      "durationMs": 4540.424457999994,
+      "operationsPerSecond": 22024.372594461987,
+      "failures": 0,
+      "heapDeltaBytes": 539968,
+      "peakRssBytes": 387661824,
+      "latencySampleSize": 4096,
+      "latencyMs": {
+        "mean": 1.4547602470703005,
+        "p50": 1.4132079999981215,
+        "p95": 1.4922909999950207,
+        "p99": 1.7156669999967562,
+        "max": 10.379290999997465
+      }
+    },
+    "downloadFetchProgress": {
+      "operations": 100000,
+      "durationMs": 1647.297375000002,
+      "operationsPerSecond": 60705.49344498281,
+      "failures": 0,
+      "heapDeltaBytes": 984696,
+      "peakRssBytes": 388530176,
+      "latencySampleSize": 4096,
+      "latencyMs": {
+        "mean": 0.5291631340331993,
+        "p50": 0.49558300000353483,
+        "p95": 0.6089170000050217,
+        "p99": 1.7579999999943539,
+        "max": 6.554042000003392
+      }
+    },
+    "downloadXhrProgress": {
+      "operations": 100000,
+      "durationMs": 1160.158666000003,
+      "operationsPerSecond": 86195.1066958627,
+      "failures": 0,
+      "heapDeltaBytes": 378360,
+      "peakRssBytes": 429326336,
+      "latencySampleSize": 4096,
+      "latencyMs": {
+        "mean": 0.37115861621091106,
+        "p50": 0.31770899999537505,
+        "p95": 0.39400000000023283,
+        "p99": 0.7792919999992591,
+        "max": 21.015708999999333
+      }
+    },
+    "sseAndNdjsonStreams": {
+      "operations": 100000,
+      "durationMs": 3249.3450840000005,
+      "operationsPerSecond": 30775.432407104712,
+      "failures": 0,
+      "heapDeltaBytes": 730320,
+      "peakRssBytes": 443252736,
+      "latencySampleSize": 4096,
+      "latencyMs": {
+        "mean": 0.5227806208496268,
+        "p50": 0.4912499999991269,
+        "p95": 0.5980419999978039,
+        "p99": 1.24775000000227,
+        "max": 4.029583999996248
+      }
+    },
+    "mixedPluginPipeline": {
+      "operations": 500000,
+      "durationMs": 1436.7084169999944,
+      "operationsPerSecond": 348017.7286383935,
+      "failures": 0,
+      "heapDeltaBytes": 646992,
+      "peakRssBytes": 443858944,
+      "latencySampleSize": 4096,
+      "latencyMs": {
+        "mean": 0.18548583837885424,
+        "p50": 0.1708749999961583,
+        "p95": 0.1864579999964917,
+        "p99": 0.23983399999997346,
+        "max": 5.0758330000026035
+      }
+    },
+    "disabledPluginFastPaths": {
+      "operations": 400000,
+      "durationMs": 915.3870420000021,
+      "operationsPerSecond": 436973.6315319166,
+      "failures": 0,
+      "heapDeltaBytes": 140336,
+      "peakRssBytes": 443858944,
+      "latencySampleSize": 4096,
+      "latencyMs": {
+        "mean": 0.14654006494143346,
+        "p50": 0.14237499999580905,
+        "p95": 0.16287500000180444,
+        "p99": 0.21562500000436557,
+        "max": 0.7164999999949941
+      }
+    }
+  }
+}

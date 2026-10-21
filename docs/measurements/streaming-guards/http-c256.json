@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-10-21T02:03:05.089Z",
+  "runtime": {
+    "node": "v24.18.0",
+    "platform": "darwin",
+    "architecture": "arm64"
+  },
+  "configuration": {
+    "operations": 100000,
+    "concurrency": 256,
+    "warmup": 500,
+    "output": "benchmark-results/review-1.19.6/http-c256.json",
+    "samples": 4096
+  },
+  "requestsReceived": 100500,
+  "scenarios": {
+    "localhostHttp": {
+      "operations": 100000,
+      "latencySamples": 4096,
+      "durationMs": 7271.511375,
+      "operationsPerSecond": 13752.299191033033,
+      "heapDeltaBytes": 77109032,
+      "latencyMs": {
+        "mean": 18.335682201904316,
+        "p50": 16.236292000000503,
+        "p95": 23.835541999999805,
+        "p99": 25.71387500000037,
+        "max": 1183.4559579999998
+      }
+    }
+  }
+}

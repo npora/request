@@ -1,0 +1,142 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-10-21T02:01:46.546Z",
+  "runtime": {
+    "node": "v24.18.0",
+    "platform": "darwin",
+    "architecture": "arm64"
+  },
+  "configuration": {
+    "maximumPayloadCharacters": 262144,
+    "rounds": 3,
+    "chunkBytes": 64
+  },
+  "scenarios": [
+    {
+      "format": "ndjson",
+      "payloadCharacters": 65536,
+      "chunkBytes": 64,
+      "chunks": 1025,
+      "medianMilliseconds": 3.216916999999995,
+      "samples": [
+        {
+          "milliseconds": 4.790208000000007,
+          "chunks": 1025
+        },
+        {
+          "milliseconds": 3.216916999999995,
+          "chunks": 1025
+        },
+        {
+          "milliseconds": 2.867500000000007,
+          "chunks": 1025
+        }
+      ]
+    },
+    {
+      "format": "ndjson",
+      "payloadCharacters": 131072,
+      "chunkBytes": 64,
+      "chunks": 2049,
+      "medianMilliseconds": 5.559792000000002,
+      "samples": [
+        {
+          "milliseconds": 5.559792000000002,
+          "chunks": 2049
+        },
+        {
+          "milliseconds": 6.1472499999999854,
+          "chunks": 2049
+        },
+        {
+          "milliseconds": 3.885499999999979,
+          "chunks": 2049
+        }
+      ]
+    },
+    {
+      "format": "ndjson",
+      "payloadCharacters": 262144,
+      "chunkBytes": 64,
+      "chunks": 4097,
+      "medianMilliseconds": 7.310791999999992,
+      "samples": [
+        {
+          "milliseconds": 7.385666000000015,
+          "chunks": 4097
+        },
+        {
+          "milliseconds": 7.310791999999992,
+          "chunks": 4097
+        },
+        {
+          "milliseconds": 6.693667000000005,
+          "chunks": 4097
+        }
+      ]
+    },
+    {
+      "format": "sse",
+      "payloadCharacters": 65536,
+      "chunkBytes": 64,
+      "chunks": 1025,
+      "medianMilliseconds": 2.14658399999999,
+      "samples": [
+        {
+          "milliseconds": 5.644499999999994,
+          "chunks": 1025
+        },
+        {
+          "milliseconds": 2.14658399999999,
+          "chunks": 1025
+        },
+        {
+          "milliseconds": 2.03120899999999,
+          "chunks": 1025
+        }
+      ]
+    },
+    {
+      "format": "sse",
+      "payloadCharacters": 131072,
+      "chunkBytes": 64,
+      "chunks": 2049,
+      "medianMilliseconds": 4.2580409999999915,
+      "samples": [
+        {
+          "milliseconds": 4.2580409999999915,
+          "chunks": 2049
+        },
+        {
+          "milliseconds": 4.286583000000007,
+          "chunks": 2049
+        },
+        {
+          "milliseconds": 3.2053750000000036,
+          "chunks": 2049
+        }
+      ]
+    },
+    {
+      "format": "sse",
+      "payloadCharacters": 262144,
+      "chunkBytes": 64,
+      "chunks": 4097,
+      "medianMilliseconds": 6.667833000000002,
+      "samples": [
+        {
+          "milliseconds": 6.588459,
+          "chunks": 4097
+        },
+        {
+          "milliseconds": 6.667833000000002,
+          "chunks": 4097
+        },
+        {
+          "milliseconds": 6.7949999999999875,
+          "chunks": 4097
+        }
+      ]
+    }
+  ]
+}

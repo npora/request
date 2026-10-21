@@ -86,7 +86,9 @@ export function finalizeTotalTimeout<T>(
       source,
       response.config.signal,
       response.config,
-      clear
+      clear,
+      Number.POSITIVE_INFINITY,
+      0
     )
     return { ...response, data: raw.body as T, raw }
   }

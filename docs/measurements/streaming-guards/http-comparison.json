@@ -1,0 +1,1938 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-10-21T02:02:48.288Z",
+  "package": {
+    "name": "@npora/request",
+    "version": "1.19.6"
+  },
+  "runtime": {
+    "node": "v24.18.0",
+    "platform": "darwin",
+    "architecture": "arm64",
+    "cpuModel": "Apple M3",
+    "logicalCpus": 8
+  },
+  "provenance": {
+    "gitCommit": "10292db7f89605bb78512f121c7e60dd9ef05229",
+    "gitDirty": false,
+    "buildSha256": "cb0f5c8cc237ceb05ed5815d114f14239a10fe8cd589daa1350fa4d34a11fec0",
+    "dependencyLockSha256": "3674fb534986655a0dc397a5c6a1953651dfe8b1f9a806072b66c5594b7116ea",
+    "comparisonLockSha256": "ffa2ec3e194880c1f9892ef457e9f36eda8b504a5be2fc347ed0713cdb165ca5"
+  },
+  "versions": {
+    "axios": "1.20.0",
+    "ky": "2.1.0",
+    "ofetch": "1.5.1"
+  },
+  "configuration": {
+    "operations": 5000,
+    "concurrency": 64,
+    "warmup": 500,
+    "output": "benchmark-results/review-1.19.6/http-comparison.json",
+    "samples": 4096,
+    "rounds": 6
+  },
+  "orders": [
+    {
+      "scenario": "get-json",
+      "round": 1,
+      "order": [
+        "native-fetch",
+        "@npora/request",
+        "axios-http",
+        "axios-fetch",
+        "ky",
+        "ofetch"
+      ]
+    },
+    {
+      "scenario": "get-json",
+      "round": 2,
+      "order": [
+        "@npora/request",
+        "axios-http",
+        "axios-fetch",
+        "ky",
+        "ofetch",
+        "native-fetch"
+      ]
+    },
+    {
+      "scenario": "get-json",
+      "round": 3,
+      "order": [
+        "axios-http",
+        "axios-fetch",
+        "ky",
+        "ofetch",
+        "native-fetch",
+        "@npora/request"
+      ]
+    },
+    {
+      "scenario": "get-json",
+      "round": 4,
+      "order": [
+        "axios-fetch",
+        "ky",
+        "ofetch",
+        "native-fetch",
+        "@npora/request",
+        "axios-http"
+      ]
+    },
+    {
+      "scenario": "get-json",
+      "round": 5,
+      "order": [
+        "ky",
+        "ofetch",
+        "native-fetch",
+        "@npora/request",
+        "axios-http",
+        "axios-fetch"
+      ]
+    },
+    {
+      "scenario": "get-json",
+      "round": 6,
+      "order": [
+        "ofetch",
+        "native-fetch",
+        "@npora/request",
+        "axios-http",
+        "axios-fetch",
+        "ky"
+      ]
+    },
+    {
+      "scenario": "post-json",
+      "round": 1,
+      "order": [
+        "native-fetch",
+        "@npora/request",
+        "axios-http",
+        "axios-fetch",
+        "ky",
+        "ofetch"
+      ]
+    },
+    {
+      "scenario": "post-json",
+      "round": 2,
+      "order": [
+        "@npora/request",
+        "axios-http",
+        "axios-fetch",
+        "ky",
+        "ofetch",
+        "native-fetch"
+      ]
+    },
+    {
+      "scenario": "post-json",
+      "round": 3,
+      "order": [
+        "axios-http",
+        "axios-fetch",
+        "ky",
+        "ofetch",
+        "native-fetch",
+        "@npora/request"
+      ]
+    },
+    {
+      "scenario": "post-json",
+      "round": 4,
+      "order": [
+        "axios-fetch",
+        "ky",
+        "ofetch",
+        "native-fetch",
+        "@npora/request",
+        "axios-http"
+      ]
+    },
+    {
+      "scenario": "post-json",
+      "round": 5,
+      "order": [
+        "ky",
+        "ofetch",
+        "native-fetch",
+        "@npora/request",
+        "axios-http",
+        "axios-fetch"
+      ]
+    },
+    {
+      "scenario": "post-json",
+      "round": 6,
+      "order": [
+        "ofetch",
+        "native-fetch",
+        "@npora/request",
+        "axios-http",
+        "axios-fetch",
+        "ky"
+      ]
+    },
+    {
+      "scenario": "query-json",
+      "round": 1,
+      "order": [
+        "native-fetch",
+        "@npora/request",
+        "axios-http",
+        "axios-fetch",
+        "ky",
+        "ofetch"
+      ]
+    },
+    {
+      "scenario": "query-json",
+      "round": 2,
+      "order": [
+        "@npora/request",
+        "axios-http",
+        "axios-fetch",
+        "ky",
+        "ofetch",
+        "native-fetch"
+      ]
+    },
+    {
+      "scenario": "query-json",
+      "round": 3,
+      "order": [
+        "axios-http",
+        "axios-fetch",
+        "ky",
+        "ofetch",
+        "native-fetch",
+        "@npora/request"
+      ]
+    },
+    {
+      "scenario": "query-json",
+      "round": 4,
+      "order": [
+        "axios-fetch",
+        "ky",
+        "ofetch",
+        "native-fetch",
+        "@npora/request",
+        "axios-http"
+      ]
+    },
+    {
+      "scenario": "query-json",
+      "round": 5,
+      "order": [
+        "ky",
+        "ofetch",
+        "native-fetch",
+        "@npora/request",
+        "axios-http",
+        "axios-fetch"
+      ]
+    },
+    {
+      "scenario": "query-json",
+      "round": 6,
+      "order": [
+        "ofetch",
+        "native-fetch",
+        "@npora/request",
+        "axios-http",
+        "axios-fetch",
+        "ky"
+      ]
+    }
+  ],
+  "requestsReceived": 594000,
+  "expectedRequests": 594000,
+  "invalidRequests": 0,
+  "results": {
+    "get-json": {
+      "native-fetch": {
+        "medianRequestsPerSecond": 15286.788654830747,
+        "medianP95Milliseconds": 9.438708499999848,
+        "medianP99Milliseconds": 10.704187999999704,
+        "minRequestsPerSecond": 11091.586837281151,
+        "maxRequestsPerSecond": 15780.242225897597,
+        "runs": [
+          {
+            "operations": 5000,
+            "latencySamples": 4096,
+            "durationMs": 450.79212500000006,
+            "operationsPerSecond": 11091.586837281151,
+            "heapDeltaBytes": 42433352,
+            "latencyMs": {
+              "mean": 5.736189705078124,
+              "p50": 5.011582999999973,
+              "p95": 10.07241700000003,
+              "p99": 11.377458999999988,
+              "max": 66.80645800000002
+            }
+          },
+          {
+            "operations": 5000,
+            "latencySamples": 4096,
+            "durationMs": 328.2392919999993,
+            "operationsPerSecond": 15232.789376111654,
+            "heapDeltaBytes": 37643880,
+            "latencyMs": {
+              "mean": 4.173565057617182,
+              "p50": 3.67200000000048,
+              "p95": 9.563874999999825,
+              "p99": 10.73541699999987,
+              "max": 11.299750000000131
+            }
+          },
+          {
+            "operations": 5000,
+            "latencySamples": 4096,
+            "durationMs": 325.9285,
+            "operationsPerSecond": 15340.787933549842,
+            "heapDeltaBytes": 70718992,
+            "latencyMs": {
+              "mean": 4.15731947680663,
+              "p50": 3.73004199999923,
+              "p95": 9.31354199999987,
+              "p99": 10.978790999999546,
+              "max": 11.24408300000141
+            }
+          },
+          {
+            "operations": 5000,
+            "latencySamples": 4096,
+            "durationMs": 341.59470800000054,
+            "operationsPerSecond": 14637.2290989941,
+            "heapDeltaBytes": -66817384,
+            "latencyMs": {
+              "mean": 4.350993350341806,
+              "p50": 3.744915999999648,
+              "p95": 9.665874999998778,
+              "p99": 10.672958999999537,
+              "max": 12.701917000000321
+            }
+          },
+          {
+            "operations": 5000,
+            "latencySamples": 4096,
+            "durationMs": 318.2792079999999,
+            "operationsPerSecond": 15709.477321559758,
+            "heapDeltaBytes": -51135080,
+            "latencyMs": {
+              "mean": 4.053714626953125,
+              "p50": 3.6179580000007263,
+              "p95": 8.587916999998924,
+              "p99": 10.35741699999926,
+              "max": 10.926708999999391
+            }
+          },
+          {
+            "operations": 5000,
+            "latencySamples": 4096,
+            "durationMs": 316.85191699999996,
+            "operationsPerSecond": 15780.242225897597,
+            "heapDeltaBytes": -15320360,
+            "latencyMs": {
+              "mean": 4.037930415039067,
+              "p50": 3.633458000000246,
+              "p95": 8.016999999999825,
+              "p99": 10.356834000000163,
+              "max": 11.284125000000131
+            }
+          }
+        ]
+      },
+      "@npora/request": {
+        "medianRequestsPerSecond": 14751.368602563702,
+        "medianP95Milliseconds": 9.59093750000011,
+        "medianP99Milliseconds": 10.370833500000117,
+        "minRequestsPerSecond": 12294.643612780432,
+        "maxRequestsPerSecond": 15084.797332776121,
+        "runs": [
+          {
+            "operations": 5000,
+            "latencySamples": 4096,
+            "durationMs": 406.6811660000001,
+            "operationsPerSecond": 12294.643612780432,
+            "heapDeltaBytes": -24319096,
+            "latencyMs": {
+              "mean": 5.179910154296873,
+              "p50": 4.4184999999999945,
+              "p95": 10.021834000000126,
+              "p99": 23.728708000000097,
+              "max": 26.815791999999874
+            }
+          },
+          {
+            "operations": 5000,
+            "latencySamples": 4096,
+            "durationMs": 336.8834999999999,
+            "operationsPerSecond": 14841.926066429498,
+            "heapDeltaBytes": 82776800,
+            "latencyMs": {
+              "mean": 4.297857609375001,
+              "p50": 3.8764579999997295,
+              "p95": 9.79037500000004,
+              "p99": 10.624291999999969,
+              "max": 11.136916999999812
+            }
+          },
+          {
+            "operations": 5000,
+            "latencySamples": 4096,
+            "durationMs": 341.0452499999992,
+            "operationsPerSecond": 14660.811138697905,
+            "heapDeltaBytes": -51827624,
+            "latencyMs": {
+              "mean": 4.344210513183585,
+              "p50": 3.8556250000001455,
+              "p95": 9.576124999999593,
+              "p99": 10.491792000000714,
+              "max": 11.577791000001525
+            }
+          },
+          {
+            "operations": 5000,
+            "latencySamples": 4096,
+            "durationMs": 347.6900829999995,
+            "operationsPerSecond": 14380.62298716759,
+            "heapDeltaBytes": -37995272,
+            "latencyMs": {
+              "mean": 4.427889564941404,
+              "p50": 3.9497919999994338,
+              "p95": 9.605750000000626,
+              "p99": 10.24987499999952,
+              "max": 11.039041999998517
+            }
+          },
+          {
+            "operations": 5000,
+            "latencySamples": 4096,
+            "durationMs": 331.4595410000002,
+            "operationsPerSecond": 15084.797332776121,
+            "heapDeltaBytes": -33194672,
+            "latencyMs": {
+              "mean": 4.221311916015637,
+              "p50": 3.7385419999991427,
+              "p95": 9.097916999999143,
+              "p99": 10.136624999999185,
+              "max": 11.370915999999852
+            }
+          },
+          {
+            "operations": 5000,
+            "latencySamples": 4096,
+            "durationMs": 334.048417,
+            "operationsPerSecond": 14967.89011875485,
+            "heapDeltaBytes": -30149672,
+            "latencyMs": {
+              "mean": 4.254818397216775,
+              "p50": 3.7653750000008586,
+              "p95": 9.100791999999274,
+              "p99": 10.123750000000655,
+              "max": 10.496750000000247
+            }
+          }
+        ]
+      },
+      "axios-http": {
+        "medianRequestsPerSecond": 8837.015233856557,
+        "medianP95Milliseconds": 10.000229499999477,
+        "medianP99Milliseconds": 11.84918800000014,
+        "minRequestsPerSecond": 8140.159983643621,
+        "maxRequestsPerSecond": 9145.311221799891,
+        "runs": [
+          {
+            "operations": 5000,
+            "latencySamples": 4096,
+            "durationMs": 614.2385419999998,
+            "operationsPerSecond": 8140.159983643621,
+            "heapDeltaBytes": 86754280,
+            "latencyMs": {
+              "mean": 7.820077619873058,
+              "p50": 7.417749999999842,
+              "p95": 10.696541000000025,
+              "p99": 12.173541999999998,
+              "max": 12.303249999999935
+            }
+          },
+          {
+            "operations": 5000,
+            "latencySamples": 4096,
+            "durationMs": 579.581083,
+            "operationsPerSecond": 8626.920627083338,
+            "heapDeltaBytes": 74672776,
+            "latencyMs": {
+              "mean": 7.383421479492178,
+              "p50": 6.9930420000000595,
+              "p95": 10.148041000000376,
+              "p99": 10.778000000000247,
+              "max": 11.1431249999996
+            }
+          },
+          {
+            "operations": 5000,
+            "latencySamples": 4096,
+            "durationMs": 565.0517920000002,
+            "operationsPerSecond": 8848.746381818391,
+            "heapDeltaBytes": -48743352,
+            "latencyMs": {
+              "mean": 7.193941456054663,
+              "p50": 6.74908300000061,
+              "p95": 9.993749999999636,
+              "p99": 13.242792000000009,
+              "max": 14.991083999999319
+            }
+          },
+          {
+            "operations": 5000,
+            "latencySamples": 4096,
+            "durationMs": 566.5540000000001,
+            "operationsPerSecond": 8825.284085894724,
+            "heapDeltaBytes": -56815864,
+            "latencyMs": {
+              "mean": 7.216433091796887,
+              "p50": 6.732874999999694,
+              "p95": 10.006708999999319,
+              "p99": 12.130584000000454,
+              "max": 14.0362499999992
+            }
+          },
+          {
+            "operations": 5000,
+            "latencySamples": 4096,
+            "durationMs": 549.1933330000011,
+            "operationsPerSecond": 9104.26201404741,
+            "heapDeltaBytes": -14111416,
+            "latencyMs": {
+              "mean": 6.997054733886712,
+              "p50": 6.601290999999037,
+              "p95": 9.79820799999834,
+              "p99": 11.567791999999827,
+              "max": 12.488875000000917
+            }
+          },
+          {
+            "operations": 5000,
+            "latencySamples": 4096,
+            "durationMs": 546.7282499999983,
+            "operationsPerSecond": 9145.311221799891,
+            "heapDeltaBytes": -21877976,
+            "latencyMs": {
+              "mean": 6.965052354980477,
+              "p50": 6.6070829999989655,
+              "p95": 9.977041000001918,
+              "p99": 10.609042000000045,
+              "max": 11.52533300000141
+            }
+          }
+        ]
+      },
+      "axios-fetch": {
+        "medianRequestsPerSecond": 8434.346215750602,
+        "medianP95Milliseconds": 10.941291999999976,
+        "medianP99Milliseconds": 14.194937499999469,
+        "minRequestsPerSecond": 7934.987580292336,
+        "maxRequestsPerSecond": 8760.026301243139,
+        "runs": [
+          {
+            "operations": 5000,
+            "latencySamples": 4096,
+            "durationMs": 630.1207089999998,
+            "operationsPerSecond": 7934.987580292336,
+            "heapDeltaBytes": -11507440,
+            "latencyMs": {
+              "mean": 8.02523370068358,
+              "p50": 7.416000000000167,
+              "p95": 11.765458000000308,
+              "p99": 13.692625000000135,
+              "max": 14.850290999999743
+            }
+          },
+          {
+            "operations": 5000,
+            "latencySamples": 4096,
+            "durationMs": 603.41075,
+            "operationsPerSecond": 8286.229570818883,
+            "heapDeltaBytes": -39753976,
+            "latencyMs": {
+              "mean": 7.683960400390581,
+              "p50": 7.074209000000337,
+              "p95": 10.983791999999994,
+              "p99": 14.426667000000634,
+              "max": 15.329125000000204
+            }
+          },
+          {
+            "operations": 5000,
+            "latencySamples": 4096,
+            "durationMs": 593.0767919999998,
+            "operationsPerSecond": 8430.61146118832,
+            "heapDeltaBytes": 13088904,
+            "latencyMs": {
+              "mean": 7.554529925537096,
+              "p50": 6.974749999999403,
+              "p95": 10.898791999999958,
+              "p99": 14.860666999999921,
+              "max": 15.978708000000552
+            }
+          },
+          {
+            "operations": 5000,
+            "latencySamples": 4096,
+            "durationMs": 592.5517920000002,
+            "operationsPerSecond": 8438.080970312883,
+            "heapDeltaBytes": 2892576,
+            "latencyMs": {
+              "mean": 7.545914432373047,
+              "p50": 6.942332999999053,
+              "p95": 11.039957999999388,
+              "p99": 14.343665999998848,
+              "max": 17.264124999999694
+            }
+          },
+          {
+            "operations": 5000,
+            "latencySamples": 4096,
+            "durationMs": 570.7745419999992,
+            "operationsPerSecond": 8760.026301243139,
+            "heapDeltaBytes": 12025128,
+            "latencyMs": {
+              "mean": 7.268203865478513,
+              "p50": 6.698833000000377,
+              "p95": 10.521249999999782,
+              "p99": 12.985208000000057,
+              "max": 16.045249999999214
+            }
+          },
+          {
+            "operations": 5000,
+            "latencySamples": 4096,
+            "durationMs": 572.6803340000006,
+            "operationsPerSecond": 8730.874282126117,
+            "heapDeltaBytes": 10325248,
+            "latencyMs": {
+              "mean": 7.292076450683605,
+              "p50": 6.765125000001717,
+              "p95": 10.410749999999098,
+              "p99": 14.04620900000009,
+              "max": 17.131375000000844
+            }
+          }
+        ]
+      },
+      "ky": {
+        "medianRequestsPerSecond": 12307.072755677942,
+        "medianP95Milliseconds": 9.966625000000477,
+        "medianP99Milliseconds": 13.39575000000059,
+        "minRequestsPerSecond": 10987.175768443072,
+        "maxRequestsPerSecond": 12619.449653080268,
+        "runs": [
+          {
+            "operations": 5000,
+            "latencySamples": 4096,
+            "durationMs": 455.076,
+            "operationsPerSecond": 10987.175768443072,
+            "heapDeltaBytes": -4652736,
+            "latencyMs": {
+              "mean": 5.8064359140625035,
+              "p50": 4.9781669999997575,
+              "p95": 11.691667000000052,
+              "p99": 12.710041000000274,
+              "max": 14.154958000000079
+            }
+          },
+          {
+            "operations": 5000,
+            "latencySamples": 4096,
+            "durationMs": 412.2416659999999,
+            "operationsPerSecond": 12128.807959940666,
+            "heapDeltaBytes": -4111440,
+            "latencyMs": {
+              "mean": 5.257043985595704,
+              "p50": 4.601582999999664,
+              "p95": 9.944000000000415,
+              "p99": 13.78125,
+              "max": 19.675750000000335
+            }
+          },
+          {
+            "operations": 5000,
+            "latencySamples": 4096,
+            "durationMs": 403.433708999999,
+            "operationsPerSecond": 12393.609875569453,
+            "heapDeltaBytes": 12333072,
+            "latencyMs": {
+              "mean": 5.144164869628911,
+              "p50": 4.4424159999998665,
+              "p95": 10.0879589999995,
+              "p99": 14.831874999999854,
+              "max": 19.765124999999898
+            }
+          },
+          {
+            "operations": 5000,
+            "latencySamples": 4096,
+            "durationMs": 407.93924999999945,
+            "operationsPerSecond": 12256.726951378194,
+            "heapDeltaBytes": -30022032,
+            "latencyMs": {
+              "mean": 5.197012644042976,
+              "p50": 4.46875,
+              "p95": 9.926666000001205,
+              "p99": 13.698500000000422,
+              "max": 18.633625000000393
+            }
+          },
+          {
+            "operations": 5000,
+            "latencySamples": 4096,
+            "durationMs": 404.6152499999989,
+            "operationsPerSecond": 12357.41855997769,
+            "heapDeltaBytes": -11647960,
+            "latencyMs": {
+              "mean": 5.1571293459472525,
+              "p50": 4.358249999999316,
+              "p95": 9.989250000000538,
+              "p99": 13.040082999999868,
+              "max": 15.288125000000946
+            }
+          },
+          {
+            "operations": 5000,
+            "latencySamples": 4096,
+            "durationMs": 396.21379199999865,
+            "operationsPerSecond": 12619.449653080268,
+            "heapDeltaBytes": 14113952,
+            "latencyMs": {
+              "mean": 5.055677970703131,
+              "p50": 4.328582999998616,
+              "p95": 9.69208300000173,
+              "p99": 13.093000000000757,
+              "max": 17.825583999998344
+            }
+          }
+        ]
+      },
+      "ofetch": {
+        "medianRequestsPerSecond": 14967.075173120165,
+        "medianP95Milliseconds": 9.663812499999949,
+        "medianP99Milliseconds": 10.465249999999287,
+        "minRequestsPerSecond": 14203.597203027648,
+        "maxRequestsPerSecond": 15574.17101607841,
+        "runs": [
+          {
+            "operations": 5000,
+            "latencySamples": 4096,
+            "durationMs": 352.0234999999998,
+            "operationsPerSecond": 14203.597203027648,
+            "heapDeltaBytes": -52181136,
+            "latencyMs": {
+              "mean": 4.485399646972651,
+              "p50": 3.9050000000002,
+              "p95": 9.979667000000063,
+              "p99": 12.08541699999978,
+              "max": 13.18933300000026
+            }
+          },
+          {
+            "operations": 5000,
+            "latencySamples": 4096,
+            "durationMs": 348.35654199999954,
+            "operationsPerSecond": 14353.110670159329,
+            "heapDeltaBytes": -48366424,
+            "latencyMs": {
+              "mean": 4.437351354248036,
+              "p50": 3.81262500000048,
+              "p95": 9.585042000000612,
+              "p99": 11.487417000000278,
+              "max": 12.717250000000604
+            }
+          },
+          {
+            "operations": 5000,
+            "latencySamples": 4096,
+            "durationMs": 325.9948750000003,
+            "operationsPerSecond": 15337.664434141781,
+            "heapDeltaBytes": 81393040,
+            "latencyMs": {
+              "mean": 4.155681878906258,
+              "p50": 3.7259160000012344,
+              "p95": 9.378875000000335,
+              "p99": 10.003375000000233,
+              "max": 10.713707999999315
+            }
+          },
+          {
+            "operations": 5000,
+            "latencySamples": 4096,
+            "durationMs": 329.80491600000096,
+            "operationsPerSecond": 15160.477474507947,
+            "heapDeltaBytes": 80555920,
+            "latencyMs": {
+              "mean": 4.200527200439446,
+              "p50": 3.7952910000003612,
+              "p95": 9.742582999999286,
+              "p99": 10.350749999999607,
+              "max": 10.887957999999344
+            }
+          },
+          {
+            "operations": 5000,
+            "latencySamples": 4096,
+            "durationMs": 338.43987500000003,
+            "operationsPerSecond": 14773.672871732384,
+            "heapDeltaBytes": 49578744,
+            "latencyMs": {
+              "mean": 4.309209252929684,
+              "p50": 3.7839999999996508,
+              "p95": 9.879290999999284,
+              "p99": 10.579749999998967,
+              "max": 11.474750000001222
+            }
+          },
+          {
+            "operations": 5000,
+            "latencySamples": 4096,
+            "durationMs": 321.0443749999995,
+            "operationsPerSecond": 15574.17101607841,
+            "heapDeltaBytes": 80135200,
+            "latencyMs": {
+              "mean": 4.091556436279303,
+              "p50": 3.6773749999993015,
+              "p95": 9.24604200000067,
+              "p99": 9.987875000000713,
+              "max": 10.497874999999112
+            }
+          }
+        ]
+      }
+    },
+    "post-json": {
+      "native-fetch": {
+        "medianRequestsPerSecond": 9542.565621875929,
+        "medianP95Milliseconds": 12.110499999998865,
+        "medianP99Milliseconds": 13.297374500001752,
+        "minRequestsPerSecond": 9001.820382324617,
+        "maxRequestsPerSecond": 9766.744112454797,
+        "runs": [
+          {
+            "operations": 5000,
+            "latencySamples": 4096,
+            "durationMs": 555.4432090000009,
+            "operationsPerSecond": 9001.820382324617,
+            "heapDeltaBytes": -8873904,
+            "latencyMs": {
+              "mean": 7.0836407602539255,
+              "p50": 6.3477920000004815,
+              "p95": 12.002500000002328,
+              "p99": 13.577625000001717,
+              "max": 15.673041000001831
+            }
+          },
+          {
+            "operations": 5000,
+            "latencySamples": 4096,
+            "durationMs": 511.94133299999885,
+            "operationsPerSecond": 9766.744112454797,
+            "heapDeltaBytes": 3506776,
+            "latencyMs": {
+              "mean": 6.530063265380845,
+              "p50": 5.821332999999868,
+              "p95": 11.976957999999286,
+              "p99": 12.754958000001352,
+              "max": 14.8527920000015
+            }
+          },
+          {
+            "operations": 5000,
+            "latencySamples": 4096,
+            "durationMs": 527.0193749999999,
+            "operationsPerSecond": 9487.317235727816,
+            "heapDeltaBytes": 4652088,
+            "latencyMs": {
+              "mean": 6.719945157226565,
+              "p50": 5.947583000001032,
+              "p95": 12.289040999999997,
+              "p99": 13.465917000001355,
+              "max": 17.19866600000023
+            }
+          },
+          {
+            "operations": 5000,
+            "latencySamples": 4096,
+            "durationMs": 520.9519580000051,
+            "operationsPerSecond": 9597.81400802404,
+            "heapDeltaBytes": 9458920,
+            "latencyMs": {
+              "mean": 6.6386918212890595,
+              "p50": 5.922916999996232,
+              "p95": 12.184832999999344,
+              "p99": 12.981208000004699,
+              "max": 13.539333000000624
+            }
+          },
+          {
+            "operations": 5000,
+            "latencySamples": 4096,
+            "durationMs": 527.0202920000011,
+            "operationsPerSecond": 9487.300728071377,
+            "heapDeltaBytes": 10074408,
+            "latencyMs": {
+              "mean": 6.719048603271521,
+              "p50": 5.9678339999954915,
+              "p95": 12.321208000001207,
+              "p99": 13.463208000001032,
+              "max": 14.599957999998878
+            }
+          },
+          {
+            "operations": 5000,
+            "latencySamples": 4096,
+            "durationMs": 515.7119579999999,
+            "operationsPerSecond": 9695.334619330275,
+            "heapDeltaBytes": 14896928,
+            "latencyMs": {
+              "mean": 6.574519301513684,
+              "p50": 5.927875000001222,
+              "p95": 12.036166999998386,
+              "p99": 13.131541000002471,
+              "max": 13.283874999993714
+            }
+          }
+        ]
+      },
+      "@npora/request": {
+        "medianRequestsPerSecond": 9352.812659929852,
+        "medianP95Milliseconds": 12.244292000003043,
+        "medianP99Milliseconds": 13.225895499999751,
+        "minRequestsPerSecond": 8946.326291754469,
+        "maxRequestsPerSecond": 9493.152662082133,
+        "runs": [
+          {
+            "operations": 5000,
+            "latencySamples": 4096,
+            "durationMs": 558.8886249999996,
+            "operationsPerSecond": 8946.326291754469,
+            "heapDeltaBytes": -4091416,
+            "latencyMs": {
+              "mean": 7.095383104248026,
+              "p50": 6.179415999999037,
+              "p95": 12.468833000002633,
+              "p99": 14.384792000000743,
+              "max": 17.309958000001643
+            }
+          },
+          {
+            "operations": 5000,
+            "latencySamples": 4096,
+            "durationMs": 526.695416999999,
+            "operationsPerSecond": 9493.152662082133,
+            "heapDeltaBytes": 11550912,
+            "latencyMs": {
+              "mean": 6.714507757812472,
+              "p50": 6.000208000001294,
+              "p95": 11.905083999998169,
+              "p99": 12.893207999997685,
+              "max": 14.343708000000333
+            }
+          },
+          {
+            "operations": 5000,
+            "latencySamples": 4096,
+            "durationMs": 536.3887089999989,
+            "operationsPerSecond": 9321.598154669602,
+            "heapDeltaBytes": -89503464,
+            "latencyMs": {
+              "mean": 6.840944541748038,
+              "p50": 6.082833000000392,
+              "p95": 12.256000000001222,
+              "p99": 13.34862499999872,
+              "max": 13.92870799999946
+            }
+          },
+          {
+            "operations": 5000,
+            "latencySamples": 4096,
+            "durationMs": 530.9335419999989,
+            "operationsPerSecond": 9417.37450070542,
+            "heapDeltaBytes": 27196088,
+            "latencyMs": {
+              "mean": 6.770049675781239,
+              "p50": 6.061499999996158,
+              "p95": 12.276125000003958,
+              "p99": 12.812084000004688,
+              "max": 13.546999999998661
+            }
+          },
+          {
+            "operations": 5000,
+            "latencySamples": 4096,
+            "durationMs": 534.2176670000044,
+            "operationsPerSecond": 9359.48080504039,
+            "heapDeltaBytes": 7448376,
+            "latencyMs": {
+              "mean": 6.812952804199224,
+              "p50": 6.123750000006112,
+              "p95": 12.232584000004863,
+              "p99": 13.103166000000783,
+              "max": 14.136749999997846
+            }
+          },
+          {
+            "operations": 5000,
+            "latencySamples": 4096,
+            "durationMs": 534.9799580000035,
+            "operationsPerSecond": 9346.144514819314,
+            "heapDeltaBytes": 12232568,
+            "latencyMs": {
+              "mean": 6.826702804443343,
+              "p50": 6.097458000003826,
+              "p95": 12.13300000000163,
+              "p99": 13.361250000001746,
+              "max": 16.486166000002413
+            }
+          }
+        ]
+      },
+      "axios-http": {
+        "medianRequestsPerSecond": 7793.255304229563,
+        "medianP95Milliseconds": 10.927333499997985,
+        "medianP99Milliseconds": 12.666416499998377,
+        "minRequestsPerSecond": 7776.573844905805,
+        "maxRequestsPerSecond": 7982.763616798606,
+        "runs": [
+          {
+            "operations": 5000,
+            "latencySamples": 4096,
+            "durationMs": 640.8151670000007,
+            "operationsPerSecond": 7802.561889113332,
+            "heapDeltaBytes": -15098488,
+            "latencyMs": {
+              "mean": 8.153109433105488,
+              "p50": 7.734082999999373,
+              "p95": 10.973125000000437,
+              "p99": 12.474249999999302,
+              "max": 13.301917000000685
+            }
+          },
+          {
+            "operations": 5000,
+            "latencySamples": 4096,
+            "durationMs": 626.3495000000003,
+            "operationsPerSecond": 7982.763616798606,
+            "heapDeltaBytes": -14770520,
+            "latencyMs": {
+              "mean": 7.980009437011733,
+              "p50": 7.590250000001106,
+              "p95": 10.744833000000654,
+              "p99": 11.839125000002241,
+              "max": 12.263749999998254
+            }
+          },
+          {
+            "operations": 5000,
+            "latencySamples": 4096,
+            "durationMs": 642.9566669999986,
+            "operationsPerSecond": 7776.573844905805,
+            "heapDeltaBytes": -60948792,
+            "latencyMs": {
+              "mean": 8.192886991455078,
+              "p50": 7.710166999997455,
+              "p95": 11.0534579999985,
+              "p99": 12.709040999998251,
+              "max": 13.914792000003217
+            }
+          },
+          {
+            "operations": 5000,
+            "latencySamples": 4096,
+            "durationMs": 642.7148329999982,
+            "operationsPerSecond": 7779.499932592988,
+            "heapDeltaBytes": -9393640,
+            "latencyMs": {
+              "mean": 8.188231633789046,
+              "p50": 7.7149999999965075,
+              "p95": 11.034917000004498,
+              "p99": 13.951790999999503,
+              "max": 14.78349999999773
+            }
+          },
+          {
+            "operations": 5000,
+            "latencySamples": 4096,
+            "durationMs": 642.3475000000035,
+            "operationsPerSecond": 7783.948719345794,
+            "heapDeltaBytes": -16597456,
+            "latencyMs": {
+              "mean": 8.183295042724618,
+              "p50": 7.731290999996418,
+              "p95": 10.82587500000227,
+              "p99": 14.012041000001773,
+              "max": 14.82445899999584
+            }
+          },
+          {
+            "operations": 5000,
+            "latencySamples": 4096,
+            "durationMs": 634.8528329999972,
+            "operationsPerSecond": 7875.8410455104995,
+            "heapDeltaBytes": -16842008,
+            "latencyMs": {
+              "mean": 8.08815782495121,
+              "p50": 7.66533299999719,
+              "p95": 10.881541999995534,
+              "p99": 12.623791999998502,
+              "max": 14.628833000002487
+            }
+          }
+        ]
+      },
+      "axios-fetch": {
+        "medianRequestsPerSecond": 5475.578904640695,
+        "medianP95Milliseconds": 15.23889600000075,
+        "medianP99Milliseconds": 19.589583000000857,
+        "minRequestsPerSecond": 5428.677311665187,
+        "maxRequestsPerSecond": 5671.080725127888,
+        "runs": [
+          {
+            "operations": 5000,
+            "latencySamples": 4096,
+            "durationMs": 909.7734999999993,
+            "operationsPerSecond": 5495.873423440014,
+            "heapDeltaBytes": 72486104,
+            "latencyMs": {
+              "mean": 11.589268725097636,
+              "p50": 10.833916999999929,
+              "p95": 15.19483400000172,
+              "p99": 19.48295899999721,
+              "max": 20.594750000000204
+            }
+          },
+          {
+            "operations": 5000,
+            "latencySamples": 4096,
+            "durationMs": 881.6661659999991,
+            "operationsPerSecond": 5671.080725127888,
+            "heapDeltaBytes": 78366384,
+            "latencyMs": {
+              "mean": 11.23426637646479,
+              "p50": 10.453958000001876,
+              "p95": 14.650166999999783,
+              "p99": 16.59675000000061,
+              "max": 22.203165999999328
+            }
+          },
+          {
+            "operations": 5000,
+            "latencySamples": 4096,
+            "durationMs": 919.5906250000007,
+            "operationsPerSecond": 5437.202015842643,
+            "heapDeltaBytes": -80870632,
+            "latencyMs": {
+              "mean": 11.708030275634734,
+              "p50": 10.732666999996582,
+              "p95": 15.703707999997278,
+              "p99": 20.113084000000526,
+              "max": 21.901874999999563
+            }
+          },
+          {
+            "operations": 5000,
+            "latencySamples": 4096,
+            "durationMs": 910.3039170000011,
+            "operationsPerSecond": 5492.671081190123,
+            "heapDeltaBytes": 51303568,
+            "latencyMs": {
+              "mean": 11.600420360839834,
+              "p50": 10.739208999999391,
+              "p95": 15.2756249999984,
+              "p99": 21.797374999998283,
+              "max": 24.19054099999994
+            }
+          },
+          {
+            "operations": 5000,
+            "latencySamples": 4096,
+            "durationMs": 921.0346669999999,
+            "operationsPerSecond": 5428.677311665187,
+            "heapDeltaBytes": -37131872,
+            "latencyMs": {
+              "mean": 11.73564085668945,
+              "p50": 10.794082999993407,
+              "p95": 15.567457999997714,
+              "p99": 19.60645800000202,
+              "max": 22.1997080000001
+            }
+          },
+          {
+            "operations": 5000,
+            "latencySamples": 4096,
+            "durationMs": 916.0047919999997,
+            "operationsPerSecond": 5458.486728091267,
+            "heapDeltaBytes": -38001792,
+            "latencyMs": {
+              "mean": 11.668296125488222,
+              "p50": 10.774124999996275,
+              "p95": 15.2021670000031,
+              "p99": 19.572707999999693,
+              "max": 21.56433300000208
+            }
+          }
+        ]
+      },
+      "ky": {
+        "medianRequestsPerSecond": 7153.0115892134345,
+        "medianP95Milliseconds": 13.907916500000283,
+        "medianP99Milliseconds": 18.10829150000245,
+        "minRequestsPerSecond": 7019.76227201615,
+        "maxRequestsPerSecond": 7358.104022620258,
+        "runs": [
+          {
+            "operations": 5000,
+            "latencySamples": 4096,
+            "durationMs": 712.2748329999995,
+            "operationsPerSecond": 7019.76227201615,
+            "heapDeltaBytes": -76718864,
+            "latencyMs": {
+              "mean": 9.093339898925738,
+              "p50": 7.959208000000217,
+              "p95": 14.118500000000495,
+              "p99": 19.837791999998444,
+              "max": 26.086999999999534
+            }
+          },
+          {
+            "operations": 5000,
+            "latencySamples": 4096,
+            "durationMs": 679.5228750000024,
+            "operationsPerSecond": 7358.104022620258,
+            "heapDeltaBytes": 14624408,
+            "latencyMs": {
+              "mean": 8.67606720751953,
+              "p50": 7.719207999998616,
+              "p95": 13.596083000000363,
+              "p99": 15.446332999999868,
+              "max": 20.220250000002125
+            }
+          },
+          {
+            "operations": 5000,
+            "latencySamples": 4096,
+            "durationMs": 699.3827500000007,
+            "operationsPerSecond": 7149.161171046891,
+            "heapDeltaBytes": 60688432,
+            "latencyMs": {
+              "mean": 8.930259437255856,
+              "p50": 7.908917000000656,
+              "p95": 13.990999999998166,
+              "p99": 19.373250000000553,
+              "max": 26.698457999998936
+            }
+          },
+          {
+            "operations": 5000,
+            "latencySamples": 4096,
+            "durationMs": 687.5593330000011,
+            "operationsPerSecond": 7272.099672014768,
+            "heapDeltaBytes": 14184400,
+            "latencyMs": {
+              "mean": 8.775203052001956,
+              "p50": 7.811249999998836,
+              "p95": 13.602833000000828,
+              "p99": 15.410125000002154,
+              "max": 16.531749999998283
+            }
+          },
+          {
+            "operations": 5000,
+            "latencySamples": 4096,
+            "durationMs": 698.6302089999954,
+            "operationsPerSecond": 7156.8620073799775,
+            "heapDeltaBytes": -34051112,
+            "latencyMs": {
+              "mean": 8.916858603027334,
+              "p50": 7.909790999998222,
+              "p95": 13.926332999995793,
+              "p99": 16.84333300000435,
+              "max": 22.131249999998545
+            }
+          },
+          {
+            "operations": 5000,
+            "latencySamples": 4096,
+            "durationMs": 703.6124999999956,
+            "operationsPerSecond": 7106.184156762466,
+            "heapDeltaBytes": 58947128,
+            "latencyMs": {
+              "mean": 8.98433923486326,
+              "p50": 7.915166999999201,
+              "p95": 13.889500000004773,
+              "p99": 22.496042000006128,
+              "max": 24.707667000002402
+            }
+          }
+        ]
+      },
+      "ofetch": {
+        "medianRequestsPerSecond": 9263.780315708043,
+        "medianP95Milliseconds": 12.46643799999947,
+        "medianP99Milliseconds": 13.870270999999775,
+        "minRequestsPerSecond": 9073.950422007394,
+        "maxRequestsPerSecond": 9389.355455976798,
+        "runs": [
+          {
+            "operations": 5000,
+            "latencySamples": 4096,
+            "durationMs": 534.0869999999995,
+            "operationsPerSecond": 9361.77064785326,
+            "heapDeltaBytes": -15228008,
+            "latencyMs": {
+              "mean": 6.81348583227538,
+              "p50": 6.061499999999796,
+              "p95": 12.233416000002762,
+              "p99": 13.438249999999243,
+              "max": 16.141250000000582
+            }
+          },
+          {
+            "operations": 5000,
+            "latencySamples": 4096,
+            "durationMs": 532.5179160000007,
+            "operationsPerSecond": 9389.355455976798,
+            "heapDeltaBytes": -11230552,
+            "latencyMs": {
+              "mean": 6.769200921630854,
+              "p50": 5.986957999997685,
+              "p95": 12.322750000002998,
+              "p99": 13.991708999998082,
+              "max": 16.056541999998444
+            }
+          },
+          {
+            "operations": 5000,
+            "latencySamples": 4096,
+            "durationMs": 539.9935409999998,
+            "operationsPerSecond": 9259.37001161279,
+            "heapDeltaBytes": -11146776,
+            "latencyMs": {
+              "mean": 6.885415141601544,
+              "p50": 6.121666999999434,
+              "p95": 12.48095900000044,
+              "p99": 13.748833000001468,
+              "max": 14.922207999999955
+            }
+          },
+          {
+            "operations": 5000,
+            "latencySamples": 4096,
+            "durationMs": 551.0279169999994,
+            "operationsPerSecond": 9073.950422007394,
+            "heapDeltaBytes": -132886448,
+            "latencyMs": {
+              "mean": 7.018490694335976,
+              "p50": 6.192459000001691,
+              "p95": 12.78533299999981,
+              "p99": 16.581500000000233,
+              "max": 17.54462500000227
+            }
+          },
+          {
+            "operations": 5000,
+            "latencySamples": 4096,
+            "durationMs": 539.4796249999999,
+            "operationsPerSecond": 9268.190619803298,
+            "heapDeltaBytes": 29355296,
+            "latencyMs": {
+              "mean": 6.880770269531226,
+              "p50": 6.178292000004149,
+              "p95": 12.839833000005456,
+              "p99": 13.635874999999942,
+              "max": 15.333791000004567
+            }
+          },
+          {
+            "operations": 5000,
+            "latencySamples": 4096,
+            "durationMs": 541.8167909999975,
+            "operationsPerSecond": 9228.211607786852,
+            "heapDeltaBytes": -5662504,
+            "latencyMs": {
+              "mean": 6.907338440429701,
+              "p50": 6.164791999995941,
+              "p95": 12.451916999998502,
+              "p99": 14.433709000004455,
+              "max": 16.27587499999936
+            }
+          }
+        ]
+      }
+    },
+    "query-json": {
+      "native-fetch": {
+        "medianRequestsPerSecond": 14503.515493806084,
+        "medianP95Milliseconds": 9.524354499997571,
+        "medianP99Milliseconds": 10.308457999999519,
+        "minRequestsPerSecond": 13902.609683332259,
+        "maxRequestsPerSecond": 14665.08073399729,
+        "runs": [
+          {
+            "operations": 5000,
+            "latencySamples": 4096,
+            "durationMs": 359.6447079999998,
+            "operationsPerSecond": 13902.609683332259,
+            "heapDeltaBytes": -58589888,
+            "latencyMs": {
+              "mean": 4.580748651123027,
+              "p50": 4.029458000004524,
+              "p95": 9.605708000002778,
+              "p99": 10.169832999999926,
+              "max": 10.78612499999872
+            }
+          },
+          {
+            "operations": 5000,
+            "latencySamples": 4096,
+            "durationMs": 351.28245900000184,
+            "operationsPerSecond": 14233.560122055436,
+            "heapDeltaBytes": -83878600,
+            "latencyMs": {
+              "mean": 4.475045723876946,
+              "p50": 3.9650839999958407,
+              "p95": 9.477833999997529,
+              "p99": 10.302999999999884,
+              "max": 11.85466599999927
+            }
+          },
+          {
+            "operations": 5000,
+            "latencySamples": 4096,
+            "durationMs": 340.9459579999966,
+            "operationsPerSecond": 14665.08073399729,
+            "heapDeltaBytes": 86284224,
+            "latencyMs": {
+              "mean": 4.3440074997559,
+              "p50": 3.936999999998079,
+              "p95": 9.584415999997873,
+              "p99": 11.031291999999667,
+              "max": 11.28770899999654
+            }
+          },
+          {
+            "operations": 5000,
+            "latencySamples": 4096,
+            "durationMs": 345.244749999998,
+            "operationsPerSecond": 14482.47945841328,
+            "heapDeltaBytes": -72287040,
+            "latencyMs": {
+              "mean": 4.396949582519511,
+              "p50": 3.9214169999977457,
+              "p95": 9.189833000004,
+              "p99": 10.937708000004932,
+              "max": 13.866666000001715
+            }
+          },
+          {
+            "operations": 5000,
+            "latencySamples": 4096,
+            "durationMs": 344.24470799999835,
+            "operationsPerSecond": 14524.551529198887,
+            "heapDeltaBytes": 50212920,
+            "latencyMs": {
+              "mean": 4.386484957275362,
+              "p50": 3.9326250000012806,
+              "p95": 9.570874999997613,
+              "p99": 10.147333000000799,
+              "max": 10.699082999999519
+            }
+          },
+          {
+            "operations": 5000,
+            "latencySamples": 4096,
+            "durationMs": 344.04004200000054,
+            "operationsPerSecond": 14533.192040477637,
+            "heapDeltaBytes": 79369904,
+            "latencyMs": {
+              "mean": 4.385035462402325,
+              "p50": 3.985500000002503,
+              "p95": 9.210874999997031,
+              "p99": 10.313915999999153,
+              "max": 11.187540999999328
+            }
+          }
+        ]
+      },
+      "@npora/request": {
+        "medianRequestsPerSecond": 14279.902839173517,
+        "medianP95Milliseconds": 9.441562500003783,
+        "medianP99Milliseconds": 10.383562500002881,
+        "minRequestsPerSecond": 13463.484841294076,
+        "maxRequestsPerSecond": 14317.280452965788,
+        "runs": [
+          {
+            "operations": 5000,
+            "latencySamples": 4096,
+            "durationMs": 358.1890829999975,
+            "operationsPerSecond": 13959.107737518721,
+            "heapDeltaBytes": 49676736,
+            "latencyMs": {
+              "mean": 4.557545851318396,
+              "p50": 4.075375000000349,
+              "p95": 9.698499999998603,
+              "p99": 10.691832999997132,
+              "max": 10.955916999999317
+            }
+          },
+          {
+            "operations": 5000,
+            "latencySamples": 4096,
+            "durationMs": 371.37487500000134,
+            "operationsPerSecond": 13463.484841294076,
+            "heapDeltaBytes": -90225752,
+            "latencyMs": {
+              "mean": 4.731087394775356,
+              "p50": 4.0821670000004815,
+              "p95": 9.916707999997016,
+              "p99": 11.13866699999926,
+              "max": 13.743541999996523
+            }
+          },
+          {
+            "operations": 5000,
+            "latencySamples": 4096,
+            "durationMs": 350.22533299999486,
+            "operationsPerSecond": 14276.522937876893,
+            "heapDeltaBytes": -55634480,
+            "latencyMs": {
+              "mean": 4.463681488037146,
+              "p50": 3.9979999999995925,
+              "p95": 9.600125000004482,
+              "p99": 10.378958000001148,
+              "max": 11.470540999995137
+            }
+          },
+          {
+            "operations": 5000,
+            "latencySamples": 4096,
+            "durationMs": 349.8583329999965,
+            "operationsPerSecond": 14291.49895366377,
+            "heapDeltaBytes": -40818840,
+            "latencyMs": {
+              "mean": 4.456869365234311,
+              "p50": 3.970415999996476,
+              "p95": 9.283000000003085,
+              "p99": 10.128375000000233,
+              "max": 10.604542000000947
+            }
+          },
+          {
+            "operations": 5000,
+            "latencySamples": 4096,
+            "durationMs": 350.05958299999475,
+            "operationsPerSecond": 14283.282740470142,
+            "heapDeltaBytes": -96163160,
+            "latencyMs": {
+              "mean": 4.453861902343752,
+              "p50": 4.021832999998878,
+              "p95": 9.118708000001789,
+              "p99": 10.09504200000083,
+              "max": 10.64520800000173
+            }
+          },
+          {
+            "operations": 5000,
+            "latencySamples": 4096,
+            "durationMs": 349.22833399999945,
+            "operationsPerSecond": 14317.280452965788,
+            "heapDeltaBytes": -22763328,
+            "latencyMs": {
+              "mean": 4.4511940209960414,
+              "p50": 4.041582999998354,
+              "p95": 9.180082999999286,
+              "p99": 10.388167000004614,
+              "max": 10.998540999993565
+            }
+          }
+        ]
+      },
+      "axios-http": {
+        "medianRequestsPerSecond": 8260.776219139781,
+        "medianP95Milliseconds": 10.63177050000013,
+        "medianP99Milliseconds": 12.855603999996674,
+        "minRequestsPerSecond": 8164.302779066495,
+        "maxRequestsPerSecond": 8435.848221375225,
+        "runs": [
+          {
+            "operations": 5000,
+            "latencySamples": 4096,
+            "durationMs": 610.7833329999994,
+            "operationsPerSecond": 8186.208971095163,
+            "heapDeltaBytes": -53308520,
+            "latencyMs": {
+              "mean": 7.776551291259734,
+              "p50": 7.3179999999993015,
+              "p95": 10.683333000000857,
+              "p99": 13.690499999996973,
+              "max": 15.110541000001831
+            }
+          },
+          {
+            "operations": 5000,
+            "latencySamples": 4096,
+            "durationMs": 608.9343749999971,
+            "operationsPerSecond": 8211.065437059657,
+            "heapDeltaBytes": -69463648,
+            "latencyMs": {
+              "mean": 7.756422966064459,
+              "p50": 7.266875000001164,
+              "p95": 10.76945899999555,
+              "p99": 13.429540999997698,
+              "max": 15.480374999999185
+            }
+          },
+          {
+            "operations": 5000,
+            "latencySamples": 4096,
+            "durationMs": 592.7086249999993,
+            "operationsPerSecond": 8435.848221375225,
+            "heapDeltaBytes": 58792992,
+            "latencyMs": {
+              "mean": 7.549920034179671,
+              "p50": 7.2022500000020955,
+              "p95": 10.475875000003725,
+              "p99": 10.709249999999884,
+              "max": 11.506916999998793
+            }
+          },
+          {
+            "operations": 5000,
+            "latencySamples": 4096,
+            "durationMs": 598.6300000000047,
+            "operationsPerSecond": 8352.404657300773,
+            "heapDeltaBytes": 63231824,
+            "latencyMs": {
+              "mean": 7.624378277099549,
+              "p50": 7.296582999995735,
+              "p95": 10.400249999998778,
+              "p99": 10.818749999998545,
+              "max": 10.898208999999042
+            }
+          },
+          {
+            "operations": 5000,
+            "latencySamples": 4096,
+            "durationMs": 612.422166999997,
+            "operationsPerSecond": 8164.302779066495,
+            "heapDeltaBytes": -41718216,
+            "latencyMs": {
+              "mean": 7.802136686279326,
+              "p50": 7.310667000005196,
+              "p95": 10.631083000000217,
+              "p99": 14.532749999998487,
+              "max": 15.28662500000064
+            }
+          },
+          {
+            "operations": 5000,
+            "latencySamples": 4096,
+            "durationMs": 601.6494579999999,
+            "operationsPerSecond": 8310.487001219904,
+            "heapDeltaBytes": -62666592,
+            "latencyMs": {
+              "mean": 7.664584086669896,
+              "p50": 7.193458999994618,
+              "p95": 10.632458000000042,
+              "p99": 12.28166699999565,
+              "max": 15.090666999996756
+            }
+          }
+        ]
+      },
+      "axios-fetch": {
+        "medianRequestsPerSecond": 7849.742060281873,
+        "medianP95Milliseconds": 11.316499500000646,
+        "medianP99Milliseconds": 15.01404150000235,
+        "minRequestsPerSecond": 7785.453650302966,
+        "maxRequestsPerSecond": 7949.973475390524,
+        "runs": [
+          {
+            "operations": 5000,
+            "latencySamples": 4096,
+            "durationMs": 638.2065829999992,
+            "operationsPerSecond": 7834.453816657053,
+            "heapDeltaBytes": 5785072,
+            "latencyMs": {
+              "mean": 8.125611775390665,
+              "p50": 7.530291999995825,
+              "p95": 11.449415999995836,
+              "p99": 15.047791000004509,
+              "max": 18.294667000001937
+            }
+          },
+          {
+            "operations": 5000,
+            "latencySamples": 4096,
+            "durationMs": 639.9619170000005,
+            "operationsPerSecond": 7812.964908035295,
+            "heapDeltaBytes": -9456240,
+            "latencyMs": {
+              "mean": 8.149261436279273,
+              "p50": 7.534749999998894,
+              "p95": 11.11250000000291,
+              "p99": 16.94991700000537,
+              "max": 19.76941700000316
+            }
+          },
+          {
+            "operations": 5000,
+            "latencySamples": 4096,
+            "durationMs": 628.9329159999979,
+            "operationsPerSecond": 7949.973475390524,
+            "heapDeltaBytes": -20374744,
+            "latencyMs": {
+              "mean": 8.011903048339772,
+              "p50": 7.44366699999955,
+              "p95": 11.183583000005456,
+              "p99": 14.04695900000661,
+              "max": 17.751124999995227
+            }
+          },
+          {
+            "operations": 5000,
+            "latencySamples": 4096,
+            "durationMs": 642.2233339999948,
+            "operationsPerSecond": 7785.453650302966,
+            "heapDeltaBytes": -22565104,
+            "latencyMs": {
+              "mean": 8.1829335932617,
+              "p50": 7.514708000002429,
+              "p95": 11.567917000000307,
+              "p99": 16.533957999999984,
+              "max": 18.297208000003593
+            }
+          },
+          {
+            "operations": 5000,
+            "latencySamples": 4096,
+            "durationMs": 634.0434999999998,
+            "operationsPerSecond": 7885.894264352528,
+            "heapDeltaBytes": -13006728,
+            "latencyMs": {
+              "mean": 8.068180922119152,
+              "p50": 7.493499999996857,
+              "p95": 11.612374999996973,
+              "p99": 14.052041999995708,
+              "max": 16.02404099999694
+            }
+          },
+          {
+            "operations": 5000,
+            "latencySamples": 4096,
+            "durationMs": 635.7254590000011,
+            "operationsPerSecond": 7865.030303906692,
+            "heapDeltaBytes": -8778872,
+            "latencyMs": {
+              "mean": 8.097222197753947,
+              "p50": 7.5087080000012065,
+              "p95": 11.1817499999961,
+              "p99": 14.98029200000019,
+              "max": 16.45837500000198
+            }
+          }
+        ]
+      },
+      "ky": {
+        "medianRequestsPerSecond": 10883.090995970666,
+        "medianP95Milliseconds": 10.68585449999955,
+        "medianP99Milliseconds": 15.739416500000516,
+        "minRequestsPerSecond": 10309.333255686213,
+        "maxRequestsPerSecond": 11319.292828176716,
+        "runs": [
+          {
+            "operations": 5000,
+            "latencySamples": 4096,
+            "durationMs": 484.9974169999987,
+            "operationsPerSecond": 10309.333255686213,
+            "heapDeltaBytes": -20284688,
+            "latencyMs": {
+              "mean": 6.180445669677676,
+              "p50": 5.292625000001863,
+              "p95": 11.270582999997714,
+              "p99": 16.676500000001397,
+              "max": 21.495583999996597
+            }
+          },
+          {
+            "operations": 5000,
+            "latencySamples": 4096,
+            "durationMs": 471.65316700000403,
+            "operationsPerSecond": 10601.01012742687,
+            "heapDeltaBytes": -32548128,
+            "latencyMs": {
+              "mean": 6.0123099428710685,
+              "p50": 5.163958999997703,
+              "p95": 10.712249999996857,
+              "p99": 18.232499999998254,
+              "max": 25.61383300000307
+            }
+          },
+          {
+            "operations": 5000,
+            "latencySamples": 4096,
+            "durationMs": 460.0823750000054,
+            "operationsPerSecond": 10867.619086690598,
+            "heapDeltaBytes": -33377440,
+            "latencyMs": {
+              "mean": 5.8686121113281615,
+              "p50": 5.1030420000024606,
+              "p95": 10.890749999998661,
+              "p99": 13.419416000004276,
+              "max": 14.412165999994613
+            }
+          },
+          {
+            "operations": 5000,
+            "latencySamples": 4096,
+            "durationMs": 456.1367079999982,
+            "operationsPerSecond": 10961.626004456584,
+            "heapDeltaBytes": 1070464,
+            "latencyMs": {
+              "mean": 5.8199558957519795,
+              "p50": 5.046999999998661,
+              "p95": 10.62762500000099,
+              "p99": 14.802332999999635,
+              "max": 15.925791000001482
+            }
+          },
+          {
+            "operations": 5000,
+            "latencySamples": 4096,
+            "durationMs": 441.7237079999977,
+            "operationsPerSecond": 11319.292828176716,
+            "heapDeltaBytes": 6548736,
+            "latencyMs": {
+              "mean": 5.637111684326168,
+              "p50": 5.057332999997016,
+              "p95": 10.189125000004424,
+              "p99": 11.913042000000132,
+              "max": 13.161417000002984
+            }
+          },
+          {
+            "operations": 5000,
+            "latencySamples": 4096,
+            "durationMs": 458.776082999997,
+            "operationsPerSecond": 10898.562905250736,
+            "heapDeltaBytes": 5528112,
+            "latencyMs": {
+              "mean": 5.849129690185537,
+              "p50": 5.071250000000873,
+              "p95": 10.659459000002244,
+              "p99": 17.57229200000438,
+              "max": 24.06183299999975
+            }
+          }
+        ]
+      },
+      "ofetch": {
+        "medianRequestsPerSecond": 13228.100850856497,
+        "medianP95Milliseconds": 9.93629200000214,
+        "medianP99Milliseconds": 11.280249999999796,
+        "minRequestsPerSecond": 12534.545709356864,
+        "maxRequestsPerSecond": 13692.921614237599,
+        "runs": [
+          {
+            "operations": 5000,
+            "latencySamples": 4096,
+            "durationMs": 374.3359169999967,
+            "operationsPerSecond": 13356.987061436705,
+            "heapDeltaBytes": 61722392,
+            "latencyMs": {
+              "mean": 4.765968256347616,
+              "p50": 4.261790999997174,
+              "p95": 9.846042000004672,
+              "p99": 10.626625000004424,
+              "max": 11.41912500000035
+            }
+          },
+          {
+            "operations": 5000,
+            "latencySamples": 4096,
+            "durationMs": 377.97570899999846,
+            "operationsPerSecond": 13228.363307336294,
+            "heapDeltaBytes": 55250072,
+            "latencyMs": {
+              "mean": 4.817112235107416,
+              "p50": 4.2838750000009895,
+              "p95": 10.66408400000364,
+              "p99": 11.582416999997804,
+              "max": 12.116916999999376
+            }
+          },
+          {
+            "operations": 5000,
+            "latencySamples": 4096,
+            "durationMs": 398.89758399999846,
+            "operationsPerSecond": 12534.545709356864,
+            "heapDeltaBytes": -83006992,
+            "latencyMs": {
+              "mean": 5.045741179687539,
+              "p50": 4.220540999995137,
+              "p95": 10.026541999999608,
+              "p99": 19.203750000000582,
+              "max": 21.929749999995693
+            }
+          },
+          {
+            "operations": 5000,
+            "latencySamples": 4096,
+            "durationMs": 365.1521670000002,
+            "operationsPerSecond": 13692.921614237599,
+            "heapDeltaBytes": 94249992,
+            "latencyMs": {
+              "mean": 4.651087189453113,
+              "p50": 4.212540999993507,
+              "p95": 9.699416000003112,
+              "p99": 10.978083000001789,
+              "max": 11.862667000001238
+            }
+          },
+          {
+            "operations": 5000,
+            "latencySamples": 4096,
+            "durationMs": 391.3040419999961,
+            "operationsPerSecond": 12777.78776432892,
+            "heapDeltaBytes": -22278000,
+            "latencyMs": {
+              "mean": 4.9833479902343925,
+              "p50": 4.288875000005646,
+              "p95": 10.33650000000489,
+              "p99": 14.741834000000381,
+              "max": 17.171125000000757
+            }
+          },
+          {
+            "operations": 5000,
+            "latencySamples": 4096,
+            "durationMs": 377.99070799999754,
+            "operationsPerSecond": 13227.8383943767,
+            "heapDeltaBytes": -62010744,
+            "latencyMs": {
+              "mean": 4.817087058349658,
+              "p50": 4.20829099999537,
+              "p95": 9.755040999996709,
+              "p99": 10.50470900000073,
+              "max": 11.551499999994121
+            }
+          }
+        ]
+      }
+    }
+  }
+}

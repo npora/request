@@ -1,0 +1,23 @@
+{
+  "source": "Transcribed from the final Vitest V8 coverage console summary (930 tests passed).",
+  "statements": {
+    "total": 4739,
+    "covered": 4389,
+    "pct": 92.61
+  },
+  "branches": {
+    "total": 3708,
+    "covered": 3295,
+    "pct": 88.86
+  },
+  "functions": {
+    "total": 946,
+    "covered": 891,
+    "pct": 94.18
+  },
+  "lines": {
+    "total": 4635,
+    "covered": 4305,
+    "pct": 92.88
+  }
+}

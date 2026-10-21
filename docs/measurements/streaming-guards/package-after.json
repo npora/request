@@ -1,0 +1,133 @@
+{
+  "generatedAt": "2026-10-21T02:03:50.535Z",
+  "files": {
+    "dist/index.js": {
+      "bytes": 134710,
+      "gzipBytes": 48232,
+      "files": 27,
+      "budget": {
+        "bytes": 154075,
+        "gzipBytes": 51000,
+        "transitive": true
+      }
+    },
+    "dist/index.cjs": {
+      "bytes": 138695,
+      "gzipBytes": 49279,
+      "files": 27,
+      "budget": {
+        "bytes": 158575,
+        "gzipBytes": 52050,
+        "transitive": true
+      }
+    },
+    "dist/index.d.ts": {
+      "bytes": 68191,
+      "gzipBytes": 20786,
+      "files": 18,
+      "budget": {
+        "bytes": 68500,
+        "gzipBytes": 20900,
+        "transitive": true
+      }
+    },
+    "dist/index.d.cts": {
+      "bytes": 68234,
+      "gzipBytes": 20753,
+      "files": 18,
+      "budget": {
+        "bytes": 68500,
+        "gzipBytes": 20900,
+        "transitive": true
+      }
+    },
+    "dist/core.js": {
+      "bytes": 49516,
+      "gzipBytes": 17121,
+      "files": 11,
+      "budget": {
+        "bytes": 54925,
+        "gzipBytes": 17800,
+        "transitive": true
+      }
+    },
+    "dist/plugins/retry.js": {
+      "bytes": 6751,
+      "gzipBytes": 2966,
+      "files": 7,
+      "budget": {
+        "bytes": 8180,
+        "gzipBytes": 3390,
+        "transitive": true
+      }
+    },
+    "dist/plugins/cache.js": {
+      "bytes": 41963,
+      "gzipBytes": 13357,
+      "files": 7,
+      "budget": {
+        "bytes": 49100,
+        "gzipBytes": 14450,
+        "transitive": true
+      }
+    },
+    "dist/plugins/memory-cache.js": {
+      "bytes": 4571,
+      "gzipBytes": 2136,
+      "files": 3,
+      "budget": {
+        "bytes": 5000,
+        "gzipBytes": 2300,
+        "transitive": true
+      }
+    },
+    "dist/plugins/rate-limit.js": {
+      "bytes": 6831,
+      "gzipBytes": 2921,
+      "files": 6,
+      "budget": {
+        "bytes": 8200,
+        "gzipBytes": 3250,
+        "transitive": true
+      }
+    },
+    "dist/plugins/opentelemetry.js": {
+      "bytes": 3943,
+      "gzipBytes": 1870,
+      "files": 3,
+      "budget": {
+        "bytes": 4550,
+        "gzipBytes": 2100,
+        "transitive": true
+      }
+    },
+    "dist/plugins/opentelemetry-metrics.js": {
+      "bytes": 5621,
+      "gzipBytes": 2579,
+      "files": 4,
+      "budget": {
+        "bytes": 6550,
+        "gzipBytes": 2800,
+        "transitive": true
+      }
+    },
+    "dist/testing.js": {
+      "bytes": 7000,
+      "gzipBytes": 3341,
+      "files": 6,
+      "budget": {
+        "bytes": 8000,
+        "gzipBytes": 3650,
+        "transitive": true
+      }
+    }
+  },
+  "package": {
+    "bytes": 131899,
+    "unpackedBytes": 478824,
+    "budget": {
+      "bytes": 136750,
+      "unpackedBytes": 517100
+    }
+  }
+}

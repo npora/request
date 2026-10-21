@@ -1,0 +1,600 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-10-21T02:02:56.784Z",
+  "package": {
+    "name": "@npora/request",
+    "version": "1.19.6"
+  },
+  "runtime": {
+    "node": "v24.18.0",
+    "platform": "darwin",
+    "architecture": "arm64",
+    "cpuModel": "Apple M3",
+    "logicalCpus": 8
+  },
+  "provenance": {
+    "gitCommit": "10292db7f89605bb78512f121c7e60dd9ef05229",
+    "gitDirty": false,
+    "buildSha256": "cb0f5c8cc237ceb05ed5815d114f14239a10fe8cd589daa1350fa4d34a11fec0",
+    "dependencyLockSha256": "3674fb534986655a0dc397a5c6a1953651dfe8b1f9a806072b66c5594b7116ea"
+  },
+  "versions": {
+    "axios": "1.20.0",
+    "ky": "2.1.0",
+    "ofetch": "1.5.1"
+  },
+  "comparisonLockSha256": "ffa2ec3e194880c1f9892ef457e9f36eda8b504a5be2fc347ed0713cdb165ca5",
+  "configuration": {
+    "operations": 1000,
+    "concurrency": 64,
+    "warmup": 10,
+    "output": "benchmark-results/review-1.19.6/http-edge-cases.json",
+    "samples": 4096
+  },
+  "results": [
+    {
+      "scenario": "slow-json",
+      "client": "native-fetch",
+      "operations": 1000,
+      "latencySamples": 1000,
+      "durationMs": 219.22591699999998,
+      "operationsPerSecond": 4561.504468470304,
+      "heapDeltaBytes": 7641832,
+      "latencyMs": {
+        "mean": 13.679793550999992,
+        "p50": 13.477750000000015,
+        "p95": 20.262167000000005,
+        "p99": 24.343250000000012,
+        "max": 25.99475000000001
+      },
+      "cancellations": 0,
+      "consumedBytes": 0,
+      "server": {
+        "received": 1000,
+        "completed": 1000,
+        "disconnected": 0
+      }
+    },
+    {
+      "scenario": "slow-json",
+      "client": "@npora/request",
+      "operations": 1000,
+      "latencySamples": 1000,
+      "durationMs": 174.18741599999993,
+      "operationsPerSecond": 5740.942847444275,
+      "heapDeltaBytes": 22372808,
+      "latencyMs": {
+        "mean": 10.852552343999992,
+        "p50": 10.548375000000021,
+        "p95": 13.365916999999968,
+        "p99": 13.399667000000022,
+        "max": 13.774708000000032
+      },
+      "cancellations": 0,
+      "consumedBytes": 0,
+      "server": {
+        "received": 1000,
+        "completed": 1000,
+        "disconnected": 0
+      }
+    },
+    {
+      "scenario": "slow-json",
+      "client": "axios-http",
+      "operations": 1000,
+      "latencySamples": 1000,
+      "durationMs": 186.34325,
+      "operationsPerSecond": 5366.440694793077,
+      "heapDeltaBytes": 13051400,
+      "latencyMs": {
+        "mean": 11.442022228000006,
+        "p50": 10.791582999999946,
+        "p95": 20.250499999999988,
+        "p99": 23.07816600000001,
+        "max": 23.378415999999902
+      },
+      "cancellations": 0,
+      "consumedBytes": 0,
+      "server": {
+        "received": 1000,
+        "completed": 1000,
+        "disconnected": 0
+      }
+    },
+    {
+      "scenario": "slow-json",
+      "client": "axios-fetch",
+      "operations": 1000,
+      "latencySamples": 1000,
+      "durationMs": 239.486083,
+      "operationsPerSecond": 4175.607983032567,
+      "heapDeltaBytes": -14672840,
+      "latencyMs": {
+        "mean": 14.88068544000001,
+        "p50": 14.694291000000021,
+        "p95": 20.50154199999986,
+        "p99": 22.22158300000001,
+        "max": 27.244249999999965
+      },
+      "cancellations": 0,
+      "consumedBytes": 0,
+      "server": {
+        "received": 1000,
+        "completed": 1000,
+        "disconnected": 0
+      }
+    },
+    {
+      "scenario": "slow-json",
+      "client": "ky",
+      "operations": 1000,
+      "latencySamples": 1000,
+      "durationMs": 185.53754200000003,
+      "operationsPerSecond": 5389.744788146432,
+      "heapDeltaBytes": 2176576,
+      "latencyMs": {
+        "mean": 11.563666377999999,
+        "p50": 11.007417000000032,
+        "p95": 17.427165999999943,
+        "p99": 17.542541999999912,
+        "max": 17.64454099999989
+      },
+      "cancellations": 0,
+      "consumedBytes": 0,
+      "server": {
+        "received": 1000,
+        "completed": 1000,
+        "disconnected": 0
+      }
+    },
+    {
+      "scenario": "slow-json",
+      "client": "ofetch",
+      "operations": 1000,
+      "latencySamples": 1000,
+      "durationMs": 160.72745799999984,
+      "operationsPerSecond": 6221.712285152926,
+      "heapDeltaBytes": 20958624,
+      "latencyMs": {
+        "mean": 9.989018762000002,
+        "p50": 9.644208999999819,
+        "p95": 15.916124999999965,
+        "p99": 16.049499999999853,
+        "max": 16.57899999999995
+      },
+      "cancellations": 0,
+      "consumedBytes": 0,
+      "server": {
+        "received": 1000,
+        "completed": 1000,
+        "disconnected": 0
+      }
+    },
+    {
+      "scenario": "large-json",
+      "client": "@npora/request",
+      "operations": 1000,
+      "latencySamples": 1000,
+      "durationMs": 211.81320800000003,
+      "operationsPerSecond": 4721.140902601314,
+      "heapDeltaBytes": 62571128,
+      "latencyMs": {
+        "mean": 13.053597959000022,
+        "p50": 13.049416000000065,
+        "p95": 16.921749999999975,
+        "p99": 18.541124999999965,
+        "max": 18.683874999999944
+      },
+      "cancellations": 0,
+      "consumedBytes": 0,
+      "server": {
+        "received": 1000,
+        "completed": 1000,
+        "disconnected": 0
+      }
+    },
+    {
+      "scenario": "large-json",
+      "client": "axios-http",
+      "operations": 1000,
+      "latencySamples": 1000,
+      "durationMs": 256.733917,
+      "operationsPerSecond": 3895.0833286277475,
+      "heapDeltaBytes": 16899344,
+      "latencyMs": {
+        "mean": 15.971942359999982,
+        "p50": 15.255582999999888,
+        "p95": 21.3599999999999,
+        "p99": 21.99479099999985,
+        "max": 22.14841699999988
+      },
+      "cancellations": 0,
+      "consumedBytes": 0,
+      "server": {
+        "received": 1000,
+        "completed": 1000,
+        "disconnected": 0
+      }
+    },
+    {
+      "scenario": "large-json",
+      "client": "axios-fetch",
+      "operations": 1000,
+      "latencySamples": 1000,
+      "durationMs": 269.0290420000001,
+      "operationsPerSecond": 3717.07081349232,
+      "heapDeltaBytes": 32323152,
+      "latencyMs": {
+        "mean": 16.781057758000017,
+        "p50": 16.834084000000075,
+        "p95": 22.067749999999705,
+        "p99": 25.956750000000284,
+        "max": 26.063000000000102
+      },
+      "cancellations": 0,
+      "consumedBytes": 0,
+      "server": {
+        "received": 1000,
+        "completed": 1000,
+        "disconnected": 0
+      }
+    },
+    {
+      "scenario": "large-json",
+      "client": "ky",
+      "operations": 1000,
+      "latencySamples": 1000,
+      "durationMs": 222.65541699999994,
+      "operationsPerSecond": 4491.244872789241,
+      "heapDeltaBytes": -13879048,
+      "latencyMs": {
+        "mean": 13.863802711999996,
+        "p50": 13.572041999999783,
+        "p95": 16.79399999999987,
+        "p99": 17.066667000000052,
+        "max": 17.2782500000003
+      },
+      "cancellations": 0,
+      "consumedBytes": 0,
+      "server": {
+        "received": 1000,
+        "completed": 1000,
+        "disconnected": 0
+      }
+    },
+    {
+      "scenario": "large-json",
+      "client": "ofetch",
+      "operations": 1000,
+      "latencySamples": 1000,
+      "durationMs": 227.6954579999997,
+      "operationsPerSecond": 4391.831127347307,
+      "heapDeltaBytes": -4336664,
+      "latencyMs": {
+        "mean": 14.216380008999993,
+        "p50": 13.899124999999913,
+        "p95": 18.27995800000008,
+        "p99": 20.424999999999727,
+        "max": 20.443874999999935
+      },
+      "cancellations": 0,
+      "consumedBytes": 0,
+      "server": {
+        "received": 1000,
+        "completed": 1000,
+        "disconnected": 0
+      }
+    },
+    {
+      "scenario": "large-json",
+      "client": "native-fetch",
+      "operations": 1000,
+      "latencySamples": 1000,
+      "durationMs": 194.55916700000034,
+      "operationsPerSecond": 5139.824637509875,
+      "heapDeltaBytes": 18679696,
+      "latencyMs": {
+        "mean": 12.158979601999999,
+        "p50": 11.57287499999984,
+        "p95": 15.20699999999988,
+        "p99": 15.406583999999839,
+        "max": 15.433332999999948
+      },
+      "cancellations": 0,
+      "consumedBytes": 0,
+      "server": {
+        "received": 1000,
+        "completed": 1000,
+        "disconnected": 0
+      }
+    },
+    {
+      "scenario": "cancel-storm",
+      "client": "axios-http",
+      "operations": 1000,
+      "latencySamples": 1000,
+      "durationMs": 317.40962500000023,
+      "operationsPerSecond": 3150.503076269345,
+      "heapDeltaBytes": 5338880,
+      "latencyMs": {
+        "mean": 19.882597110000006,
+        "p50": 20.204833000000235,
+        "p95": 25.845291999999972,
+        "p99": 27.7334579999997,
+        "max": 28.892749999999978
+      },
+      "cancellations": 1000,
+      "consumedBytes": 0,
+      "server": {
+        "received": 1000,
+        "completed": 0,
+        "disconnected": 1008
+      }
+    },
+    {
+      "scenario": "cancel-storm",
+      "client": "axios-fetch",
+      "operations": 1000,
+      "latencySamples": 1000,
+      "durationMs": 361.87408400000004,
+      "operationsPerSecond": 2763.3921416710236,
+      "heapDeltaBytes": 45604328,
+      "latencyMs": {
+        "mean": 22.560712803000037,
+        "p50": 21.804667000000336,
+        "p95": 29.816749999999956,
+        "p99": 46.25758300000007,
+        "max": 50.32487500000025
+      },
+      "cancellations": 1000,
+      "consumedBytes": 0,
+      "server": {
+        "received": 1000,
+        "completed": 0,
+        "disconnected": 1008
+      }
+    },
+    {
+      "scenario": "cancel-storm",
+      "client": "ky",
+      "operations": 1000,
+      "latencySamples": 1000,
+      "durationMs": 256.73308399999996,
+      "operationsPerSecond": 3895.0959666733106,
+      "heapDeltaBytes": -86301064,
+      "latencyMs": {
+        "mean": 16.042522739000017,
+        "p50": 14.99133299999994,
+        "p95": 29.889208999999937,
+        "p99": 30.75183399999969,
+        "max": 33.181332999999995
+      },
+      "cancellations": 1000,
+      "consumedBytes": 0,
+      "server": {
+        "received": 1000,
+        "completed": 0,
+        "disconnected": 1000
+      }
+    },
+    {
+      "scenario": "cancel-storm",
+      "client": "ofetch",
+      "operations": 1000,
+      "latencySamples": 1000,
+      "durationMs": 216.65212500000007,
+      "operationsPerSecond": 4615.694399489503,
+      "heapDeltaBytes": 10470744,
+      "latencyMs": {
+        "mean": 13.463826289000002,
+        "p50": 12.678083000000242,
+        "p95": 22.218917000000147,
+        "p99": 23.58358300000009,
+        "max": 23.949874999999793
+      },
+      "cancellations": 1000,
+      "consumedBytes": 0,
+      "server": {
+        "received": 1000,
+        "completed": 0,
+        "disconnected": 1000
+      }
+    },
+    {
+      "scenario": "cancel-storm",
+      "client": "native-fetch",
+      "operations": 1000,
+      "latencySamples": 1000,
+      "durationMs": 208.44341699999995,
+      "operationsPerSecond": 4797.465011811815,
+      "heapDeltaBytes": 15761976,
+      "latencyMs": {
+        "mean": 12.949151585000006,
+        "p50": 12.447709000000032,
+        "p95": 19.50654200000008,
+        "p99": 19.86004200000025,
+        "max": 19.90808399999969
+      },
+      "cancellations": 1000,
+      "consumedBytes": 0,
+      "server": {
+        "received": 1000,
+        "completed": 0,
+        "disconnected": 1000
+      }
+    },
+    {
+      "scenario": "cancel-storm",
+      "client": "@npora/request",
+      "operations": 1000,
+      "latencySamples": 1000,
+      "durationMs": 252.07279199999994,
+      "operationsPerSecond": 3967.1080407599097,
+      "heapDeltaBytes": -59615536,
+      "latencyMs": {
+        "mean": 15.685678337999999,
+        "p50": 14.768583000000035,
+        "p95": 26.135333000000173,
+        "p99": 28.93004100000053,
+        "max": 28.95129199999974
+      },
+      "cancellations": 1000,
+      "consumedBytes": 0,
+      "server": {
+        "received": 1000,
+        "completed": 0,
+        "disconnected": 1000
+      }
+    },
+    {
+      "scenario": "stream-backpressure",
+      "client": "axios-fetch",
+      "operations": 1000,
+      "latencySamples": 1000,
+      "durationMs": 704.4081669999996,
+      "operationsPerSecond": 1419.6314677311236,
+      "heapDeltaBytes": 33561928,
+      "latencyMs": {
+        "mean": 43.967356041999984,
+        "p50": 44.014916000000085,
+        "p95": 49.23695800000041,
+        "p99": 50.09554200000002,
+        "max": 51.745332999999846
+      },
+      "cancellations": 0,
+      "consumedBytes": 16384000,
+      "server": {
+        "received": 1000,
+        "completed": 1000,
+        "disconnected": 0
+      }
+    },
+    {
+      "scenario": "stream-backpressure",
+      "client": "ky",
+      "operations": 1000,
+      "latencySamples": 1000,
+      "durationMs": 599.4928330000002,
+      "operationsPerSecond": 1668.076655722087,
+      "heapDeltaBytes": 21861600,
+      "latencyMs": {
+        "mean": 37.40824067400008,
+        "p50": 36.288166000000274,
+        "p95": 48.34058399999958,
+        "p99": 52.69187499999953,
+        "max": 55.05250000000069
+      },
+      "cancellations": 0,
+      "consumedBytes": 16384000,
+      "server": {
+        "received": 1000,
+        "completed": 1000,
+        "disconnected": 0
+      }
+    },
+    {
+      "scenario": "stream-backpressure",
+      "client": "ofetch",
+      "operations": 1000,
+      "latencySamples": 1000,
+      "durationMs": 554.6419159999996,
+      "operationsPerSecond": 1802.9650683667421,
+      "heapDeltaBytes": 1166392,
+      "latencyMs": {
+        "mean": 34.62439866300003,
+        "p50": 34.54433400000016,
+        "p95": 40.221958000000086,
+        "p99": 44.157500000000255,
+        "max": 44.18204100000003
+      },
+      "cancellations": 0,
+      "consumedBytes": 16384000,
+      "server": {
+        "received": 1000,
+        "completed": 1000,
+        "disconnected": 0
+      }
+    },
+    {
+      "scenario": "stream-backpressure",
+      "client": "native-fetch",
+      "operations": 1000,
+      "latencySamples": 1000,
+      "durationMs": 570.4974159999992,
+      "operationsPerSecond": 1752.856317932913,
+      "heapDeltaBytes": -20822432,
+      "latencyMs": {
+        "mean": 35.57871138199992,
+        "p50": 35.47404199999983,
+        "p95": 44.264624999999796,
+        "p99": 45.76387499999964,
+        "max": 47.826750000000175
+      },
+      "cancellations": 0,
+      "consumedBytes": 16384000,
+      "server": {
+        "received": 1000,
+        "completed": 1000,
+        "disconnected": 0
+      }
+    },
+    {
+      "scenario": "stream-backpressure",
+      "client": "@npora/request",
+      "operations": 1000,
+      "latencySamples": 1000,
+      "durationMs": 600.2832079999998,
+      "operationsPerSecond": 1665.8803489302343,
+      "heapDeltaBytes": -16625896,
+      "latencyMs": {
+        "mean": 37.40450618999995,
+        "p50": 37.22870799999964,
+        "p95": 44.35233299999982,
+        "p99": 46.28208300000006,
+        "max": 47.51749999999993
+      },
+      "cancellations": 0,
+      "consumedBytes": 16384000,
+      "server": {
+        "received": 1000,
+        "completed": 1000,
+        "disconnected": 0
+      }
+    },
+    {
+      "scenario": "stream-backpressure",
+      "client": "axios-http",
+      "operations": 1000,
+      "latencySamples": 1000,
+      "durationMs": 744.8382910000009,
+      "operationsPerSecond": 1342.5732968929744,
+      "heapDeltaBytes": 32286320,
+      "latencyMs": {
+        "mean": 46.118599491999944,
+        "p50": 46.19458399999894,
+        "p95": 49.19316600000093,
+        "p99": 52.26158299999952,
+        "max": 56.3070000000007
+      },
+      "cancellations": 0,
+      "consumedBytes": 16384000,
+      "server": {
+        "received": 1000,
+        "completed": 1000,
+        "disconnected": 0
+      }
+    }
+  ],
+  "server": {
+    "received": 24240,
+    "completed": 18180,
+    "disconnected": 6060
+  },
+  "limitations": [
+    "One local loopback run per client/scenario, shared process, no TLS or remote latency.",
+    "Library transport/pool differences remain; streaming Axios HTTP needs a Node-to-Web bridge.",
+    "Consumer delay approximates backpressure; this is not a retained-memory or production capacity measurement.",
+    "Server disconnect accounting is asynchronous; per-client disconnect deltas can include preceding cancellations.",
+    "Abort scenario checks eventual rejection after headers; it does not assert identical buffered-data semantics."
+  ]
+}
