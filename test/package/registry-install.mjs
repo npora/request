@@ -135,6 +135,7 @@ function runCommand(command, args) {
   return spawnSync(command, args, {
     cwd: temporaryDirectory,
     encoding: 'utf8',
+    timeout: 120_000,
     env: {
       ...process.env,
       npm_config_cache: npmCache

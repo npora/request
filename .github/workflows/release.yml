@@ -25,6 +25,10 @@ jobs:
       github.event.workflow_run.head_repository.full_name == github.repository
     runs-on: ubuntu-latest
 
+    outputs:
+      published: ${{ steps.changesets.outputs.published }}
+      version: ${{ fromJSON(steps.changesets.outputs['published-packages'] || '[]')[0].version }}
+
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -83,8 +87,31 @@ jobs:
           publish-script: pnpm release
           create-github-releases: true
 
+  verify-published:
+    name: Verify published package
+    needs: release
+    if: needs.release.outputs.published == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+          package-manager-cache: false
+
       - name: Verify the newly published package
-        if: steps.changesets.outputs.published == 'true'
-        run: node test/package/registry-install.mjs
+        run: |
+          test -n "$EXPECTED_PACKAGE_VERSION"
+          node test/package/registry-install.mjs
         env:
-          EXPECTED_PACKAGE_VERSION: ${{ fromJSON(steps.changesets.outputs['published-packages'])[0].version }}
+          EXPECTED_PACKAGE_VERSION: ${{ needs.release.outputs.version }}

@@ -267,8 +267,20 @@ Every user-visible change includes a Changesets entry. CI verifies Node.js 22,
 24, and 26 plus the public type, quality, and browser suites. The release
 workflow runs only after the exact `main` commit completes that matrix
 successfully. Merging the generated version PR then publishes to npm with
-trusted publishing, creates a Git tag and GitHub Release, and immediately
-installs the exact published version for ESM and CommonJS smoke tests.
+trusted publishing and creates a Git tag and GitHub Release. A separate
+`Verify published package` job installs the exact version for ESM and CommonJS
+smoke tests. It receives the published version through job outputs, checks out
+the same release commit, and has only repository read permission. When creating
+a version PR without publishing, this verification job is skipped.
+
+Registry metadata can lag behind an accepted publish. Installation retries
+only npm `ETARGET` and `E404` failures, with 15 minutes of scheduled waits and
+a maximum 30-second interval. Each install or smoke-test command has a two-minute
+timeout, and the verification job has a 30-minute deadline. Command time adds
+to the scheduled waits; killed commands and other failures stop immediately.
+After a propagation failure, use GitHub Actions **Re-run failed jobs** to repeat
+the verification job while retaining the successful publish job and its exact
+version output. Do not republish or bump a version just to rerun verification.
 
 The release workflow uses Changesets CLI v3 with an immutable-pinned
 Changesets Action v2. Run `pnpm test:release-workflow` after changing release

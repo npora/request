@@ -3,16 +3,12 @@ const DEFAULT_RETRY_DELAYS = [
   4_000,
   8_000,
   16_000,
-  30_000,
-  30_000,
-  30_000,
-  30_000,
-  30_000,
-  30_000
+  // Fifteen minutes of scheduled waits, with at most 30s between attempts.
+  ...Array(29).fill(30_000)
 ]
 
 /**
- * Retry the short window where npm has accepted a publish but its package
+ * Retry the propagation window where npm has accepted a publish but its package
  * metadata is not yet visible to every registry reader.
  */
 export async function retryRegistryInstall(
@@ -45,6 +41,9 @@ export async function retryRegistryInstall(
 }
 
 export function isRegistryPropagationFailure(result) {
+  // Killed or timed-out commands are not evidence of registry propagation.
+  if (result.status !== 1) return false
+
   const output = `${result.stdout ?? ''}\n${result.stderr ?? ''}`
 
   return /\b(?:ETARGET|E404)\b/.test(output)

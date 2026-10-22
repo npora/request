@@ -87,8 +87,40 @@ describe('registry install retry', () => {
     expect(onRetry).toHaveBeenLastCalledWith({
       attempt: 8,
       delay: 30_000,
-      maximumAttempts: 11
+      maximumAttempts: 34
     })
+  })
+
+  it('keeps polling when the published version takes twelve minutes to appear', async () => {
+    let elapsed = 0
+    const install = vi.fn(() => elapsed < 12 * 60_000 ? failure('ETARGET') : success())
+    const wait = vi.fn(async (delay: number) => { elapsed += delay })
+
+    await expect(retryRegistryInstall(install, { wait })).resolves.toEqual(success())
+    expect(elapsed).toBe(12 * 60_000)
+    expect(install).toHaveBeenCalledTimes(28)
+    expect(wait.mock.calls.every(([delay]) => delay <= 30_000)).toBe(true)
+  })
+
+  it('stops after fifteen minutes of default scheduled waits', async () => {
+    const result = failure('E404')
+    const install = vi.fn(() => result)
+    let elapsed = 0
+    const wait = vi.fn(async (delay: number) => { elapsed += delay })
+
+    await expect(retryRegistryInstall(install, { wait })).resolves.toBe(result)
+    expect(elapsed).toBe(15 * 60_000)
+    expect(install).toHaveBeenCalledTimes(34)
+  })
+
+  it('does not retry a killed install with propagation text in its output', async () => {
+    const result = { ...failure('E404'), status: null, signal: 'SIGTERM' }
+    const install = vi.fn(() => result)
+    const wait = vi.fn()
+
+    await expect(retryRegistryInstall(install, { wait })).resolves.toBe(result)
+    expect(install).toHaveBeenCalledOnce()
+    expect(wait).not.toHaveBeenCalled()
   })
 
   it('recognizes propagation codes in either npm output stream', () => {
