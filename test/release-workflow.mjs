@@ -84,14 +84,21 @@ assert.doesNotMatch(actionStep, /^\s+version:/m)
 assert.doesNotMatch(actionStep, /^\s+publish:/m)
 assert.doesNotMatch(actionStep, /createGithubReleases:/)
 assert.doesNotMatch(actionStep, /^\s+env:/m)
-assert.match(
-  workflow,
-  /if: steps\.changesets\.outputs\.published == 'true'/
-)
-assert.match(
-  workflow,
-  /EXPECTED_PACKAGE_VERSION: \$\{\{ fromJSON\(steps\.changesets\.outputs\['published-packages'\]\)\[0\]\.version \}\}/
-)
+const verificationStart = workflow.indexOf('\n  verify-published:')
+assert.ok(verificationStart > actionStart, 'Published verification must be a separate job')
+const publishJob = workflow.slice(0, verificationStart)
+const verificationJob = workflow.slice(verificationStart)
+assert.match(publishJob, /published: \$\{\{ steps\.changesets\.outputs\.published \}\}/)
+assert.ok(publishJob.includes("fromJSON(steps.changesets.outputs['published-packages'] || '[]')[0].version"))
+assert.doesNotMatch(publishJob, /node test\/package\/registry-install\.mjs/)
+assert.match(verificationJob, /needs: release/)
+assert.match(verificationJob, /if: needs\.release\.outputs\.published == 'true'/)
+assert.match(verificationJob, /timeout-minutes: 30/)
+assert.match(verificationJob, /permissions:\s+contents: read/)
+assert.match(verificationJob, /ref: \$\{\{ github\.event\.workflow_run\.head_sha \}\}/)
+assert.match(verificationJob, /EXPECTED_PACKAGE_VERSION: \$\{\{ needs\.release\.outputs\.version \}\}/)
+assert.match(verificationJob, /test -n "\$EXPECTED_PACKAGE_VERSION"\s+node test\/package\/registry-install\.mjs/)
+assert.doesNotMatch(verificationJob, /pnpm release|changesets\/action|id-token: write|contents: write/)
 
 console.log(
   'Changesets v3 and Action v2 release workflow contract passed.'
