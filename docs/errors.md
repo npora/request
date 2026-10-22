@@ -1,5 +1,33 @@
 # Handle request failures
 
+## Map schema issues to form fields
+
+The optional helper keeps form-specific code out of the core entry:
+
+```ts
+import { isSchemaValidationError } from '@npora/request/core'
+import { toFormErrors } from '@npora/request/schema-errors'
+
+try {
+  await api.get('/user', { schema: userSchema })
+} catch (error) {
+  if (!isSchemaValidationError(error)) throw error
+  const { fieldErrors, formErrors } = toFormErrors(error.issues)
+  // fieldErrors['users.0.name'] contains every message for that field.
+  // Choose fieldErrors['users.0.name']?.[0] for a single-message UI.
+}
+```
+
+The result is `{ formErrors: string[], fieldErrors: Record<string, string[]> }`.
+Paths accept Standard Schema primitive keys and `{ key }` segments. Literal
+dots and backslashes are escaped, so `['a.b']` maps to `a\\.b`, while `['a', 'b']`
+maps to `a.b`. Duplicate messages are preserved in issue order. Missing/empty
+paths and paths containing symbols become form-level errors. The field map
+has a null prototype so keys such as `__proto__` are safe.
+
+This maps validator issues; it does not infer a server's form-error protocol
+from an arbitrary HTTP error body or introduce request-body validation.
+
 Start by narrowing an unknown caught value with `isRequestError()`. An
 application interceptor, hook, or custom adapter may throw an ordinary Error or
 another value. Do not assume every failure has HTTP status or response data.

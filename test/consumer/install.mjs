@@ -45,6 +45,11 @@ try {
     await checkStreamingContract({ ...esm, downloadPlugin }, 'ESM');
     await checkStreamingContract({ ...require('@npora/request/core'),
       ...require('@npora/request/plugins/download') }, 'CommonJS');
+    const { toFormErrors } = await import('@npora/request/schema-errors');
+    const issues = [{ message: 'Required', path: ['users', 0, 'name'] }];
+    for (const flatten of [toFormErrors, require('@npora/request/schema-errors').toFormErrors]) {
+      if (flatten(issues).fieldErrors['users.0.name'][0] !== 'Required') throw Error('Form error export');
+    }
   `)
   run(process.execPath, ['streaming.mjs'], directory)
   console.log('Installed package consumer, onboarding workflows, and ESM/CommonJS streaming passed.')

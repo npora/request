@@ -4,7 +4,8 @@ import type {
   RequestConfig,
   RequestURL,
   ServerSentEvent,
-  SseReconnectOptions
+  SseReconnectOptions,
+  SseStateObserver
 } from '../types'
 import { waitForRetry } from '../core/lifecycleTiming'
 import { throwIfAborted } from '../utils/createAbortError'
@@ -23,7 +24,8 @@ export function createReconnectingSse(
   url: RequestURL,
   config: Omit<RequestConfig, 'url'>,
   options: SseReconnectOptions,
-  connect: (config: Omit<RequestConfig, 'url'>) => Promise<SseStreamResponse>
+  connect: (config: Omit<RequestConfig, 'url'>) => Promise<SseStreamResponse>,
+  notify?: SseStateObserver
 ): Promise<AsyncIterable<ServerSentEvent>> {
   const initialConfig: RequestConfig = {
     ...config,
@@ -40,7 +42,11 @@ export function createReconnectingSse(
 
   const state: ReconnectState = {}
 
-  return connect(withSseControl(config, observerFor(state))).then(first => reconnectSse(
+  const open = (response: SseStreamResponse) => {
+    notify?.(response.status === 204 ? 'closed' : 'open')
+    return response
+  }
+  return connect(withSseControl(config, observerFor(state))).then(open).then(first => reconnectSse(
     first,
     initialConfig,
     options,
@@ -48,7 +54,8 @@ export function createReconnectingSse(
     () => connect(withSseControl(
       reconnectConfig(config, state.lastEventId),
       observerFor(state)
-    ))
+    )).then(open),
+    notify
   ))
 }
 
@@ -81,7 +88,8 @@ export function reconnectSse(
   config: RequestConfig,
   options: SseReconnectOptions,
   state: ReconnectState,
-  connect: () => Promise<SseStreamResponse>
+  connect: () => Promise<SseStreamResponse>,
+  notify?: SseStateObserver
 ): AsyncIterable<ServerSentEvent> {
   return withEarlyIteratorCleanup(start => (async function* () {
     start()
@@ -112,6 +120,7 @@ export function reconnectSse(
         return
       }
 
+      notify?.('reconnecting')
       const delay = Math.min(
         state.serverDelay ?? options.delay ?? 1000,
         options.maxDelay ?? MAX_TIMER_DELAY

@@ -1,5 +1,16 @@
 # Performance Benchmarks
 
+See the [runtime-hardening candidate report](measurements/runtime-hardening/README.md)
+for the latest local stable-version HTTP comparison, size costs, adverse-body
+diagnostics and verification results. It identifies unreleased changes separately
+from the unchanged 1.20.2 npm release.
+
+`pnpm benchmark:compare -- --large-json` repeats the same rotated-order HTTP
+comparison for GET responses containing a 64 KiB string payload. It records the
+actual JSON response byte size and verifies every returned value and server
+request count. This complements the ordinary small-response comparison and the
+single-run adverse-body diagnostics.
+
 The core benchmark measures request-library overhead without network latency.
 It uses a minimal stateless adapter, a warm-up phase and the same workload for
 every scenario. A separate HTTP benchmark uses a localhost server. The core
@@ -521,7 +532,10 @@ node --import tsx benchmark/competitors/edge-cases.mjs \
 
 Each of the six clients uses the same loopback server. Scenarios cover a 5 ms
 server delay, a 64 KiB JSON string, cancellation after the first streaming chunk,
-and byte-verified streaming with a 2 ms consumer pause. Retries are disabled.
+byte-verified streaming with a 2 ms consumer pause, and 16 MiB binary streams
+verified with SHA-256. Retries are disabled. The binary case transfers 16 MiB
+per operation per client; start with `--operations 64 --concurrency 8 --warmup 8`
+for diagnostic runs rather than a large default workload.
 Axios HTTP streams use a Node-to-Web stream bridge. Cancellation must eventually
 reject the active body; the runner does not assume all clients discard buffered
 data identically. Server disconnect notifications are asynchronous, so their

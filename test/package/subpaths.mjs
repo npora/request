@@ -6,6 +6,9 @@ import {
 import { retryPlugin } from '@npora/request/plugins/retry'
 import { memoryCachePlugin } from '@npora/request/plugins/memory-cache'
 import { MockAdapter } from '@npora/request/testing'
+import { toFormErrors } from '@npora/request/schema-errors'
+
+assert.deepEqual(toFormErrors([{ message: 'Required', path: ['name'] }]).fieldErrors.name, ['Required'])
 
 const adapter = new MockAdapter()
 

@@ -17,6 +17,11 @@ const server = createServer((request, response) => {
 
 async function handle(request, response) {
   const url = new URL(request.url, 'http://localhost')
+  if (url.pathname === '/api/redirect') {
+    response.writeHead(303, { location: '/api/users?redirected=true' })
+    response.end()
+    return
+  }
   if (url.pathname === '/api/pending') {
     const waiter = pending.get(url.searchParams.get('id'))
     if (waiter) waiter.resolve()
@@ -48,6 +53,8 @@ async function handle(request, response) {
     method: request.method, url: request.url,
     contentType: request.headers['content-type'],
     marker: request.headers['x-migration'],
+    authorization: request.headers.authorization,
+    xsrf: request.headers['x-xsrf-token'],
     body: fields ? undefined : body.toString('utf8'), fields
   }))
 }
@@ -67,6 +74,40 @@ after(async () => {
 for (const adapter of ['http', 'fetch']) {
   const oldClient = () => axios.create({ baseURL, adapter, proxy: false, timeout: 3000 })
   const options = { timeout: 5000 }
+
+  test(`${adapter}: explicit authentication and XSRF headers`, options, async () => {
+    const headers = { authorization: 'Bearer migration-token', 'x-xsrf-token': 'explicit-token' }
+    const old = await oldClient().get('/users', { headers })
+    const next = await npora.get('/users', { headers })
+    assert.deepEqual(next, old.data)
+    assert.equal(next.authorization, headers.authorization)
+    assert.equal(next.xsrf, headers['x-xsrf-token'])
+  })
+
+  test(`${adapter}: URL-encoded form wire contract`, options, async () => {
+    const form = new URLSearchParams([['name', '你好'], ['tag', 'a b'], ['tag', 'c']])
+    const old = await oldClient().post('/users', form)
+    const next = await npora.post('/users', { form })
+    assert.equal(next.body, old.data.body)
+    assert.match(next.contentType, /^application\/x-www-form-urlencoded/i)
+    assert.match(old.data.contentType, /^application\/x-www-form-urlencoded/i)
+  })
+
+  test(`${adapter}: default redirects follow, explicit Fetch manual redirect stays visible`, options, async () => {
+    const old = await oldClient().get('/redirect')
+    assert.deepEqual(await npora.get('/redirect'), old.data)
+    const manual = await npora.getResponse('/redirect', {
+      fetchOptions: { redirect: 'manual' }, throwHttpErrors: false
+    })
+    assert.equal(manual.status, 303)
+    assert.equal(manual.headers.get('location'), '/api/users?redirected=true')
+  })
+
+  test(`${adapter}: timeouts retain each library's own error code`, options, async () => {
+    await assert.rejects(oldClient().get('/pending', { timeout: 20 }), error =>
+      axios.isAxiosError(error) && ['ECONNABORTED', 'ETIMEDOUT'].includes(error.code))
+    await assert.rejects(npora.get('/pending', { timeout: 20 }), { code: 'TIMEOUT_ERROR' })
+  })
 
   test(`${adapter}: base path, scalar query, headers and data-first return`, options, async () => {
     const headers = { 'x-migration': 'dashboard' }

@@ -5,6 +5,37 @@ import {
   TieredCacheStore
 } from '../src'
 
+it.each([undefined, {}, { request: true }])('rejects invalid lock managers: %j', locks => {
+  expect(() => new TieredCacheStore({
+    primary: new MemoryCacheStore(), secondary: new MemoryCacheStore(),
+    coordination: { locks: locks as LockManager }
+  })).toThrow(expect.objectContaining({ code: 'CONFIG_ERROR' }))
+})
+
+it.each([{}, { addEventListener() {} }, {
+  addEventListener() {}, removeEventListener() {}, postMessage: true
+}])('rejects incomplete broadcast channels: %j', channel => {
+  expect(() => new TieredCacheStore({
+    primary: new MemoryCacheStore(), secondary: new MemoryCacheStore(),
+    broadcast: { channel: channel as BroadcastChannel }
+  })).toThrow(expect.objectContaining({ code: 'CONFIG_ERROR' }))
+})
+
+it('works without navigator or lock coordination', () => {
+  vi.stubGlobal('navigator', undefined)
+  try {
+    const store = new TieredCacheStore({
+      primary: new MemoryCacheStore(), secondary: new MemoryCacheStore()
+    })
+    expect(store.acquireRefreshLease).toBeUndefined()
+    store.set('key', createEntry('value'))
+    expect(store.get('key')).toMatchObject({ data: 'value' })
+    store.dispose()
+  } finally {
+    vi.unstubAllGlobals()
+  }
+})
+
 function createEntry(data: unknown): CacheEntry {
   return {
     data,

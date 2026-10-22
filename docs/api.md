@@ -77,6 +77,7 @@ and TypeScript declarations.
 | --- | --- |
 | `.` | Core client, types, errors, and established plugin exports |
 | `./core` | Core client, types, errors, and Fetch adapter |
+| `./schema-errors` | Optional Standard Schema issue-to-form mapping |
 | `./plugins` | Established plugin exports |
 | `./plugins/auth` | auth plugin |
 | `./plugins/cache` | cache plugin |
@@ -217,6 +218,14 @@ initial one and resumes with the most recently observed `Last-Event-ID`.
 The setting applies only to `sse()`; `sseResponse()` continues to describe one
 HTTP response. See the [streaming workflow](workflows.md#consume-streaming-responses)
 for cancellation, retry, and error behavior.
+
+`sse()` also accepts `onStateChange?: (state: SseState) => void`.
+`SseState` is `connecting | open | reconnecting | closed | errored`.
+Notifications include the first connection, reconnect waits and terminal outcomes;
+observer failures do not affect the stream. These options belong to `sse()`
+rather than inherited request defaults or `sseResponse()`.
+For optional schema issue mapping, import `toFormErrors` from
+`@npora/request/schema-errors`; see [form errors](errors.md#map-schema-issues-to-form-fields).
 
 Example:
 

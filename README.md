@@ -25,7 +25,7 @@ has zero runtime dependencies.
 | Add retry, cache, authentication, or observability | [Plugins](#plugins) |
 | Handle stable error codes | [Errors](#errors) |
 | Configure Node.js proxying, pooling, mTLS, or DNS | [Undici integration](docs/undici.md) |
-| Review runtime boundaries and release checks | [Testing](docs/testing.md) and [security](docs/security.md) |
+| Review runtime boundaries and release checks | [Runtime support](docs/runtimes.md), [testing](docs/testing.md), and [security](docs/security.md) |
 
 ## Install
 
@@ -212,7 +212,8 @@ for await (const event of events) {
 
 // Opt in to bounded reconnection after a stream ends or disconnects.
 const liveEvents = await api.sse('/events', {
-  reconnect: { maxAttempts: 5, delay: 1000, maxDelay: 30000 }
+  reconnect: { maxAttempts: 5, delay: 1000, maxDelay: 30000 },
+  onStateChange: state => console.log(state)
 })
 
 for await (const event of liveEvents) {
@@ -237,6 +238,11 @@ When SSE reconnection is enabled, the next connection sends the last observed
 event ID in `Last-Event-ID` and honors the server's `retry` delay up to
 `maxDelay`. Cancellation, schema errors, and response-size errors stop the
 iterator; each connection uses its own request timeout.
+
+`onStateChange` observes `connecting`, `open`, `reconnecting`, `closed`, and
+`errored`. It is available before the initial promise resolves; callback
+failures are isolated. See the [streaming workflow](docs/workflows.md#consume-streaming-responses)
+for terminal-state and cancellation details.
 
 Run `pnpm example:streaming` for a local demonstration. See
 [streaming workflows](docs/workflows.md#consume-streaming-responses) for

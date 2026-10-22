@@ -11,13 +11,13 @@
       "transitive": true
     },
     "dist/index.d.ts": {
-      "bytes": 68500,
-      "gzipBytes": 20900,
+      "bytes": 69100,
+      "gzipBytes": 21250,
       "transitive": true
     },
     "dist/index.d.cts": {
-      "bytes": 68500,
-      "gzipBytes": 20900,
+      "bytes": 69100,
+      "gzipBytes": 21250,
       "transitive": true
     },
     "dist/core.js": {

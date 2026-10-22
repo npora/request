@@ -191,9 +191,11 @@ pnpm build
 pnpm test:migration:axios
 ```
 
-The 16 cases cover base paths, scalar query encoding, repeated query keys,
+The 24 cases cover base paths, scalar query encoding, repeated query keys,
 explicit bracket-array serialization, JSON bodies, response metadata,
 multipart fields and file contents, HTTP failures, custom status acceptance,
+explicit authentication/XSRF headers, URL-encoded forms, default redirects,
+manual Fetch redirects, each library's timeout classification,
 and cancellation after the server receives a request. CI runs this suite in
 its quality job. Comparison dependencies remain in the isolated fixture;
 they add no runtime dependency to Npora Request.
@@ -207,8 +209,13 @@ so the transport supplies the boundary, including with the Fetch adapter.
 Npora uses `{ body: formData }` without a manually supplied Content-Type.
 
 These checks cover deliberate API mappings, rather than general Axios
-compatibility. Browser cookies, CORS, XSRF handling, proxies, redirects,
-timeout equivalence, and interceptor equivalence are outside this suite.
+compatibility. Browser cookies, CORS, automatic XSRF cookie extraction, proxies,
+redirect security policy, timeout equivalence, and interceptor equivalence are
+outside this suite. Explicit XSRF headers do not imply automatic cookie support;
+Npora does not implement Axios's `auth` option or XSRF cookie-to-header behavior.
+Supply authorization deliberately. Axios `maxRedirects` is not a portable Fetch
+redirect limit; use Fetch's `redirect` policy and test browser opaque responses
+separately. Timeout checks assert the error category, not identical timing scope.
 Continue validating application-specific request and response contracts.
 
 For Axios-side options, consult the [official request configuration](https://axios-http.com/docs/req_config).

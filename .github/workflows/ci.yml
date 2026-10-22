@@ -146,6 +146,16 @@ jobs:
       - name: Verify Axios HTTP and Fetch migration contracts
         run: pnpm test:migration:axios
 
+      - name: Install pinned Edge and Undici test dependencies
+        run: npm ci --prefix test/edge --ignore-scripts
+
+      - name: Audit Edge test dependencies
+        run: npm audit --prefix test/edge --audit-level high
+
+      - name: Verify workerd and Undici runtime contracts
+        timeout-minutes: 5
+        run: pnpm test:edge
+
       - name: Verify package entrypoints
         run: pnpm test:package
 

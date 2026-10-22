@@ -81,7 +81,12 @@ export class TieredCacheStore implements CacheStore {
     this.primary = options.primary
     this.secondary = options.secondary
 
-    if (options.broadcast && !options.broadcast.channel) {
+    if (options.broadcast && (
+      !options.broadcast.channel ||
+      typeof options.broadcast.channel.addEventListener !== 'function' ||
+      typeof options.broadcast.channel.removeEventListener !== 'function' ||
+      typeof options.broadcast.channel.postMessage !== 'function'
+    )) {
       throw new RequestError(
         'Tiered cache broadcast requires a channel',
         { code: 'CONFIG_ERROR' }
@@ -90,7 +95,8 @@ export class TieredCacheStore implements CacheStore {
 
     if (
       options.coordination &&
-      !options.coordination.locks
+      (!options.coordination.locks ||
+        typeof options.coordination.locks.request !== 'function')
     ) {
       throw new RequestError(
         'Tiered cache coordination requires a lock manager',
