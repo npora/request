@@ -1,9 +1,10 @@
 {
-  "root: basic": 14375,
-  "core: basic": 14375,
-  "core + retry": 15725,
-  "core + cache": 20850,
-  "core + memory cache": 15600,
-  "root: retry + cache": 22175,
-  "core + retry + cache": 22275
+  "schema errors only": 400,
+  "root: basic": 14575,
+  "core: basic": 14575,
+  "core + retry": 15925,
+  "core + cache": 21050,
+  "core + memory cache": 15800,
+  "root: retry + cache": 22375,
+  "core + retry + cache": 22475
 }

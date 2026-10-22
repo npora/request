@@ -145,6 +145,30 @@ for streaming item validation too.
 
 ## Consume streaming responses
 
+Observe SSE transport lifecycle through `onStateChange`:
+
+```ts
+const events = await api.sse('/events', {
+  reconnect: { maxAttempts: 3, delay: 1000 },
+  onStateChange(state) {
+    renderConnectionState(state)
+  }
+})
+```
+
+The initial notification is `connecting`, before the returned promise settles.
+`open` means response headers were accepted. `reconnecting` includes the wait
+before a subsequent connection. EOF without further retries, HTTP 204, explicit
+iteration closure and user cancellation lead to `closed`. Unrecoverable or
+exhausted failures lead to `errored`. Terminal states are final and reported
+once. Synchronous throws and rejected promises from observers are ignored.
+
+Stream errors/EOF are observed as the iterable is consumed; caller cancellation
+is also observed while the consumer is idle. Always abort or close streams on
+view disposal. Notifications do not add event deduplication, exactly-once
+delivery, application health probes or a UI rendering queue. Pull-based async
+iteration continues to provide consumption backpressure.
+
 SSE returns event envelopes with string `data`; NDJSON decodes one JSON value
 per line. Pass `itemSchema` to validate and infer each yielded item's type.
 For SSE, the schema receives the event envelope, including `data`, `event`,

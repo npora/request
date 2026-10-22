@@ -18,6 +18,7 @@ import type {
   RequestURL,
   ServerSentEvent,
   SseReconnectOptions,
+  SseStateObserver,
   StandardSchemaV1
 } from '../types'
 import {
@@ -27,6 +28,7 @@ import { hasOwnProperty } from '../utils/hasOwnProperty'
 import { trustDefaults } from '../core/trustedDefaults'
 import { requestToConfig } from './requestInput'
 import { createReconnectingSse } from './reconnectSse'
+import { observeSse } from './observeSse'
 
 type MethodConfig = Omit<RequestConfig, 'url' | 'method'>
 
@@ -46,6 +48,8 @@ type StreamingMethodConfig = Omit<
 
 type SseMethodConfig = StreamingMethodConfig & {
   reconnect?: SseReconnectOptions
+  /** Connection lifecycle notifications; observer failures are isolated. */
+  onStateChange?: SseStateObserver
 }
 
 type SseSchemaMethodConfig<Schema extends StandardSchemaV1> = Omit<
@@ -530,24 +534,31 @@ export class Client {
     url: RequestURL,
     config: SseMethodConfig = {}
   ): Promise<AsyncIterable<ServerSentEvent>> {
-    const { reconnect, itemSchema, ...requestConfig } = config
+    const { reconnect, itemSchema, onStateChange, ...requestConfig } = config
 
-    if (reconnect === undefined) {
-      return this.getResponse<AsyncIterable<ServerSentEvent>>(url, {
-        ...config,
-        responseType: 'sse'
-      }).then(response => response.data ?? emptySse())
-    }
+    return observeSse(notify => {
+      if (reconnect === undefined) {
+        return this.getResponse<AsyncIterable<ServerSentEvent>>(url, {
+          ...requestConfig,
+          itemSchema,
+          responseType: 'sse'
+        }).then(response => {
+          notify?.(response.status === 204 ? 'closed' : 'open')
+          return response.data ?? emptySse()
+        })
+      }
 
-    return createReconnectingSse(
-      url,
-      { signal: this.defaults.signal, ...requestConfig, itemSchema },
-      reconnect,
-      next => this.getResponse<AsyncIterable<ServerSentEvent>>(url, {
-        ...next,
-        responseType: 'sse'
-      })
-    )
+      return createReconnectingSse(
+        url,
+        { signal: this.defaults.signal, ...requestConfig, itemSchema },
+        reconnect,
+        next => this.getResponse<AsyncIterable<ServerSentEvent>>(url, {
+          ...next,
+          responseType: 'sse'
+        }),
+        notify
+      )
+    }, onStateChange, 'signal' in requestConfig ? requestConfig.signal : this.defaults.signal)
   }
 
   /**

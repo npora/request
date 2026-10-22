@@ -184,6 +184,12 @@ Node.js 22, 24, and 26.
 
 ## Browser checks
 
+See the [runtime support matrix](runtimes.md) for the workerd, Service Worker,
+Undici, and unverified-platform boundaries. `pnpm test:edge` requires the
+isolated `test/edge` fixture installed with `npm ci --ignore-scripts`; the CI
+quality job installs, audits and executes it. Service Worker contracts run as
+part of the normal three-browser suite.
+
 ```sh
 pnpm exec playwright install chromium firefox webkit
 pnpm test:browser

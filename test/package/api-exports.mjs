@@ -111,6 +111,8 @@ const publicExports = [
   'ServerSentEvent',
   'StandardSchemaV1',
   'SseReconnectOptions',
+  'SseState',
+  'SseStateObserver',
   'StreamingSchemaLocation',
   'TieredCacheStore',
   'TieredCacheBroadcastOptions',
@@ -175,6 +177,7 @@ const require = createRequire(import.meta.url)
 const commonJSModule = require('../../dist/index.cjs')
 
 const subpathRuntimeExports = {
+  'schema-errors': ['toFormErrors'],
   core: [
     'Client',
     'FetchAdapter',

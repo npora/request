@@ -28,20 +28,10 @@ export function limitResponseSize(
     return response
   }
 
-  const contentLength = Number(response.headers.get('content-length'))
-
-  if (Number.isFinite(contentLength) && contentLength > maxSize) {
-    const error = createSizeError(response, maxSize, config)
-
-    void response.body.cancel(error).catch(() => {
-      // Preserve the size-limit error.
-    })
-
-    throw error
-  }
+  rejectOversizedContentLength(response, maxSize, config)
 
   const limited = new Response(
-    limitResponseStream(response, maxSize, config),
+    createResponseStream(response, config, maxSize),
     {
       status: response.status,
       statusText: response.statusText,
@@ -110,7 +100,9 @@ export async function parseResponse<T = unknown>(
     if (isStreamingResponseType(responseType)) {
       if (maxSize !== undefined && Number.isFinite(maxSize)) {
         rejectOversizedContentLength(response, maxSize, config)
-        response = new Response(limitResponseStream(response, maxSize, config), response)
+        response = new Response(response.body
+          ? createResponseStream(response, config, maxSize)
+          : null, response)
       }
       return parseStreamingResponse<T>(response, responseType, config, readSignal)
     }
@@ -384,34 +376,6 @@ function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
   }
 
   return Uint8Array.from(bytes).buffer
-}
-
-function limitResponseStream(
-  response: Response,
-  maxSize: number,
-  config: RequestConfig
-): ReadableStream<Uint8Array> | null {
-  if (!response.body) {
-    return null
-  }
-
-  const contentLength = Number(response.headers.get('content-length'))
-
-  if (Number.isFinite(contentLength) && contentLength > maxSize) {
-    const error = createSizeError(response, maxSize, config)
-
-    void response.body.cancel(error).catch(() => {
-      // Preserve the size-limit error.
-    })
-
-    return new ReadableStream<Uint8Array>({
-      start(controller) {
-        controller.error(error)
-      }
-    })
-  }
-
-  return createResponseStream(response, config, maxSize)
 }
 
 /** Share reader ownership, size accounting, and cancellation cleanup. */

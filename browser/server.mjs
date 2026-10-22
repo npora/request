@@ -8,6 +8,12 @@ import {
   resolve
 } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { build } from 'esbuild'
+
+const runtimeWorker = await build({
+  entryPoints: [fileURLToPath(new URL('./fixtures/runtime-worker.mjs', import.meta.url))],
+  bundle: true, platform: 'browser', format: 'iife', target: 'es2020', write: false
+})
 
 const HOST = 'localhost'
 const PORT = 4173
@@ -51,6 +57,12 @@ const server = createServer(
       if (request.method === 'OPTIONS') {
         sendPreflight(response)
 
+        return
+      }
+
+      if (url.pathname === '/runtime-worker.js') {
+        response.writeHead(200, { 'content-type': 'text/javascript', 'cache-control': 'no-store' })
+        response.end(runtimeWorker.outputFiles[0].text)
         return
       }
 

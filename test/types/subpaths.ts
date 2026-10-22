@@ -33,6 +33,10 @@ import {
 } from '@npora/request/plugins/memory-cache'
 import type { MockAdapterOptions } from '@npora/request/testing'
 import { MockAdapter } from '@npora/request/testing'
+import { toFormErrors, type FormErrors } from '@npora/request/schema-errors'
+
+const formErrors: FormErrors = toFormErrors([{ path: ['name'], message: 'Required' }])
+void formErrors
 
 const adapterOptions: MockAdapterOptions = { delay: 1 }
 const cacheOptions: CachePluginOptions = { maxEntries: 100 }

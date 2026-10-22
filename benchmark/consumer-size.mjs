@@ -9,6 +9,9 @@ import { summarizeBrowserBundle } from './browser-bundle.mjs'
 
 const root = fileURLToPath(new URL('../', import.meta.url))
 const scenarios = {
+  'schema errors only': `
+    export { toFormErrors } from '@npora/request/schema-errors'
+  `,
   'root: basic': `
     import { createClient } from '@npora/request'
     export const api = createClient({ baseURL: 'https://api.example.com' })

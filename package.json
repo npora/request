@@ -45,6 +45,11 @@
       "import": "./dist/core.js",
       "require": "./dist/core.cjs"
     },
+    "./schema-errors": {
+      "types": "./dist/schema-errors.d.ts",
+      "import": "./dist/schema-errors.js",
+      "require": "./dist/schema-errors.cjs"
+    },
     "./plugins": {
       "types": "./dist/plugins.d.ts",
       "import": "./dist/plugins.js",
@@ -163,6 +168,7 @@
     "test:size": "node test/package/size.mjs",
     "test:consumer-bundle": "node --test test/package/browser-bundle.test.mjs",
     "test:browser": "playwright test --config=browser/playwright.config.ts",
+    "test:edge": "node test/edge/run.mjs && node --test test/edge/undici.test.mjs",
     "test:browser:ui": "playwright test --config=browser/playwright.config.ts --ui",
     "test:browser:report": "playwright show-report playwright-report",
     "audit:dependencies": "pnpm audit --audit-level high",

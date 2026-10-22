@@ -25,6 +25,11 @@ export interface ServerSentEvent {
   retry?: number
 }
 
+/** Observable SSE connection lifecycle, separate from delivery/backpressure. */
+export type SseState = 'connecting' | 'open' | 'reconnecting' | 'closed' | 'errored'
+
+export type SseStateObserver = (state: SseState) => void
+
 /** Bounded reconnection for an SSE async iterable. */
 export interface SseReconnectOptions {
   /** Maximum number of new connections after the initial response. */

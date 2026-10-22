@@ -4,6 +4,7 @@ export default defineConfig({
   entry: {
     index: 'src/index.ts',
     core: 'src/core-entry.ts',
+    'schema-errors': 'src/schema-errors.ts',
     plugins: 'src/plugins/index.ts',
     'plugins/auth': 'src/plugins/authPlugin.ts',
     'plugins/cache': 'src/plugins/cachePlugin.ts',
@@ -33,6 +34,7 @@ export default defineConfig({
       // Keep the public API recognizable; internal helper bindings can shrink.
       reserved: [
         'createClient', 'isRequestError', 'isSchemaValidationError',
+        'toFormErrors',
         'authPlugin', 'cachePlugin', 'memoryCachePlugin', 'circuitBreakerPlugin',
         'concurrencyPlugin', 'downloadPlugin', 'loggerPlugin',
         'openTelemetryPlugin', 'openTelemetryMetricsPlugin',

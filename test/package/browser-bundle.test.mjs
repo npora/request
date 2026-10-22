@@ -71,10 +71,14 @@ test('budget checker rejects growth hidden in lazy chunks with a passing initial
   const { fileURLToPath } = await import('node:url')
   const directory = await mkdtemp(resolve(tmpdir(), 'request-split-budget-'))
   try {
-    const report = JSON.parse(await readFile(
-      new URL('../../docs/measurements/1.19.3/consumer.json', import.meta.url), 'utf8'
+    const limits = JSON.parse(await readFile(
+      new URL('../../benchmark/consumer-size-budget.json', import.meta.url), 'utf8'
     ))
-    report.schemaVersion = 3
+    const report = { schemaVersion: 3, results: Object.fromEntries(
+      Object.entries(limits).map(([name, limit]) => [name, {
+        bytes: limit * 2, gzipBytes: Math.floor(limit / 2)
+      }])
+    ) }
     report.splitResults = Object.fromEntries(Object.entries(report.results).map(([name, result]) => {
       const initial = { bytes: result.bytes, gzipBytes: result.gzipBytes, files: 1 }
       return [name, { initial, lazy: { bytes: 0, gzipBytes: 0, files: 0 }, total: { ...initial } }]
@@ -84,10 +88,10 @@ test('budget checker rejects growth hidden in lazy chunks with a passing initial
     await writeFile(path, JSON.stringify(report))
     execFileSync(process.execPath, [checker, path], { stdio: 'pipe' })
     const split = report.splitResults['core: basic']
-    split.lazy = { bytes: 2000, gzipBytes: 1000, files: 1 }
+    split.lazy = { bytes: 200000, gzipBytes: 100000, files: 1 }
     split.total = {
-      bytes: split.initial.bytes + 2000,
-      gzipBytes: split.initial.gzipBytes + 1000,
+      bytes: split.initial.bytes + split.lazy.bytes,
+      gzipBytes: split.initial.gzipBytes + split.lazy.gzipBytes,
       files: 2
     }
     await writeFile(path, JSON.stringify(report))

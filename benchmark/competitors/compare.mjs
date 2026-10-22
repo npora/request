@@ -10,6 +10,10 @@ import { parseBenchmarkOptions, runConcurrent, writeBenchmarkReport } from '../h
 import { hashFile, measurementMetadata } from '../provenance.mjs'
 
 const args = process.argv.slice(2)
+const largeIndex = args.indexOf('--large-json')
+const largeJson = largeIndex !== -1
+if (largeJson) args.splice(largeIndex, 1)
+const scenarios = largeJson ? ['get-json'] : ['get-json', 'post-json', 'query-json']
 const roundIndex = args.indexOf('--rounds')
 const rounds = roundIndex < 0 ? 6 : Number(args.splice(roundIndex, 2)[1])
 assert.ok(Number.isSafeInteger(rounds) && rounds > 0, 'rounds must be a positive integer')
@@ -25,7 +29,7 @@ const metadata = measurementMetadata()
 metadata.provenance.comparisonLockSha256 = hashFile(new URL('package-lock.json', import.meta.url))
 let received = 0
 let invalid = 0
-const expected = { ok: true }
+const expected = largeJson ? { ok: true, payload: 'x'.repeat(65536) } : { ok: true }
 const server = createServer(async (request, response) => {
   received++
   try {
@@ -104,7 +108,7 @@ try {
     const middle = Math.floor(sorted.length / 2)
     return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2
   }
-  for (const scenario of ['get-json', 'post-json', 'query-json']) {
+  for (const scenario of scenarios) {
     const runs = Object.fromEntries(names.map(name => [name, []]))
     for (let round = 0; round < rounds; round++) {
       const offset = round % names.length
@@ -133,11 +137,12 @@ try {
       ([name, { runs: _runs, ...summary }]) => [name, summary]
     )))
   }
-  const expectedRequests = 3 * names.length * rounds * (options.operations + options.warmup)
+  const expectedRequests = scenarios.length * names.length * rounds * (options.operations + options.warmup)
   assert.equal(received, expectedRequests)
   await writeBenchmarkReport(options.output, {
     schemaVersion: 1, generatedAt: new Date().toISOString(), ...metadata,
-    versions, configuration: { ...options, rounds }, orders,
+    versions, configuration: { ...options, rounds,
+      responseBytes: Buffer.byteLength(JSON.stringify(expected)) }, orders,
     requestsReceived: received, expectedRequests, invalidRequests: invalid, results
   })
 } finally {

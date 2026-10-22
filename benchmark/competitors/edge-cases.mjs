@@ -3,6 +3,7 @@ import { createServer } from 'node:http'
 import { once } from 'node:events'
 import { Readable } from 'node:stream'
 import { readFileSync } from 'node:fs'
+import { createHash } from 'node:crypto'
 import axios from 'axios'
 import ky from 'ky'
 import { ofetch } from 'ofetch'
@@ -19,6 +20,8 @@ const versions = Object.fromEntries(['axios', 'ky', 'ofetch'].map(name => [
 assert.deepEqual(versions, JSON.parse(readFileSync(new URL('package.json', import.meta.url))).dependencies)
 const counts = { received: 0, completed: 0, disconnected: 0 }
 const block = Buffer.alloc(1024, 120)
+const binaryBlock = Buffer.alloc(64 * 1024, 120)
+const binaryHash = createHash('sha256').update(Buffer.alloc(16 * 1024 * 1024, 120)).digest('hex')
 const large = JSON.stringify({ ok: true, payload: 'x'.repeat(65536) })
 const server = createServer((request, response) => {
   counts.received++
@@ -37,12 +40,16 @@ const server = createServer((request, response) => {
     return
   }
   response.writeHead(200, { 'content-type': 'application/octet-stream' })
+  const binary = scenario === 'binary-16mb'
   let chunks = 0
   const write = () => {
     chunks++
-    const ready = response.write(block)
-    if (chunks === 16) { response.end(); return }
-    const schedule = () => { timer = setTimeout(write, scenario === 'cancel-storm' ? 20 : 1) }
+    const ready = response.write(binary ? binaryBlock : block)
+    if (chunks === (binary ? 256 : 16)) { response.end(); return }
+    const schedule = () => {
+      if (binary) setImmediate(write)
+      else timer = setTimeout(write, scenario === 'cancel-storm' ? 20 : 1)
+    }
     if (ready) schedule()
     else response.once('drain', schedule)
   }
@@ -79,7 +86,7 @@ const clients = {
 }
 const results = []
 try {
-  for (const scenario of ['slow-json', 'large-json', 'cancel-storm', 'stream-backpressure']) {
+  for (const scenario of ['slow-json', 'large-json', 'cancel-storm', 'stream-backpressure', 'binary-16mb']) {
     // Rotate order across scenarios. This diagnostic run is not a ranking or CI gate.
     const names = Object.keys(clients)
     const shift = results.length / names.length
@@ -88,7 +95,8 @@ try {
       let consumedBytes = 0
       const operation = async () => {
         const controller = new AbortController()
-        const stream = scenario === 'cancel-storm' || scenario === 'stream-backpressure'
+        const binary = scenario === 'binary-16mb'
+        const stream = binary || scenario === 'cancel-storm' || scenario === 'stream-backpressure'
         const data = await clients[name](scenario, controller.signal, stream)
         if (!stream) {
           assert.equal(data.ok, true)
@@ -108,14 +116,17 @@ try {
             cancellations++
           } else {
             let size = 0
+            const hash = binary ? createHash('sha256') : undefined
             while (true) {
               const { done, value } = await reader.read()
               if (done) break
-              assert.ok(value.every(byte => byte === 120))
+              if (hash) hash.update(value)
+              else assert.ok(value.every(byte => byte === 120))
               size += value.byteLength
-              await new Promise(resolve => setTimeout(resolve, 2))
+              if (!binary) await new Promise(resolve => setTimeout(resolve, 2))
             }
-            assert.equal(size, 16 * block.byteLength)
+            assert.equal(size, binary ? 16 * 1024 * 1024 : 16 * block.byteLength)
+            if (hash) assert.equal(hash.digest('hex'), binaryHash)
             consumedBytes += size
           }
         } finally { reader.releaseLock() }
@@ -136,7 +147,7 @@ console.table(results.map(({ scenario, client, operationsPerSecond, cancellation
   scenario, client, operationsPerSecond, cancellations, consumedBytes
 })))
 await writeBenchmarkReport(options.output, {
-  schemaVersion: 1, generatedAt: new Date().toISOString(), ...measurementMetadata(),
+  schemaVersion: 2, generatedAt: new Date().toISOString(), ...measurementMetadata(),
   versions, comparisonLockSha256: hashFile(new URL('package-lock.json', import.meta.url)),
   configuration: options, results, server: counts,
   limitations: [

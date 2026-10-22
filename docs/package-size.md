@@ -20,8 +20,8 @@ pnpm benchmark:consumer-size:check package-size-results/consumer.json
 ```
 
 The measurement uses esbuild with a minified ESM browser build targeting
-ES2020. Its seven small application entries cover the root and core imports,
-plus retry and cache plugin combinations. It reports the final JavaScript
+ES2020. Its eight small application entries cover the root and core imports,
+retry and cache plugin combinations, and the standalone schema-error helper. It reports the final JavaScript
 bytes, gzip bytes, and input module count. Run `pnpm build` first so the
 measurement uses current `dist` output. These application bundle sizes differ
 from the transitive package closure budgets below: a bundler can remove unused
@@ -29,7 +29,19 @@ exports and combine shared chunks. The consumer report is checked against
 `benchmark/consumer-size-budget.json` in CI and recorded alongside the package
 size report.
 
-## Current measurement: 1.20.1
+## Current development candidate
+
+The [runtime hardening snapshot](measurements/runtime-hardening/README.md)
+records the working-tree candidate based on 1.20.2, including SSE state
+notifications and the separate form-error helper. Core basic gzip grows from
+14,287 to 14,510 bytes (+223); the standalone helper is 268 gzip bytes and is
+absent from the basic client bundle. This is an explicit feature cost, not a
+bundle-size reduction. Consumer ceilings increase by 200 bytes per existing
+scenario, and the helper has its own 400-byte ceiling. Declaration ceilings
+increase by 600 raw/350 gzip bytes for the new public types and option.
+Executable-subpath, tarball and unpacked-package ceilings remain unchanged.
+
+## Released measurement: 1.20.1
 
 The [1.20.1 snapshot](measurements/1.20.1/README.md) was measured from clean
 commit `6494ac4` after rebuilding, with Node.js 24.18.0, esbuild 0.28.2,
