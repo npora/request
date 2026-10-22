@@ -179,4 +179,36 @@ server, Axios installation, or external credentials. It verifies Npora's side
 of the migration; also compare your application's old and new wire requests,
 including array encoding, multipart values, credentials, and error handling.
 
+## Compare real HTTP requests
+
+The [migration contract suite](../benchmark/competitors/axios-migration.test.mjs)
+compares the built package with pinned Axios 1.20.0 using both its Node HTTP
+and Fetch adapters against the same loopback HTTP server:
+
+```sh
+npm ci --prefix benchmark/competitors --ignore-scripts
+pnpm build
+pnpm test:migration:axios
+```
+
+The 16 cases cover base paths, scalar query encoding, repeated query keys,
+explicit bracket-array serialization, JSON bodies, response metadata,
+multipart fields and file contents, HTTP failures, custom status acceptance,
+and cancellation after the server receives a request. CI runs this suite in
+its quality job. Comparison dependencies remain in the isolated fixture;
+they add no runtime dependency to Npora Request.
+
+Scalar and URLSearchParams cases compare the exact received URL. The bracket
+array case compares decoded ordered query entries because Axios and
+URLSearchParams escape brackets differently. Multipart compares parsed fields,
+file names, media types, and contents; generated boundary strings differ.
+The Axios multipart requests explicitly set `headers: { 'Content-Type': null }`
+so the transport supplies the boundary, including with the Fetch adapter.
+Npora uses `{ body: formData }` without a manually supplied Content-Type.
+
+These checks cover deliberate API mappings, rather than general Axios
+compatibility. Browser cookies, CORS, XSRF handling, proxies, redirects,
+timeout equivalence, and interceptor equivalence are outside this suite.
+Continue validating application-specific request and response contracts.
+
 For Axios-side options, consult the [official request configuration](https://axios-http.com/docs/req_config).

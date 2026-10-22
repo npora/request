@@ -30,6 +30,34 @@ validation have Node boundary tests and count toward these thresholds. Database
 transactions, cursor maintenance, and the store itself are exercised against
 real IndexedDB in Chromium, Firefox, and WebKit rather than a Node simulation.
 
+## Documentation contracts
+
+Run the documentation inventories and their regression tests with:
+
+```sh
+pnpm test:docs
+node --test test/docs-contract.test.mjs
+```
+
+The checks compare source request config field names with the API config blocks
+and configuration option tables, public manifest export keys with the API
+entrypoint table, public plugin build entries with the README plugin list,
+and stable error codes with their documented inventories. Negative fixtures
+verify that omissions, additions, duplicates, and obsolete inventory entries
+are rejected. The CI quality job runs both commands.
+
+These checks verify inventory coverage. They do not prove that documented
+types, defaults, explanations, or runtime behavior are correct; review those
+alongside implementation and behavior tests.
+
+## Axios migration contracts
+
+After building, run `pnpm test:migration:axios` with the pinned comparison
+fixture installed. The [migration guide](axios-migration.md#compare-real-http-requests)
+describes installation, coverage, and limits. This separate Node test suite
+compares the built package with Axios HTTP and Fetch adapters over loopback
+HTTP; it runs in the CI quality job and is separate from `pnpm test` coverage.
+
 ## Feature regression matrix
 
 Run the complete Node suite with `pnpm test:coverage`, then the complete
@@ -48,7 +76,7 @@ combination of application callbacks and plugins.
 | Request/response size limits | [request size](../test/request-size.test.ts), [stream size](../test/stream-size-lifecycle.test.ts) | Browser limits; installed stream contracts |
 | Attempt/total timeout, cancellation and cleanup | [timeout](../test/timeout.test.ts), [signals](../test/timeout-signal.test.ts), [lifecycle cancellation](../test/lifecycle-cancellation.test.ts) | Browser cancellation and early iterator closure |
 | Errors and interceptor ordering/failure handling | [errors](../test/request-error.test.ts), [interceptors](../test/interceptor.test.ts), [pipeline errors](../test/pipeline-error.test.ts) | Error workflow; exact documented error-code inventory |
-| Plugin installation, removal, dependencies and composition | [plugins](../test/plugin.test.ts), [composition](../test/plugin-composition.test.ts) | Session and batch workflows |
+| Plugin installation, removal, dependencies and composition | [plugins](../test/plugin.test.ts), [composition](../test/plugin-composition.test.ts), [session combinations](../test/session-composition.test.ts) | Both auth/cache registration orders; shared refresh cancellation, logout, mutation invalidation, and retry budgets; session and batch workflows |
 | Authentication, refresh coalescing and token storage | [auth](../test/auth-plugin.test.ts), [storage](../test/auth-storage.test.ts) | Account isolation and installed session workflows |
 | Retry policy, Retry-After, jitter and retry budgets | [retry](../test/retry-plugin.test.ts) | Installed Node consumer and bounded batch workflow |
 | HTTP cache, deduplication, validators, stale policies and invalidation | [cache](../test/cache-plugin.test.ts), [unshared revalidation](../test/cache-unshared-revalidation.test.ts) | [Browser credential/integrity/redirect isolation](../browser/tests/cache-transport.spec.ts); browser cache; installed cache consumer |

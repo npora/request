@@ -137,6 +137,15 @@ jobs:
       - name: Build
         run: pnpm build
 
+      - name: Install pinned migration comparison dependencies
+        run: npm ci --prefix benchmark/competitors --ignore-scripts
+
+      - name: Audit pinned comparison dependencies
+        run: npm audit --prefix benchmark/competitors --audit-level high
+
+      - name: Verify Axios HTTP and Fetch migration contracts
+        run: pnpm test:migration:axios
+
       - name: Verify package entrypoints
         run: pnpm test:package
 

@@ -742,8 +742,12 @@ Requires `authPlugin()`.
 | `scheme` | `Bearer` | Authorization scheme. |
 
 The built-in refresh decision handles HTTP 401. A successful refresh retries
-the logical request once, including XHR progress transfers. Requests with a
-`ReadableStream` body (including bodies inherited from a native `Request`)
+the logical request once, including XHR progress transfers. This auth replay
+increments the shared request attempt count: with `retryPlugin({ retries: 1 })`,
+a 401 followed by a 503 has no ordinary retry remaining. Use `retries: 2` to
+allow one auth replay followed by one transient-failure retry. Auth refresh has
+its own once-per-request guard and does not require the retry plugin.
+Requests with a `ReadableStream` body (including bodies inherited from a native `Request`)
 are not refreshed or retried because the upload cannot be replayed. Their
 original HTTP error is preserved; create a fresh body for an application retry.
 
