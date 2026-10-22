@@ -18,7 +18,8 @@ const server = createServer((request, response) => {
 async function handle(request, response) {
   const url = new URL(request.url, 'http://localhost')
   if (url.pathname === '/api/pending') {
-    pending.get(url.searchParams.get('id'))?.()
+    const waiter = pending.get(url.searchParams.get('id'))
+    if (waiter) waiter.resolve()
     return // The client must abort this response; no timing-based server delay.
   }
   const chunks = []
@@ -163,7 +164,7 @@ for (const adapter of ['http', 'fetch']) {
     for (const library of ['axios', 'npora']) {
       const id = `${adapter}-${library}`
       const controller = new AbortController()
-      const received = new Promise(resolve => pending.set(id, resolve))
+      const received = new Promise(resolve => pending.set(id, { resolve }))
       const promise = library === 'axios'
         ? oldClient().get('/pending', { params: { id }, signal: controller.signal })
         : npora.get('/pending', { query: { id }, signal: controller.signal })
