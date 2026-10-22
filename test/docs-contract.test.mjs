@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs'
-import { join } from 'node:path'
+import { cpSync, readFileSync, mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { checkApiDocs } from './api-docs.mjs'
 import { tmpdir } from 'node:os'
 import { checkErrorCodeDocs } from './error-code-docs.mjs'
 
@@ -41,4 +43,66 @@ test('rejects duplicate and obsolete entries', () => fixture(({ root, write }) =
 test('requires documentation for newly added source codes', () => fixture(({ root, write }) => {
   write('src/errors/RequestError.ts', "export type RequestErrorCode = 'CONFIG_ERROR' | 'RATE_LIMIT' | 'HTTP_ERROR'")
   assert.throws(() => checkErrorCodeDocs(root), /README error codes differ/)
+}))
+
+function apiFixture(run) {
+  const root = mkdtempSync(join(tmpdir(), 'request-api-docs-'))
+  const repository = fileURLToPath(new URL('../', import.meta.url))
+  for (const path of ['src', 'docs/api.md', 'docs/configuration.md', 'README.md', 'package.json', 'tsdown.config.ts']) {
+    const target = join(root, path)
+    mkdirSync(dirname(target), { recursive: true })
+    cpSync(join(repository, path), target, { recursive: true })
+  }
+  const edit = (path, update) => {
+    const target = join(root, path)
+    writeFileSync(target, update(readFileSync(target, 'utf8')))
+  }
+  try { run({ root, edit }) } finally { rmSync(root, { recursive: true, force: true }) }
+}
+
+test('accepts current config, public entrypoint, and plugin inventories', () => apiFixture(({ root }) => {
+  const result = checkApiDocs(root)
+  assert.ok(result.fields > 0 && result.entrypoints > 0 && result.plugins > 0)
+}))
+
+test('rejects a missing API config field despite prose mentions', () => apiFixture(({ root, edit }) => {
+  edit('docs/api.md', source => source.replace('  streamIdleTimeout?: number\n', ''))
+  assert.throws(() => checkApiDocs(root), /API config fields differ/)
+}))
+
+test('requires new source config fields in the API reference', () => apiFixture(({ root, edit }) => {
+  edit('src/types/config.ts', source => source.replace('export interface RequestConfig {',
+    'export interface RequestConfig {\n  futureOption?: boolean'))
+  assert.throws(() => checkApiDocs(root), /API config fields differ/)
+}))
+
+test('requires an option table row independently from API field coverage', () => apiFixture(({ root, edit }) => {
+  edit('docs/configuration.md', source => source.replace(/^\| `maxStreamLineSize`.*\n/m, ''))
+  assert.throws(() => checkApiDocs(root), /Configuration option table is missing maxStreamLineSize/)
+}))
+
+test('requires newly exported entrypoints in the public table', () => apiFixture(({ root, edit }) => {
+  edit('package.json', source => {
+    const manifest = JSON.parse(source)
+    manifest.exports['./future'] = manifest.exports['./core']
+    return JSON.stringify(manifest)
+  })
+  assert.throws(() => checkApiDocs(root), /API entrypoints differ/)
+}))
+
+test('rejects obsolete and duplicate public entrypoints', () => apiFixture(({ root, edit }) => {
+  edit('docs/api.md', source => source.replace('<!-- /public-entrypoints -->',
+    '| `./core` | duplicate |\n| `./obsolete` | removed |\n<!-- /public-entrypoints -->'))
+  assert.throws(() => checkApiDocs(root), /API entrypoints differ/)
+}))
+
+test('requires the memory cache factory in the plugin inventory', () => apiFixture(({ root, edit }) => {
+  edit('README.md', source => source.replace('- `memoryCachePlugin()`\n', ''))
+  assert.throws(() => checkApiDocs(root), /README plugin list differs/)
+}))
+
+test('rejects duplicate plugin factories', () => apiFixture(({ root, edit }) => {
+  edit('README.md', source => source.replace('- `cachePlugin()`\n',
+    '- `cachePlugin()`\n- `cachePlugin()`\n'))
+  assert.throws(() => checkApiDocs(root), /README plugin list differs/)
 }))

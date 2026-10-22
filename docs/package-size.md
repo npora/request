@@ -29,18 +29,36 @@ exports and combine shared chunks. The consumer report is checked against
 `benchmark/consumer-size-budget.json` in CI and recorded alongside the package
 size report.
 
-On the local Node.js 24.18.0 and esbuild 0.28.2 build used for this change,
-the basic root and core imports both produced about 13.6 kB gzip. Core plus
-retry was 14.9 kB, core plus cache was 20.0 kB, and core plus both was 21.4
-kB. The root entry therefore had no meaningful penalty for this tree-shaken
-basic application. Cache contributed the largest optional bundle increment;
-measure it again when its implementation changes instead of assuming subpath
-imports alone will shrink an application bundle.
+## Current measurement: 1.20.1
 
-The memory-only cache application measures 14.8 kB gzip, about 5.2 kB below
-the full cache application. It intentionally omits revalidation, stale
-serving, concurrent miss sharing, persistent stores, and tag invalidation.
-Its consumer budget also requires at least a 15% reduction from full cache.
+The [1.20.1 snapshot](measurements/1.20.1/README.md) was measured from clean
+commit `6494ac4` after rebuilding, with Node.js 24.18.0, esbuild 0.28.2,
+and gzip level 9. These are browser application bundles after tree shaking:
+
+| Application | Gzip bytes |
+| --- | ---: |
+| Root: basic | 14,286 |
+| Core: basic | 14,287 |
+| Core + retry | 15,646 |
+| Core + full cache | 20,792 |
+| Core + memory cache | 15,507 |
+| Root + retry + cache | 22,137 |
+| Core + retry + cache | 22,203 |
+
+All seven single-bundle and complete split-output measurements pass the
+existing consumer budgets. Memory caching saves 5,285 gzip bytes compared with
+full caching in this fixture. It omits revalidation, stale serving, concurrent
+miss sharing, persistent stores, and tag invalidation. Its consumer budget
+requires at least a 15% reduction from full cache.
+
+The root and core basic imports have effectively equal bundled size in this
+fixture. Subpath imports alone do not guarantee a smaller application; measure
+the actual features used by the application.
+
+## Historical implementation measurements
+
+The measurements below describe individual earlier builds and implementation
+changes. Use the versioned snapshot above for 1.20.1 bundle sizes.
 
 Splitting the full cache implementation into internal state, mutation,
 operation, observer, request coordination, response, and installation modules
@@ -67,6 +85,9 @@ pnpm test:size -- --output package-size-results/report.json
 ```
 
 ## Budgets
+
+The following entries record historical budget changes. Current ceilings live
+in the checked-in budget files and are verified by the commands above.
 
 The 1.19.x early-iterator cleanup fix closes response bodies and timeout/reconnect
 wrappers even when a consumer returns or throws before the first read. A shared
@@ -452,7 +473,7 @@ measure the complete consumer again after an optimization.
 For an optional fixed-version browser comparison with Axios, Ky, ofetch, and
 native Fetch, see [pinned library comparison](benchmark.md#pinned-library-comparison).
 
-The [1.19.3 measurement snapshot](measurements/1.19.3/README.md) contains current
+The [1.19.3 measurement snapshot](measurements/1.19.3/README.md) contains historical
 consumer and fixed-version browser comparison reports. Its basic core consumer
 is 13,889 gzip bytes; full cache is 20,364 and memory cache is 15,104. Existing
 budgets pass unchanged. Historical measurements above describe their own builds

@@ -49,8 +49,9 @@ traffic control, transfer progress, or OpenTelemetry support.
 
 ## Package entrypoints
 
-The root entrypoint remains backward compatible and exports the complete API.
-Applications may use subpaths to load a smaller runtime surface:
+The root entrypoint retains its established core and plugin exports.
+`memoryCachePlugin` is available through its dedicated subpath. Applications
+may use subpaths to load a smaller runtime surface:
 
 ```ts
 import { createClient } from '@npora/request/core'
@@ -61,12 +62,37 @@ import { retryPlugin } from '@npora/request/plugins/retry'
 ```
 
 Official plugin entrypoints are `auth`, `cache`, `circuit-breaker`,
-`concurrency`, `download`, `logger`, `opentelemetry`,
+`concurrency`, `download`, `logger`, `memory-cache`, `opentelemetry`,
 `opentelemetry-metrics`, `rate-limit`, `retry`,
 and `upload` under
 `@npora/request/plugins/`. The aggregate plugin entrypoint remains available
 at `@npora/request/plugins`. Import `MockAdapter` from
 `@npora/request/testing` or its alias `@npora/request/adapters/mock`.
+
+Export keys below are relative to `@npora/request`. Each supports ESM, CommonJS,
+and TypeScript declarations.
+
+<!-- public-entrypoints -->
+| Export key | Purpose |
+| --- | --- |
+| `.` | Core client, types, errors, and established plugin exports |
+| `./core` | Core client, types, errors, and Fetch adapter |
+| `./plugins` | Established plugin exports |
+| `./plugins/auth` | auth plugin |
+| `./plugins/cache` | cache plugin |
+| `./plugins/memory-cache` | memory-cache plugin |
+| `./plugins/circuit-breaker` | circuit-breaker plugin |
+| `./plugins/concurrency` | concurrency plugin |
+| `./plugins/download` | download plugin |
+| `./plugins/logger` | logger plugin |
+| `./plugins/opentelemetry` | opentelemetry plugin |
+| `./plugins/opentelemetry-metrics` | opentelemetry-metrics plugin |
+| `./plugins/rate-limit` | rate-limit plugin |
+| `./plugins/retry` | retry plugin |
+| `./plugins/upload` | upload plugin |
+| `./testing` | MockAdapter and testing types |
+| `./adapters/mock` | MockAdapter and testing types |
+<!-- /public-entrypoints -->
 
 ---
 
@@ -322,7 +348,7 @@ await request.get('/account', {
 ```ts
 {
   body?: BodyInit | Record<string, unknown> | null
-  json?: Record<string, unknown> | unknown[]
+  json?: unknown
   form?: URLSearchParams | Record<string, QueryValue | QueryValue[]>
   formData?: FormData | Record<string, unknown>
   maxFormDataDepth?: number
@@ -350,6 +376,9 @@ detection, automatically receive Fetch half-duplex mode, and are not retried.
   signal?: AbortSignal
   maxRequestSize?: number
   maxResponseSize?: number
+  streamIdleTimeout?: number
+  maxStreamLineSize?: number
+  maxSseEventSize?: number
   maxErrorResponseSize?: number
 }
 ```
@@ -370,6 +399,21 @@ Native FormData and custom-adapter bodies require transport-specific limits.
 `Infinity`. A response that exceeds the limit fails with
 `RESPONSE_TOO_LARGE`; a trustworthy `Content-Length` can reject it before the
 body is consumed.
+
+Fetch streaming responses support three opt-in guards:
+
+| Option | Default | Behavior |
+| --- | --- | --- |
+| `streamIdleTimeout` | disabled | Maximum wait for an underlying body read, in milliseconds; `0` disables it. |
+| `maxStreamLineSize` | `Infinity` | Maximum UTF-8 bytes per SSE/NDJSON line, excluding CR/LF delimiters. |
+| `maxSseEventSize` | `Infinity` | Maximum UTF-8 bytes in all non-empty lines of one SSE event, excluding delimiters. |
+
+Idle violations throw `TIMEOUT_ERROR`; line/event violations throw
+`RESPONSE_TOO_LARGE`, including during iteration. Idle timing excludes response
+headers and pauses when backpressure prevents another source read. SSE event
+accounting includes comments and ignored fields. See
+[streaming guard semantics](configuration.md#cancellation-and-limits)
+for inheritance, cleanup, and incremental accounting details.
 
 Thrown HTTP error data has a separate 10 MiB default limit. If an error body
 exceeds `maxErrorResponseSize`, the result remains an `HTTP_ERROR` with status,
@@ -2078,13 +2122,12 @@ Retries and direct adapter calls use the regular method and validate again.
 
 # Stability
 
-Starting with 1.0, the package follows Semantic Versioning. Package-root
-exports, their TypeScript declarations and the behavior documented in this
-contract are stable public API.
+Starting with 1.0, the package follows Semantic Versioning. Exports from every
+public entrypoint listed in `package.json.exports`, their TypeScript declarations
+and the behavior documented in this contract are stable public API.
 
 Breaking public API changes require a new major version. Additive,
 backward-compatible functionality may be released in minor versions, and
 backward-compatible fixes in patch versions.
 
-Internal modules that are not exported from the package root may change
-without notice.
+Internal modules outside those public entrypoints may change without notice.

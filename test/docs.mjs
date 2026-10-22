@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { checkErrorCodeDocs } from './error-code-docs.mjs'
+import { checkApiDocs } from './api-docs.mjs'
 import {
   existsSync,
   readFileSync,
@@ -71,3 +72,6 @@ console.log(
 )
 
 console.log(`Error code documentation matches all ${checkErrorCodeDocs(root)} public codes.`)
+
+const apiCounts = checkApiDocs(root)
+console.log(`API documentation matches ${apiCounts.fields} config fields, ${apiCounts.entrypoints} entrypoints, and ${apiCounts.plugins} plugins.`)
