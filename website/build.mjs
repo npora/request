@@ -3,7 +3,7 @@ import { fileURLToPath } from 'node:url'
 import { build } from 'esbuild'
 
 const root = new URL('./', import.meta.url)
-const output = new URL('../.artifacts/website/public/', root)
+const output = new URL('./dist/', root)
 const { version } = JSON.parse(await readFile(new URL('../package.json', root), 'utf8'))
 await rm(output, { recursive: true, force: true })
 await mkdir(output, { recursive: true })
@@ -16,4 +16,4 @@ await build({ entryPoints: [fileURLToPath(new URL('app.js', root))],
   platform: 'browser', format: 'esm', target: 'es2022', minify: true,
   define: { __VERSION__: JSON.stringify(version) } })
 await writeFile(new URL('build.json', output), JSON.stringify({ version }))
-console.log(`Website v${version} built in .artifacts/website/public`)
+console.log(`Website v${version} built in website/dist`)

@@ -2,7 +2,8 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "npora",
   "compatibility_date": "2026-07-30",
-  "pages_build_output_dir": "../.artifacts/website/public",
+  "pages_build_output_dir": "dist",
+  "vars": { "NODE_VERSION": "24", "SKIP_DEPENDENCY_INSTALL": "1" },
   "durable_objects": {
     "bindings": [{ "name": "DEMO_STATE", "class_name": "DemoState", "script_name": "npora-request-demo-state" }]
   }

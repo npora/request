@@ -11,7 +11,7 @@ export async function createRuntime(options = {}) {
       { name: 'pages', modules: true, script: await readFile(new URL('../../.artifacts/website/functions/index.js', import.meta.url), 'utf8'),
         compatibilityDate: '2026-07-30',
         durableObjects: { DEMO_STATE: { className: 'DemoState', scriptName: 'state', useSQLite: true } },
-        assets: { directory: fileURLToPath(new URL('../../.artifacts/website/public', import.meta.url)),
+        assets: { directory: fileURLToPath(new URL('../dist', import.meta.url)),
           binding: 'ASSETS', run_worker_first: true,
           routerConfig: { has_user_worker: true, invoke_user_worker_ahead_of_assets: true },
           assetConfig: { not_found_handling: '404-page' } } },

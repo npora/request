@@ -2,7 +2,7 @@
 
 官网目标地址为 **https://npora.pages.dev**，对应现有 Pages 项目 `npora`。
 官网打包当前仓库源码，版本标记自动读取根 `package.json`，不从 CDN 加载另一个版本。
-本轮只增加官网、Mock 接口和测试；npm 包仍是 1.21.1。
+官网、Mock 接口和测试独立于库的 npm 发布流程。
 
 ## 按现有 Pages 项目部署
 
@@ -13,12 +13,17 @@ Cloudflare 控制台截图使用的是 Pages。保留 GitHub 仓库 `npora/reque
 | --- | --- |
 | Framework preset | None |
 | Root directory | `website` |
-| Build command | `npm run build` |
-| Build output directory | `../.artifacts/website/public` |
+| Build command | `npm ci --ignore-scripts && npm run build` |
+| Build output directory | `dist` |
 | Node.js 构建环境变量 | `NODE_VERSION=24` |
+| 跳过自动依赖安装 | `SKIP_DEPENDENCY_INSTALL=1` |
 
-Pages 安装 `website/package-lock.json` 中的独立构建依赖，再执行构建。
+构建命令明确安装 `website/package-lock.json` 中的独立依赖，再执行构建。
+跳过 Pages 的自动安装，避免它检测到仓库根目录的 pnpm 而安装错误的工具链，参见
+[Pages 构建镜像说明](https://developers.cloudflare.com/pages/configuration/build-image/#skip-dependency-install)。
 不要将输出目录保留为 `.`，否则源文件、部署配置和后端代码会进入静态上传范围。
+也不要使用 `../.artifacts/...`：当前 Pages Git 构建会拒绝根目录之外的输出路径。
+公开静态产物保存在被 Git 忽略的 `website/dist/`，其他测试报告和运行时状态保存在根 `.artifacts/`。
 `build.mjs` 只复制明确允许的静态文件；API 由 Functions 单独编译。
 仓库根目录与 `website` 各自有独立工具链，官网依赖不进入 npm 包。
 
@@ -144,7 +149,7 @@ pnpm website:dev
 ```
 
 打开 `http://127.0.0.1:8787`。开发脚本先启动 8788 端口的状态 Worker，
-再启动 Pages，自动连接本地 DO 绑定。构建产物、状态、报告统一放在 `.artifacts/website/`，
+再启动 Pages，自动连接本地 DO 绑定。静态产物在 `website/dist/`，状态与报告在 `.artifacts/website/`，
 Wrangler 元数据 `.wrangler/` 被忽略。保留兼容日期 `2026-07-30` 作为已测试的运行时基线。
 
 ```sh
@@ -160,6 +165,6 @@ pnpm test:website:browser
 
 不要同时运行多组 Wrangler 开发服务器或官网浏览器测试，它们会争用端口和本地服务注册信息。
 接口测试用临时隔离存储；结束后清理。官网 CI 运行构建、接口、浏览器与依赖审计。
-`pnpm clean` 清理 `.artifacts/` 后，需重新执行构建才能预览。
+`pnpm clean` 清理 `.artifacts/` 和 `website/dist/` 后，需重新执行构建才能预览。
 
 本地无需 npm 发版。网站源码和独立 lockfile 推送到 GitHub 后，由 Pages 的 Git 集成构建部署。
