@@ -102,8 +102,10 @@ website/
 
 状态接口要求 `x-demo-session` 为 1–64 个字母、数字或连字符。
 控制台每次运行创建随机 session；Retry 同时使用独立 run ID。
-Retry 与 Auth 隔离各次演示；Traffic 使用 Cloudflare 注入的 `CF-Connecting-IP`，
-不能通过更换 session 绕过 IP 限流。本地没有该头时使用统一 local key。
+Retry 与 Auth 隔离各次演示。每个 session 只保留最近 run 的重试计数；
+切换 run 会重置该计数，避免建立不断增长的 run Map。
+Traffic 使用 Cloudflare 注入的 `CF-Connecting-IP`，不能通过更换 session 绕过 IP 限流。
+本地没有该头时使用统一 local key。
 首次部署后访问 `/api/health`，确认状态服务就绪；页面可访问不能单独证明 DO 已连接。
 共享出口 IP 的多个访客会共享限流窗口，因此繁忙时可能需要等待再次测试。
 

@@ -36,7 +36,7 @@ const snippets = {
   query: `const result = await api.query('/query', {\n  json: {\n    filter: { active: true, roles: ['developer'] },\n    sort: { field: 'name', order: 'asc' },\n    page: { offset: 0, limit: 10 }\n  }\n})\n// 请求体携带 JSON；真实 HTTP QUERY 方法\nconsole.log(result.filters)`,
   sse: `const events = await api.sse('/sse', {\n  signal: controller.signal,\n  onStateChange: state => console.log(state)\n})\n\nfor await (const event of events) {\n  const { text } = JSON.parse(event.data)\n  appendText(text)\n}\n// 每秒一条，3 条后正常关闭`,
   ndjson: `const records = await api.ndjson('/ndjson', {\n  itemSchema: recordSchema,\n  signal: controller.signal\n})\n\nfor await (const record of records) {\n  console.log(record.id, record.action)\n}\n// 每条独立解析与校验，不等待完整响应`,
-  retry: `const api = createClient({ baseURL: '/api' })\n  .use(retryPlugin({\n    retries: 2,\n    delay: 350,\n    onRetry: ({ attempt, delay }) => {\n      console.log('retry', attempt, delay)\n    }\n  }))\n\nawait api.get('/retry', { params: { run: runId } })\n// 503 → 503 → 200`,
+  retry: `const api = createClient({ baseURL: '/api' })\n  .use(retryPlugin({\n    retries: 2,\n    delay: 350,\n    onRetry: ({ attempt, delay }) => {\n      console.log('retry', attempt, delay)\n    }\n  }))\n\nawait api.get('/retry', { query: { run: runId } })\n// 503 → 503 → 200`,
   timeout: `const api = createClient({\n  baseURL: '/api', timeout: 1000\n}).use(circuitBreakerPlugin({\n  failureThreshold: 2,\n  resetTimeout: 30000\n}))\n\n// 服务端等待 10 秒\n// 前两次：TIMEOUT_ERROR\n// 第三次：CIRCUIT_OPEN，不发网络请求`,
   transfer: `const api = createClient({ baseURL: '/api' })\n  .use(uploadPlugin()).use(downloadPlugin())\n\nawait api.post('/upload', { extensions: {\n  upload: { data: formData, onProgress: updateUpload }\n} })\n\nconst blob = await api.get('/download', {\n  extensions: { download: {\n    onProgress: updateDownload\n  } }\n})`,
   auth: `// refreshApi 不安装 authPlugin，避免递归刷新\nconst api = refreshApi.extend().use(authPlugin({\n  storage: inMemoryTokenStorage,\n  async refreshToken() {\n    const session = await refreshApi.post('/refresh')\n    return session.accessToken\n  }\n}))\n\nawait Promise.all([api.get('/auth'), api.get('/auth')])\n// 401 → 共享一次刷新 → 自动重放原请求`,
@@ -76,7 +76,7 @@ export const scenarios = [
   { id: 'retry', name: '故障自动重试', tag: 'RESILIENCE / RETRY', description: '同一次演示前两次返回 503，第三次成功。每次运行都有独立 run ID，计数保存在 Durable Object 中。',
     async run(ctx) {
       const api = ctx.api(retryPlugin({ retries: 2, delay: 350, onRetry: ({ attempt, delay }) => ctx.log({ retry: attempt, delay }) }))
-      const result = await api.get('/retry', { params: { run: crypto.randomUUID() } })
+      const result = await api.get('/retry', { query: { run: crypto.randomUUID() } })
       check(result.attempt === 3 && result.recovered, 'Expected success on third attempt'); ctx.log(result)
     } },
   { id: 'timeout', name: '超时与熔断保护', tag: 'TIMEOUT / CIRCUIT', description: '服务端延迟十秒，客户端一秒超时。连续两次失败打开熔断器，第三次立即拒绝，不再访问接口。',

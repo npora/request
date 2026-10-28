@@ -4,7 +4,9 @@ const { version } = JSON.parse(readFileSync(new URL('../../../package.json', imp
 
 test('all ten real scenarios complete and report actual network activity', async ({ page }, testInfo) => {
   const errors: string[] = []
+  const retryUrls: string[] = []
   page.on('pageerror', error => errors.push(error.message))
+  page.on('request', request => { if (new URL(request.url()).pathname === '/api/retry') retryUrls.push(request.url()) })
   await page.goto('/')
   await expect(page.getByRole('heading', { level: 1 })).toContainText('从容可控')
   await expect(page.locator('[data-version]')).toHaveText(version)
@@ -16,6 +18,10 @@ test('all ten real scenarios complete and report actual network activity', async
     const output = await page.locator('#output').innerText()
     if (id === 'schema') expect(output).toContain('SCHEMA_ERROR')
     if (id === 'retry') {
+      const runs = retryUrls.map(url => new URL(url).searchParams.get('run'))
+      expect(runs).toHaveLength(3)
+      expect(runs[0]).toMatch(/^[a-f0-9-]{36}$/)
+      expect(new Set(runs).size).toBe(1)
       await expect(page.locator('#requests tr')).toHaveCount(3)
       expect(await page.locator('#requests').innerText()).toMatch(/503[\s\S]*503[\s\S]*200/)
     }
