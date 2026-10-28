@@ -15,8 +15,8 @@ Measure what a browser application actually receives after bundling and tree
 shaking the published entrypoints:
 
 ```sh
-pnpm benchmark:consumer-size -- --output package-size-results/consumer.json
-pnpm benchmark:consumer-size:check package-size-results/consumer.json
+pnpm benchmark:consumer-size -- --output .artifacts/package-size/consumer.json
+pnpm benchmark:consumer-size:check .artifacts/package-size/consumer.json
 ```
 
 The measurement uses esbuild with a minified ESM browser build targeting
@@ -29,10 +29,20 @@ exports and combine shared chunks. The consumer report is checked against
 `benchmark/consumer-size-budget.json` in CI and recorded alongside the package
 size report.
 
-## Current development candidate
+## Reliability patch measurement
+
+The [Fetch capability patch snapshot](measurements/fetch-capability/README.md)
+compares the released 1.21.0 baseline with the environment-error correction
+and internal type extraction. Core basic gzip changes from 14,510 to 14,524
+bytes (+14); all consumer, executable, declaration and package ceilings remain
+unchanged. The standalone form helper remains 268 bytes. This is a reliability
+patch with a small net cost, not a claimed application-size reduction.
+
+## 1.21.0 feature baseline
 
 The [runtime hardening snapshot](measurements/runtime-hardening/README.md)
-records the working-tree candidate based on 1.20.2, including SSE state
+records the pre-release measurement based on 1.20.2 for the features shipped
+in 1.21.0, including SSE state
 notifications and the separate form-error helper. Core basic gzip grows from
 14,287 to 14,510 bytes (+223); the standalone helper is 268 gzip bytes and is
 absent from the basic client bundle. This is an explicit feature cost, not a
@@ -93,7 +103,7 @@ declaration, tarball, unpacked-package, and consumer budgets remain fixed.
 Generate a machine-readable report:
 
 ```sh
-pnpm test:size -- --output package-size-results/report.json
+pnpm test:size -- --output .artifacts/package-size/report.json
 ```
 
 ## Budgets

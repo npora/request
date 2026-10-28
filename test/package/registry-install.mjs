@@ -61,6 +61,13 @@ try {
 
   assertRunSucceeded('npm', installArgs, installResult)
 
+  for (const name of ['capabilities.mjs', 'capability-contract.mjs']) {
+    writeFileSync(join(temporaryDirectory, name), readFileSync(
+      new URL(`../consumer/${name}`, import.meta.url)
+    ))
+  }
+  run(process.execPath, ['capabilities.mjs'])
+
   const installedManifest = JSON.parse(
     readFileSync(
       join(

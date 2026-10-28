@@ -57,8 +57,8 @@ export class FetchAdapter implements Adapter {
     try {
       throwIfAborted(config)
 
+      const fetchImplementation = resolveFetch(config)
       request = buildRequestWithHeaders(config, headers)
-      const fetchImplementation = config.fetch ?? globalThis.fetch
       let response = await fetchImplementation(
         request.input ?? request.url,
         request.useNativeInput ? undefined : request.init
@@ -234,6 +234,16 @@ export class FetchAdapter implements Adapter {
       }
     }
   }
+}
+
+function resolveFetch(config: RequestConfig): NonNullable<RequestConfig['fetch']> {
+  const fetch = config.fetch ?? globalThis.fetch
+  if (typeof fetch !== 'function') {
+    throw new RequestError('Request fetch must be a function', {
+      code: 'CONFIG_ERROR', config
+    })
+  }
+  return fetch
 }
 
 function exceedsContentLength(response: Response, limit: number): boolean {

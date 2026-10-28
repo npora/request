@@ -1,5 +1,22 @@
 # Contributing
 
+## Keep the working tree tidy
+
+Coverage, browser reports and CI benchmark/size reports live under the ignored
+`.artifacts/` directory. `dist/` remains the package's build output.
+
+```sh
+pnpm clean:dry-run
+pnpm clean
+```
+
+The cleaner removes known generated outputs, legacy report directories,
+project-local caches and generated package tarballs. It retains installed
+dependencies, source, tests, `.git`, environment files and IDE preferences.
+Archived evidence under `docs/measurements/` is maintained documentation.
+Rebuild before running checks that consume `dist/`. Generate fresh test reports
+when needed; they are not source files to commit.
+
 ## Setup
 
 Requirements:

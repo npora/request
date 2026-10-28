@@ -172,6 +172,13 @@ loopback listener but does not contact an external service. Child commands have
 a 60-second timeout so a broken lifecycle fails instead of hanging indefinitely.
 ESM and CommonJS stream checks use injected Fetch response fixtures and the built FetchAdapter.
 
+The registry and offline tarball runners share
+[`capability-contract.mjs`](../test/consumer/capability-contract.mjs). In both
+ESM and CommonJS, it checks form mapping and prototype-safe keys, SSE reconnect
+and early-closure states, malformed lock/channel rejection, and cache operation
+without coordination. Thus new entrypoints and lifecycle behavior are checked
+against the actual installed artifact, not only source imports.
+
 The published `latest` package can be tested in an isolated temporary project:
 
 ```sh
@@ -209,8 +216,8 @@ pnpm benchmark
 pnpm benchmark:streaming
 pnpm benchmark:check -- \
   --budget benchmark/performance-budget.json \
-  --request benchmark-results/request.json \
-  --streaming benchmark-results/streaming-schema.json
+  --request .artifacts/benchmarks/request.json \
+  --streaming .artifacts/benchmarks/streaming-schema.json
 pnpm test:size
 ```
 
@@ -243,11 +250,11 @@ sequentially so simultaneous benchmark processes do not distort each other's
 latency and throughput:
 
 ```sh
-pnpm stress -- --operations 10000000 --concurrency 64 --output benchmark-results/stress-10m-c64.json
-pnpm stress -- --operations 1000000 --concurrency 256 --output benchmark-results/stress-1m-c256.json
-pnpm benchmark:http -- --operations 100000 --concurrency 256 --output benchmark-results/http-100k-c256.json
-pnpm benchmark:streaming -- --operations 1000000 --output benchmark-results/streaming-schema.json
-pnpm benchmark:streaming-lines -- --output benchmark-results/streaming-lines.json
+pnpm stress -- --operations 10000000 --concurrency 64 --output .artifacts/benchmarks/stress-10m-c64.json
+pnpm stress -- --operations 1000000 --concurrency 256 --output .artifacts/benchmarks/stress-1m-c256.json
+pnpm benchmark:http -- --operations 100000 --concurrency 256 --output .artifacts/benchmarks/http-100k-c256.json
+pnpm benchmark:streaming -- --operations 1000000 --output .artifacts/benchmarks/streaming-schema.json
+pnpm benchmark:streaming-lines -- --output .artifacts/benchmarks/streaming-lines.json
 ```
 
 The mixed stress runner distributes logical operations across 28 scenarios:

@@ -53,6 +53,7 @@ async function handle(request, response) {
     method: request.method, url: request.url,
     contentType: request.headers['content-type'],
     marker: request.headers['x-migration'],
+    link: request.headers.link,
     authorization: request.headers.authorization,
     xsrf: request.headers['x-xsrf-token'],
     body: fields ? undefined : body.toString('utf8'), fields
@@ -74,6 +75,14 @@ after(async () => {
 for (const adapter of ['http', 'fetch']) {
   const oldClient = () => axios.create({ baseURL, adapter, proxy: false, timeout: 3000 })
   const options = { timeout: 5000 }
+
+  test(`${adapter}: literal Link defaults survive null-prototype header maps`, options, async () => {
+    const headers = Object.assign(Object.create(null), { Link: '<https://example.test/next>; rel="next"' })
+    const old = await axios.create({ baseURL, adapter, proxy: false, headers }).get('/users')
+    const next = await createClient({ baseURL, headers }).get('/users')
+    assert.deepEqual(next, old.data)
+    assert.equal(next.link, headers.Link)
+  })
 
   test(`${adapter}: explicit authentication and XSRF headers`, options, async () => {
     const headers = { authorization: 'Bearer migration-token', 'x-xsrf-token': 'explicit-token' }

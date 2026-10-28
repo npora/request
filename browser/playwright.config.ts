@@ -2,6 +2,7 @@ import {
   defineConfig,
   devices
 } from '@playwright/test'
+import { fileURLToPath } from 'node:url'
 
 export default defineConfig({
   testDir: './tests',
@@ -24,7 +25,7 @@ export default defineConfig({
       {
         open: 'never',
         outputFolder:
-          './playwright-report'
+          fileURLToPath(new URL('../.artifacts/playwright-report', import.meta.url))
       }
     ]
   ],
@@ -83,5 +84,5 @@ export default defineConfig({
     stderr: 'pipe'
   },
 
-  outputDir: './test-results'
+  outputDir: fileURLToPath(new URL('../.artifacts/test-results', import.meta.url))
 })

@@ -17,8 +17,6 @@ import type {
   RequestInputConfig,
   RequestURL,
   ServerSentEvent,
-  SseReconnectOptions,
-  SseStateObserver,
   StandardSchemaV1
 } from '../types'
 import {
@@ -30,41 +28,16 @@ import { requestToConfig } from './requestInput'
 import { createReconnectingSse } from './reconnectSse'
 import { observeSse } from './observeSse'
 
-type MethodConfig = Omit<RequestConfig, 'url' | 'method'>
+import type {
+  ItemSchemaMethodConfig,
+  MethodConfig,
+  SchemaMethodConfig,
+  SseMethodConfig,
+  SseSchemaMethodConfig,
+  StreamingMethodConfig
+} from './methodTypes'
 
 const EMPTY_METHOD_CONFIG = trustDefaults({}) as MethodConfig
-
-type SchemaMethodConfig<Schema extends StandardSchemaV1> = Omit<
-  MethodConfig,
-  'schema'
-> & {
-  schema: Schema
-}
-
-type StreamingMethodConfig = Omit<
-  RequestConfig,
-  'url' | 'method' | 'responseType' | 'schema'
->
-
-type SseMethodConfig = StreamingMethodConfig & {
-  reconnect?: SseReconnectOptions
-  /** Connection lifecycle notifications; observer failures are isolated. */
-  onStateChange?: SseStateObserver
-}
-
-type SseSchemaMethodConfig<Schema extends StandardSchemaV1> = Omit<
-  SseMethodConfig,
-  'itemSchema'
-> & {
-  itemSchema: Schema
-}
-
-type ItemSchemaMethodConfig<Schema extends StandardSchemaV1> = Omit<
-  StreamingMethodConfig,
-  'itemSchema'
-> & {
-  itemSchema: Schema
-}
 
 export class Client {
   private readonly defaults: Partial<RequestConfig>
@@ -101,7 +74,7 @@ export class Client {
           ConfigMerger.mergeDefaults(EMPTY_METHOD_CONFIG, defaults)
         )
     this.adapter = adapter
-    this.pipeline = this.createPipeline(adapter)
+    this.pipeline = new Pipeline(adapter, this.interceptors, this.hooks)
   }
 
   /**
@@ -721,10 +694,6 @@ export class Client {
       ...overrides,
       url: requestConfig.url
     })
-  }
-
-  private createPipeline(adapter: Adapter): Pipeline {
-    return new Pipeline(adapter, this.interceptors, this.hooks)
   }
 
   private validatePlugin(plugin: Plugin): void {

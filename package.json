@@ -138,6 +138,8 @@
     "access": "public"
   },
   "scripts": {
+    "clean": "node scripts/clean.mjs",
+    "clean:dry-run": "node scripts/clean.mjs --dry-run",
     "dev": "tsdown --watch",
     "build": "tsdown",
     "test": "vitest run",
@@ -170,7 +172,7 @@
     "test:browser": "playwright test --config=browser/playwright.config.ts",
     "test:edge": "node test/edge/run.mjs && node --test test/edge/undici.test.mjs",
     "test:browser:ui": "playwright test --config=browser/playwright.config.ts --ui",
-    "test:browser:report": "playwright show-report playwright-report",
+    "test:browser:report": "playwright show-report .artifacts/playwright-report",
     "audit:dependencies": "pnpm audit --audit-level high",
     "audit:malware": "node scripts/audit-malware.mjs",
     "audit:signatures": "pnpm audit signatures",

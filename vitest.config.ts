@@ -24,7 +24,7 @@ export default defineConfig({
         'lcov'
       ],
 
-      reportsDirectory: './coverage',
+      reportsDirectory: './.artifacts/coverage',
 
       include: [
         'src/**/*.ts'
