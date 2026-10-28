@@ -160,45 +160,47 @@ jobs:
         run: pnpm test:package
 
       - name: Record package size
-        run: pnpm test:size -- --output package-size-results/report.json
+        run: pnpm test:size -- --output .artifacts/package-size/report.json
 
       - name: Verify consumer bundle graph accounting
         run: pnpm test:consumer-bundle
 
       - name: Measure consumer bundles
-        run: pnpm benchmark:consumer-size -- --output package-size-results/consumer.json
+        run: pnpm benchmark:consumer-size -- --output .artifacts/package-size/consumer.json
 
       - name: Enforce consumer bundle budgets
-        run: pnpm benchmark:consumer-size:check package-size-results/consumer.json
+        run: pnpm benchmark:consumer-size:check .artifacts/package-size/consumer.json
 
       - name: Upload package size report
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: package-size
-          path: package-size-results/
+          path: .artifacts/package-size/
+          include-hidden-files: true
           retention-days: 30
 
       - name: Run performance benchmarks
-        run: pnpm benchmark -- --operations 50000 --warmup 2000 --samples 4096 --output benchmark-results/request.json
+        run: pnpm benchmark -- --operations 50000 --warmup 2000 --samples 4096 --output .artifacts/benchmarks/request.json
 
       - name: Run million-item streaming schema benchmark
-        run: pnpm benchmark:streaming -- --operations 1000000 --warmup 1000 --output benchmark-results/streaming-schema.json
+        run: pnpm benchmark:streaming -- --operations 1000000 --warmup 1000 --output .artifacts/benchmarks/streaming-schema.json
 
       - name: Measure fragmented long-line parsing
-        run: pnpm benchmark:streaming-lines -- --output benchmark-results/streaming-lines.json
+        run: pnpm benchmark:streaming-lines -- --output .artifacts/benchmarks/streaming-lines.json
 
       - name: Enforce stable relative performance budgets
         run: >-
           pnpm benchmark:check --
           --budget benchmark/performance-budget.json
-          --request benchmark-results/request.json
-          --streaming benchmark-results/streaming-schema.json
+          --request .artifacts/benchmarks/request.json
+          --streaming .artifacts/benchmarks/streaming-schema.json
 
       - name: Upload performance report
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: request-benchmark
-          path: benchmark-results/
+          path: .artifacts/benchmarks/
+          include-hidden-files: true
           retention-days: 30
 
   browser:
@@ -240,7 +242,8 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: playwright-report
-          path: browser/playwright-report/
+          path: .artifacts/playwright-report/
+          include-hidden-files: true
           retention-days: 14
 
       - name: Upload Playwright test results
@@ -248,5 +251,6 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: playwright-test-results
-          path: browser/test-results/
+          path: .artifacts/test-results/
+          include-hidden-files: true
           retention-days: 14

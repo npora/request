@@ -182,7 +182,7 @@ including array encoding, multipart values, credentials, and error handling.
 ## Compare real HTTP requests
 
 The [migration contract suite](../benchmark/competitors/axios-migration.test.mjs)
-compares the built package with pinned Axios 1.20.0 using both its Node HTTP
+compares the built package with pinned Axios 1.21.0 using both its Node HTTP
 and Fetch adapters against the same loopback HTTP server:
 
 ```sh
@@ -191,7 +191,8 @@ pnpm build
 pnpm test:migration:axios
 ```
 
-The 24 cases cover base paths, scalar query encoding, repeated query keys,
+The 26 cases cover literal Link defaults in null-prototype header maps,
+base paths, scalar query encoding, repeated query keys,
 explicit bracket-array serialization, JSON bodies, response metadata,
 multipart fields and file contents, HTTP failures, custom status acceptance,
 explicit authentication/XSRF headers, URL-encoded forms, default redirects,
@@ -219,3 +220,11 @@ separately. Timeout checks assert the error category, not identical timing scope
 Continue validating application-specific request and response contracts.
 
 For Axios-side options, consult the [official request configuration](https://axios-http.com/docs/req_config).
+
+Axios 1.21 adds `response.duration`, measured around its adapter. Npora's
+response envelope does not provide an equivalent field. Use the optional
+OpenTelemetry Metrics plugin and select its documented request/attempt/stream
+measurements; their timing boundaries are not automatically equivalent to
+Axios's duration. The historical 1.20.0 comparison reports remain archived;
+use the [reliability patch comparison](measurements/fetch-capability/README.md)
+for the 1.21.0 fixture. See [Axios's release notes](https://github.com/axios/axios/releases/tag/v1.21.0).

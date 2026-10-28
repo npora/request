@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "dependencies": {
-    "axios": "1.20.0",
+    "axios": "1.21.0",
     "ky": "2.2.0",
     "ofetch": "1.5.1"
   }

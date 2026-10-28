@@ -4,6 +4,9 @@ node_modules
 
 # Build
 dist
+/.artifacts/
+*.tsbuildinfo
+*.tgz
 
 # Coverage
 coverage

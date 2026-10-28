@@ -1,0 +1,73 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-10-28T08:27:38.090Z",
+  "package": {
+    "name": "@npora/request",
+    "version": "1.21.0"
+  },
+  "runtime": {
+    "node": "v24.18.0",
+    "platform": "darwin",
+    "architecture": "arm64",
+    "cpuModel": "Apple M3",
+    "logicalCpus": 8
+  },
+  "provenance": {
+    "gitCommit": "46682ef7c306fe55ca1c08291ef9f6e7e28e322f",
+    "gitDirty": true,
+    "buildSha256": "07d1b3f63eda1699bcfb7384940719c717e0909aa99f8dc7917fb01dc4814ca7",
+    "dependencyLockSha256": "baeaa6e8e260b2cd6a2f1ec294260addac1193667313ee330c0fe2cf8d338609"
+  },
+  "versions": {
+    "axios": "1.21.0",
+    "ky": "2.2.0",
+    "ofetch": "1.5.1"
+  },
+  "comparisonLockSha256": "726e9b347fa3a3da0688e03147b386041e48c02931fbcbef3279e601d8912662",
+  "bundler": "esbuild",
+  "bundlerVersion": "0.28.2",
+  "platform": "browser",
+  "format": "esm",
+  "target": "es2020",
+  "gzipLevel": 9,
+  "entries": {
+    "native-fetch": "export const load = () => fetch('https://api.example.com/users/1').then(r => r.json())",
+    "@npora/request": "import {createClient} from '@npora/request/core';\n    const api = createClient({baseURL:'https://api.example.com'});\n    export const load = () => api.get('/users/1')",
+    "axios-default": "import axios from 'axios';\n    const api = axios.create({baseURL:'https://api.example.com'});\n    export const load = () => api.get('/users/1').then(r => r.data)",
+    "axios-fetch": "import axios from 'axios';\n    const api = axios.create({baseURL:'https://api.example.com',adapter:'fetch'});\n    export const load = () => api.get('/users/1').then(r => r.data)",
+    "ky": "import ky from 'ky';\n    export const load = () => ky('https://api.example.com/users/1',{retry:0,timeout:false}).json()",
+    "ofetch": "import {ofetch} from 'ofetch';\n    export const load = () => ofetch('https://api.example.com/users/1',{retry:0})"
+  },
+  "results": {
+    "native-fetch": {
+      "bytes": 88,
+      "gzipBytes": 102,
+      "inputFiles": 1
+    },
+    "@npora/request": {
+      "bytes": 47689,
+      "gzipBytes": 14518,
+      "inputFiles": 12
+    },
+    "axios-default": {
+      "bytes": 58610,
+      "gzipBytes": 22287,
+      "inputFiles": 59
+    },
+    "axios-fetch": {
+      "bytes": 58626,
+      "gzipBytes": 22292,
+      "inputFiles": 59
+    },
+    "ky": {
+      "bytes": 34589,
+      "gzipBytes": 11711,
+      "inputFiles": 22
+    },
+    "ofetch": {
+      "bytes": 10137,
+      "gzipBytes": 4080,
+      "inputFiles": 5
+    }
+  }
+}

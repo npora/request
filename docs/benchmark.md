@@ -1,9 +1,10 @@
 # Performance Benchmarks
 
-See the [runtime-hardening candidate report](measurements/runtime-hardening/README.md)
-for the latest local stable-version HTTP comparison, size costs, adverse-body
-diagnostics and verification results. It identifies unreleased changes separately
-from the unchanged 1.20.2 npm release.
+See the [Fetch capability patch report](measurements/fetch-capability/README.md)
+for the Axios 1.21.0 comparison and patch size costs. The
+[1.21.0 feature baseline](measurements/runtime-hardening/README.md) preserves
+the earlier Axios 1.20.0 results, adverse-body diagnostics and verification.
+Historical snapshots describe their original build, not the current npm release.
 
 `pnpm benchmark:compare -- --large-json` repeats the same rotated-order HTTP
 comparison for GET responses containing a 64 KiB string payload. It records the
@@ -26,7 +27,7 @@ pnpm benchmark
 Generate a machine-readable report:
 
 ```sh
-pnpm benchmark -- --output benchmark-results/request.json
+pnpm benchmark -- --output .artifacts/benchmarks/request.json
 ```
 
 Tune the workload:
@@ -43,7 +44,7 @@ Run the bounded full-feature stress matrix (10,000,000 logical operations by
 default):
 
 ```sh
-pnpm stress -- --output benchmark-results/stress.json
+pnpm stress -- --output .artifacts/benchmarks/stress.json
 ```
 
 Run a separate real localhost HTTP concurrency test:
@@ -53,7 +54,7 @@ pnpm benchmark:http -- \
   --operations 100000 \
   --concurrency 256 \
   --samples 4096 \
-  --output benchmark-results/http.json
+  --output .artifacts/benchmarks/http.json
 ```
 
 The core and localhost HTTP runners retain at most `--samples` evenly spaced
@@ -371,7 +372,7 @@ relative-path fast paths while query encoding remains delegated to
 Measure long SSE and NDJSON lines arriving in 64-byte chunks:
 
 ```sh
-pnpm benchmark:streaming-lines -- --output benchmark-results/streaming-lines.json
+pnpm benchmark:streaming-lines -- --output .artifacts/benchmarks/streaming-lines.json
 ```
 
 The benchmark verifies exactly one intact record for 64, 128, and 256 KiB
@@ -435,8 +436,8 @@ pnpm build
 npm ci --prefix benchmark/competitors --ignore-scripts --no-audit --no-fund
 pnpm benchmark:compare -- \
   --operations 5000 --concurrency 64 --warmup 500 --rounds 6 \
-  --samples 4096 --output benchmark-results/comparison.json
-pnpm benchmark:compare:size -- --output package-size-results/comparison.json
+  --samples 4096 --output .artifacts/benchmarks/comparison.json
+pnpm benchmark:compare:size -- --output .artifacts/package-size/comparison.json
 ```
 
 Run timing benchmarks by themselves on an otherwise idle machine. The HTTP
@@ -494,7 +495,7 @@ The [1.19.3 snapshot](measurements/1.19.3/README.md) records a clean-commit run,
 all six HTTP rounds, request-count validation, consumer bundle contributions,
 fixed dependency versions, and browser comparison entry strings. It also records
 limitations and the next bundle-cost investigation. Keep versioned evidence
-separate from ignored scratch reports under `benchmark-results`.
+separate from ignored scratch reports under `.artifacts/benchmarks`.
 
 The [streaming parser split investigation](measurements/streaming-split/README.md)
 includes an unapplied candidate patch and before/after single-bundle, initial,
@@ -504,7 +505,7 @@ and total split costs. It explains why parser-only dynamic loading was rejected.
 
 ```sh
 pnpm build
-pnpm benchmark:response-stream -- --output benchmark-results/response-stream.json
+pnpm benchmark:response-stream -- --output .artifacts/benchmarks/response-stream.json
 ```
 
 This runner imports the built core entry and consumes 200,000 chunks of 256
@@ -527,7 +528,7 @@ After installing the pinned comparison dependencies and building, run:
 ```sh
 node --import tsx benchmark/competitors/edge-cases.mjs \
   --operations 1000 --concurrency 64 \
-  --output benchmark-results/http-edge-cases.json
+  --output .artifacts/benchmarks/http-edge-cases.json
 ```
 
 Each of the six clients uses the same loopback server. Scenarios cover a 5 ms

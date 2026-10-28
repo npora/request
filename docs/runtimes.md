@@ -5,6 +5,11 @@ they do not supply Fetch, Headers, AbortController, Response, or ReadableStream.
 The existing ESM/CommonJS entries work across the tested environments without
 separate browser/worker/node implementations.
 
+The default adapter reports a missing or non-callable global Fetch as
+`CONFIG_ERROR`, not retryable `NETWORK_ERROR`. Provide a Fetch-compatible
+`fetch` function or use a custom adapter; custom adapters do not require global
+Fetch. Caller cancellation retains precedence for already-aborted requests.
+
 | Environment | Executable verification | Scope |
 | --- | --- | --- |
 | Node.js 22/24/26 | Runtime CI and installed-package consumers | ESM/CommonJS and HTTP contracts |
@@ -56,6 +61,6 @@ pnpm test:edge
 pnpm test:browser
 ```
 
-The isolated fixture pins Undici 7.29.1 and overrides sharp to 0.35.5 to address
+The isolated fixture pins Undici 7.30.1 and overrides sharp to 0.35.5 to address
 advisories in Miniflare's pinned dependencies. The fixture is audited and tested
 in CI; none of its dependencies enter the published package.
