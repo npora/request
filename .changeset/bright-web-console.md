@@ -1,4 +1,5 @@
 ---
+"@npora/request": patch
 ---
 
-Add the Cloudflare Pages website, live request console, bounded mock APIs and deployment documentation. No published package changes.
+Refresh the published README with the official website, ten live request demonstrations, and local website setup. Point npm's homepage metadata to the official site. The request API and runtime dependencies are unchanged.

@@ -6,6 +6,10 @@
 [![runtime dependencies](https://img.shields.io/badge/runtime_dependencies-0-success)](package.json)
 [![license](https://img.shields.io/npm/l/@npora/request.svg)](LICENSE)
 
+[Website & live playground](https://npora.pages.dev) ·
+[API reference](https://github.com/npora/request/blob/main/docs/api.md) ·
+[Changelog](https://github.com/npora/request/blob/main/CHANGELOG.md)
+
 A production-focused, TypeScript-first HTTP client built on the standard Fetch
 API. It adds typed responses, runtime validation, streaming, stable errors, and
 composable resilience while keeping native platform values visible. The package
@@ -16,17 +20,49 @@ has zero runtime dependencies.
 | Goal | Documentation |
 | --- | --- |
 | Send the first request | [Quick start](#quick-start) |
-| Try the live console or deploy the website | [Cloudflare Pages website](docs/cloudflare-website.md) |
-| Move an existing Axios client | [Axios migration guide](docs/axios-migration.md) |
+| Try real requests in the browser | [Live playground](https://npora.pages.dev/#playground) |
+| Develop or deploy the website | [Cloudflare Pages guide](https://github.com/npora/request/blob/main/docs/cloudflare-website.md) |
+| Move an existing Axios client | [Axios migration guide](https://github.com/npora/request/blob/main/docs/axios-migration.md) |
 | Consume SSE or NDJSON | [Streaming responses](#streaming-responses) |
-| Run a complete session workflow | [Session example](docs/workflows.md#build-a-session-client) |
-| Refresh authentication tokens | [Authentication workflow](docs/workflows.md#refresh-authentication-tokens) |
-| Find a client or response API | [API reference](docs/api.md) |
-| Configure URLs, bodies, timeouts, or parsing | [Configuration reference](docs/configuration.md) |
+| Run a complete session workflow | [Session example](https://github.com/npora/request/blob/main/docs/workflows.md#build-a-session-client) |
+| Refresh authentication tokens | [Authentication workflow](https://github.com/npora/request/blob/main/docs/workflows.md#refresh-authentication-tokens) |
+| Find a client or response API | [API reference](https://github.com/npora/request/blob/main/docs/api.md) |
+| Configure URLs, bodies, timeouts, or parsing | [Configuration reference](https://github.com/npora/request/blob/main/docs/configuration.md) |
 | Add retry, cache, authentication, or observability | [Plugins](#plugins) |
 | Handle stable error codes | [Errors](#errors) |
-| Configure Node.js proxying, pooling, mTLS, or DNS | [Undici integration](docs/undici.md) |
-| Review runtime boundaries and release checks | [Runtime support](docs/runtimes.md), [testing](docs/testing.md), and [security](docs/security.md) |
+| Configure Node.js proxying, pooling, mTLS, or DNS | [Undici integration](https://github.com/npora/request/blob/main/docs/undici.md) |
+| Review runtime boundaries and release checks | [Runtime support](https://github.com/npora/request/blob/main/docs/runtimes.md), [testing](https://github.com/npora/request/blob/main/docs/testing.md), and [security](https://github.com/npora/request/blob/main/docs/security.md) |
+
+## Live playground
+
+Try the library at **[npora.pages.dev](https://npora.pages.dev/#playground)**.
+The console uses the request client built from this repository and makes real
+same-origin requests to Cloudflare Pages Functions. Its displayed version comes
+from the package manifest.
+
+| Scenario | What to observe |
+| --- | --- |
+| JSON requests | A complete user object returned by `GET`. |
+| Runtime validation | Invalid fields rejected with `SCHEMA_ERROR` and field-level issues. |
+| Content-bearing queries | An actual HTTP `QUERY` request carrying nested JSON filters. |
+| SSE | Three events consumed incrementally, with connection state and cancellation. |
+| NDJSON | Records parsed and validated one at a time. |
+| Retry | Two `503` responses followed by a successful third attempt. |
+| Timeout and circuit breaking | `TIMEOUT_ERROR`, then `CIRCUIT_OPEN` without another network request. |
+| Transfer progress | A one-MiB upload in acknowledged 64-KiB parts and a paced one-MiB download. |
+| Authentication | Two expired-token requests sharing one refresh before replay. |
+| Traffic control | Actual IP-limit observations, a labelled `429` recovery probe, queueing and local `RATE_LIMIT`. |
+
+Failures are deliberately generated for these demonstrations. The upload
+splitting is application code composed with the upload plugin. Real IP limits
+use server arrival times; a separate, clearly labelled probe makes
+`Retry-After` recovery observable even when a slow connection never exceeds
+the real limit. Mock users and tokens are demonstration data.
+
+The website and its build tools are separate from the npm package. Installing
+`@npora/request` adds no runtime dependencies or website server code. See the
+[Cloudflare deployment guide](https://github.com/npora/request/blob/main/docs/cloudflare-website.md)
+for local setup, API routes and bindings.
 
 ## Install
 
@@ -242,11 +278,11 @@ iterator; each connection uses its own request timeout.
 
 `onStateChange` observes `connecting`, `open`, `reconnecting`, `closed`, and
 `errored`. It is available before the initial promise resolves; callback
-failures are isolated. See the [streaming workflow](docs/workflows.md#consume-streaming-responses)
+failures are isolated. See the [streaming workflow](https://github.com/npora/request/blob/main/docs/workflows.md#consume-streaming-responses)
 for terminal-state and cancellation details.
 
 Run `pnpm example:streaming` for a local demonstration. See
-[streaming workflows](docs/workflows.md#consume-streaming-responses) for
+[streaming workflows](https://github.com/npora/request/blob/main/docs/workflows.md#consume-streaming-responses) for
 consumption and error-handling contracts.
 
 Native `FormData`, `Blob`, `ArrayBuffer`, and `ReadableStream` request bodies
@@ -359,7 +395,7 @@ const request = createClient().use(retryPlugin({ retries: 2 }))
 Retry is opt-in: installing `retryPlugin()` without a `retries` value leaves
 the default at zero. Cache is also opt-in per request, or through a client
 default under `extensions.cache`. See the
-[configuration reference](docs/configuration.md#extension-options) for the
+[configuration reference](https://github.com/npora/request/blob/main/docs/configuration.md#extension-options) for the
 precise defaults and method rules.
 
 For a smaller memory-only cache, import `memoryCachePlugin` from
@@ -413,7 +449,7 @@ const user = await request.get<User>('/users/1', {
 cache.clear()
 ```
 
-See [cache workflows](docs/cache.md) for request sharing, cache updates, tag
+See [cache workflows](https://github.com/npora/request/blob/main/docs/cache.md) for request sharing, cache updates, tag
 invalidation, HTTP revalidation, stale recovery, persistent stores, and
 coordination across browser tabs.
 
@@ -616,7 +652,7 @@ request failures through the unified base class while still inspecting schema
 issues when `error.code === 'SCHEMA_ERROR'`.
 
 Use `isRequestError()` and `isSchemaValidationError()` to narrow unknown errors
-across realms and package copies. See [error handling](docs/errors.md) for
+across realms and package copies. See [error handling](https://github.com/npora/request/blob/main/docs/errors.md) for
 recovery, cancellation, and retry decisions.
 
 ## Supply-chain verification
@@ -629,6 +665,8 @@ allowlist, and size budgets.
 
 ## Documentation
 
+- [Live playground](https://npora.pages.dev/#playground)
+- [Website development and Cloudflare deployment](https://github.com/npora/request/blob/main/docs/cloudflare-website.md)
 - [Configuration reference](https://github.com/npora/request/blob/main/docs/configuration.md)
 - [API reference](https://github.com/npora/request/blob/main/docs/api.md)
 - [Architecture](https://github.com/npora/request/blob/main/docs/architecture.md)
@@ -659,6 +697,18 @@ pnpm test:browser
 See the
 [testing and release gates](https://github.com/npora/request/blob/main/docs/testing.md)
 for the complete matrix.
+
+To run the website locally, install its isolated tools and build its public assets:
+
+```sh
+npm ci --prefix website --ignore-scripts
+pnpm website:build
+pnpm website:dev
+```
+
+Open `http://127.0.0.1:8787`. The development command starts Pages and its local
+state Worker. Website checks are `pnpm test:website` and
+`pnpm test:website:browser`; they do not deploy or publish anything.
 
 ## Versioning
 
