@@ -129,8 +129,10 @@ export const scenarios = [
     } },
   { id: 'traffic', name: '并发与速率控制', tag: 'CONCURRENCY / RATE LIMIT', description: '先突发请求触发服务端 429，再按 Retry-After 等待恢复；最后展示并发排队、节流和本地 RATE_LIMIT 拒绝。',
     async run(ctx) {
-      ctx.log('阶段 1 / 突发 7 次请求，服务器每 IP 每秒允许 5 次')
-      const burst = await Promise.allSettled(Array.from({ length: 7 }, () => ctx.api().get('/traffic')))
+      ctx.log('阶段 1 / 预热连接后并发 12 次请求，服务器每 IP 每秒允许 5 次')
+      const direct = ctx.api()
+      await Promise.all(Array.from({ length: 6 }, () => direct.get('/user')))
+      const burst = await Promise.allSettled(Array.from({ length: 12 }, () => direct.get('/traffic')))
       const rejected = burst.filter(value => value.status === 'rejected' && value.reason.status === 429)
       check(rejected.length >= 2, 'Expected server 429 responses')
       ctx.log({ serverRejections: rejected.length, code: 'HTTP_ERROR', status: 429, retryAfter: '5 seconds' })
@@ -140,7 +142,8 @@ export const scenarios = [
       ctx.log('阶段 3 / 最多 2 个并发、每秒 4 次，排队完成 8 个请求')
       const concurrency = concurrencyPlugin({ maxConcurrent: 2 })
       const rate = rateLimitPlugin({ maxRequests: 4, interval: 1100 })
-      const bounded = ctx.api(concurrency, rate)
+      const bounded = ctx.api(concurrency, rate, retryPlugin({ retries: 1,
+        onRetry: ({ delay }) => ctx.log({ boundedRetryDelay: delay }) }))
       const requests = Array.from({ length: 8 }, () => bounded.get('/traffic'))
       ctx.log({ concurrency: concurrency.getState(location.origin), rate: rate.getState(location.origin) })
       check((await Promise.all(requests)).every(value => value.accepted), 'Bounded request failed')
