@@ -61,7 +61,7 @@ try {
 
   assertRunSucceeded('npm', installArgs, installResult)
 
-  for (const name of ['capabilities.mjs', 'capability-contract.mjs']) {
+  for (const name of ['capabilities.mjs', 'capability-contract.mjs', 'session.mjs', 'session-contract.mjs']) {
     writeFileSync(join(temporaryDirectory, name), readFileSync(
       new URL(`../consumer/${name}`, import.meta.url)
     ))
@@ -121,9 +121,10 @@ try {
   if (expectedVersion) {
     assert.equal(installedManifest.version, expectedVersion)
   }
+  run(process.execPath, ['session.mjs'])
   console.log(
-    `Registry smoke test passed for ${packageName}@${installedManifest.version} ` +
-      `on ${process.version}.`
+    `Registry verification passed for ${packageName}@${installedManifest.version} ` +
+      `on ${process.version}: ESM/CommonJS capabilities and HTTP sessions.`
   )
 } finally {
   rmSync(temporaryDirectory, {
