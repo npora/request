@@ -3,7 +3,7 @@ import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const generatedPaths = [
-  '.artifacts', 'dist', 'coverage', 'benchmark-results', 'package-size-results',
+  '.artifacts', 'dist', 'website/dist', 'coverage', 'benchmark-results', 'package-size-results',
   'playwright-report', 'test-results', 'browser/playwright-report', 'browser/test-results',
   'benchmark/competitors/library-comparison-result.json',
   '.pnpm-store', 'node_modules/.cache', 'node_modules/.vite', 'node_modules/.tmp'

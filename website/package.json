@@ -1,0 +1,18 @@
+{
+  "name": "npora-request-website",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs",
+    "dev": "node dev.mjs",
+    "dev:state": "wrangler dev --config state/wrangler.jsonc --ip 127.0.0.1 --port 8788 --persist-to ../../.artifacts/website/do-state",
+    "deploy:state": "wrangler deploy --config state/wrangler.jsonc",
+    "check": "wrangler pages functions build --outdir ../.artifacts/website/functions && wrangler deploy --config state/wrangler.jsonc --dry-run --outdir ../../.artifacts/website/worker",
+    "test": "npm run build && wrangler pages functions build --outdir ../.artifacts/website/functions && node --test test/*.test.mjs"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2",
+    "miniflare": "5.20261023.1-beta",
+    "wrangler": "4.154.0"
+  }
+}

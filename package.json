@@ -138,6 +138,10 @@
     "access": "public"
   },
   "scripts": {
+    "website:build": "npm --prefix website run build",
+    "website:dev": "npm --prefix website run dev",
+    "test:website": "npm --prefix website test",
+    "test:website:browser": "playwright test --config=website/playwright.config.ts",
     "clean": "node scripts/clean.mjs",
     "clean:dry-run": "node scripts/clean.mjs --dry-run",
     "dev": "tsdown --watch",

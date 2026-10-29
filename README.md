@@ -16,6 +16,7 @@ has zero runtime dependencies.
 | Goal | Documentation |
 | --- | --- |
 | Send the first request | [Quick start](#quick-start) |
+| Try the live console or deploy the website | [Cloudflare Pages website](docs/cloudflare-website.md) |
 | Move an existing Axios client | [Axios migration guide](docs/axios-migration.md) |
 | Consume SSE or NDJSON | [Streaming responses](#streaming-responses) |
 | Run a complete session workflow | [Session example](docs/workflows.md#build-a-session-client) |
