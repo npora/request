@@ -29,6 +29,15 @@ exports and combine shared chunks. The consumer report is checked against
 `benchmark/consumer-size-budget.json` in CI and recorded alongside the package
 size report.
 
+## Configuration merger reduction
+
+The [configuration merger snapshot](measurements/config-merger/README.md)
+records a small reduction from released 1.21.3: core basic changes from 14,524
+to 14,458 gzip bytes (-66, about 0.45%). Internal helpers become module-local
+functions; public APIs and configuration semantics stay unchanged. All seven
+affected consumer scenarios shrink, and their budgets are tightened. The
+standalone schema-error helper remains unchanged. No dynamic chunks are added.
+
 ## Reliability patch measurement
 
 The [Fetch capability patch snapshot](measurements/fetch-capability/README.md)
