@@ -106,11 +106,11 @@ test('slow endpoint really waits ten seconds; cancellation is possible', async (
 
 test('upload verifies multipart file bytes; download is a paced one-MiB stream', async () => {
   const data = new FormData()
-  data.append('file', new Blob([new Uint8Array(65536)]), 'sample.bin')
+  data.append('file', new Blob([new Uint8Array(1048576)]), 'sample.bin')
   const uploaded = await request('/api/upload', { method: 'POST', body: data })
   assert.equal(uploaded.status, 200)
   const result = await uploaded.json()
-  assert.equal(result.bytes, 65536); assert.ok(result.receivedBytes > result.bytes)
+  assert.equal(result.bytes, 1048576); assert.ok(result.receivedBytes > result.bytes)
   const malformed = await request('/api/upload', { method: 'POST', body: 'not multipart' })
   assert.equal(malformed.status, 400)
   const start = Date.now()

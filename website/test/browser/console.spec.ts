@@ -31,6 +31,7 @@ test('all ten real scenarios complete and report actual network activity', async
       expect(output).toContain('CIRCUIT_OPEN')
     }
     if (id === 'transfer') {
+      expect((await page.locator('#requests').innerText()).match(/POST \/api\/upload/g)).toHaveLength(16)
       await expect(page.locator('#upload-progress')).toHaveAttribute('value', '1')
       await expect(page.locator('#download-progress')).toHaveAttribute('value', '1')
     }
@@ -78,6 +79,7 @@ test('stopping the full sequence prevents later scenarios from starting', async 
 test('responsive layout, keyboard access and source isolation', async ({ page }, testInfo) => {
   await page.goto('/')
   await expect(page.locator('[data-scenario]')).toHaveCount(10)
+  await expect(page.locator('.workspace')).toHaveCSS('display', 'grid')
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
   const response = await page.request.get('/functions/api/user.js')
   expect(response.status()).toBe(404)

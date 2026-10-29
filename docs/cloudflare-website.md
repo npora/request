@@ -99,7 +99,7 @@ website/
 | NDJSON | `GET /api/ndjson` | 每 250ms 一条，共六条；逐条校验 id/action |
 | Retry | `GET /api/retry?run=<uuid>` | 同一 session/run 的前两次为 503，第三次为 200 |
 | Timeout / 熔断 | `GET /api/timeout` | 10 秒后响应；客户端 1 秒超时两次，第三次 `CIRCUIT_OPEN` |
-| Upload | `POST /api/upload` | 接收 FormData 的 file，返回文件字节数和完整请求体接收字节数 |
+| Upload | `POST /api/upload` | 接收 FormData 的 file；控制台将 1 MiB 文件拆成 16 个 64 KiB 分片，逐片核对接收字节数 |
 | Download | `GET /api/download` | 16 个 64 KiB 块，每 100ms 一块，共 1 MiB |
 | Auth | `GET /api/auth`、`POST /api/refresh` | 过期凭证 401；刷新后重放，两个并发请求共享一次刷新 |
 | Traffic | `GET /api/traffic` | 每 IP 滚动一秒最多五次，超限返回 429，冷却五秒并携带 `Retry-After: 5` |
@@ -126,7 +126,9 @@ DO 的事务防止并发计数丢失；SQLite 保留跨实例重启的计数与�
   `formErrors` 和 `fieldErrors`，保留同一字段的全部消息。
 - SSE 的 `onStateChange` 显示连接生命周期，异步迭代器负责增量消费和背压。
   此端点正常结束三条事件，不自动制造重连；连接状态不等同于 UI 打字机队列。
-- 上传进度来自库的 XHR upload 回调，含 multipart 请求体开销，可能在本地瞬间完成。
+- 上传按 64 KiB 顺序分片，每片使用库的 XHR upload 回调，包含 multipart 请求体开销。
+  面板以分片占文件的比例汇总整体进度，字节展示是对应的文件进度估算，最终使用服务端确认总数核对。
+  不额外伪造进度计时器；分片发送是官网示例的应用逻辑，并非 uploadPlugin 自动分片。
   服务端按块有界读取并在完成后确认字节数；不宣称普通 HTTP 上传会持续反向推送接收进度。
   文件不落盘、不长期保留；请求体（含 multipart 开销）上限 2 MiB。
 - 下载使用 Cloudflare `FixedLengthStream`，使浏览器获得可靠的总字节数。

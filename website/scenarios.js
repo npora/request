@@ -38,7 +38,7 @@ const snippets = {
   ndjson: `const records = await api.ndjson('/ndjson', {\n  itemSchema: recordSchema,\n  signal: controller.signal\n})\n\nfor await (const record of records) {\n  console.log(record.id, record.action)\n}\n// 每条独立解析与校验，不等待完整响应`,
   retry: `const api = createClient({ baseURL: '/api' })\n  .use(retryPlugin({\n    retries: 2,\n    delay: 350,\n    onRetry: ({ attempt, delay }) => {\n      console.log('retry', attempt, delay)\n    }\n  }))\n\nawait api.get('/retry', { query: { run: runId } })\n// 503 → 503 → 200`,
   timeout: `const api = createClient({\n  baseURL: '/api', timeout: 1000\n}).use(circuitBreakerPlugin({\n  failureThreshold: 2,\n  resetTimeout: 30000\n}))\n\n// 服务端等待 10 秒\n// 前两次：TIMEOUT_ERROR\n// 第三次：CIRCUIT_OPEN，不发网络请求`,
-  transfer: `const api = createClient({ baseURL: '/api' })\n  .use(uploadPlugin()).use(downloadPlugin())\n\nawait api.post('/upload', { extensions: {\n  upload: { data: formData, onProgress: updateUpload }\n} })\n\nconst blob = await api.get('/download', {\n  extensions: { download: {\n    onProgress: updateDownload\n  } }\n})`,
+  transfer: `const api = createClient({ baseURL: '/api' })\n  .use(uploadPlugin()).use(downloadPlugin())\n\n// 1 MiB 文件，按 64 KiB 分片顺序发送\nfor (let start = 0; start < file.size; start += 65536) {\n  const data = new FormData()\n  data.append('file', file.slice(start, start + 65536))\n  await api.post('/upload', { extensions: {\n    upload: { data, onProgress: updatePart }\n  } })\n}\n\nconst blob = await api.get('/download', {\n  extensions: { download: {\n    onProgress: updateDownload\n  } }\n})`,
   auth: `// refreshApi 不安装 authPlugin，避免递归刷新\nconst api = refreshApi.extend().use(authPlugin({\n  storage: inMemoryTokenStorage,\n  async refreshToken() {\n    const session = await refreshApi.post('/refresh')\n    return session.accessToken\n  }\n}))\n\nawait Promise.all([api.get('/auth'), api.get('/auth')])\n// 401 → 共享一次刷新 → 自动重放原请求`,
   traffic: `const api = createClient({ baseURL: '/api' })\n  .use(concurrencyPlugin({ maxConcurrent: 2 }))\n  .use(rateLimitPlugin({\n    maxRequests: 4, interval: 1000\n  }))\n  .use(retryPlugin({ retries: 1 }))\n\nawait Promise.all(urls.map(url => api.get(url)))\n// 429: HTTP_ERROR；重试遵从 Retry-After\n// 本地队列拒绝: RATE_LIMIT`
 }
@@ -90,13 +90,28 @@ export const scenarios = [
         throw new Error(`Expected ${expected}`)
       }
     } },
-  { id: 'transfer', name: '上传与下载进度', tag: 'TRANSFER / PROGRESS', description: '上传 1 MiB FormData 文件，再逐块下载 1 MiB Blob。上传显示浏览器发送进度，完成后核对服务端接收字节数。',
+  { id: 'transfer', name: '上传与下载进度', tag: 'TRANSFER / PROGRESS', description: '将 1 MiB 文件拆成 64 KiB FormData 分片，逐片确认，再下载 1 MiB Blob。整体进度由每片真实传输回调汇总。',
     async run(ctx) {
       const api = ctx.api(uploadPlugin(), downloadPlugin())
-      const data = new FormData()
-      data.append('file', new Blob([new Uint8Array(1024 * 1024).fill(110)]), 'npora-demo.bin')
-      const upload = await ctx.upload(api, { data, onProgress: value => ctx.progress('upload', value) })
-      check(upload.bytes === 1024 * 1024, 'Uploaded file byte count mismatch'); ctx.log({ upload })
+      const file = new Blob([new Uint8Array(1024 * 1024).fill(110)])
+      const partSize = 64 * 1024
+      let confirmed = 0, receivedBytes = 0
+      for (let offset = 0; offset < file.size; offset += partSize) {
+        const part = file.slice(offset, offset + partSize)
+        const data = new FormData()
+        data.append('file', part, `npora-demo-${offset / partSize + 1}.bin`)
+        const upload = await ctx.upload(api, { data, onProgress: value => {
+          // Each callback measures the current multipart request. Overall file
+          // progress weights its ratio by this part's share of the whole file.
+          const loaded = offset + part.size * (value.progress ?? 0)
+          ctx.progress('upload', { loaded, total: file.size, progress: loaded / file.size })
+        } })
+        check(upload.bytes === part.size, 'Uploaded part byte count mismatch')
+        confirmed += upload.bytes; receivedBytes += upload.receivedBytes
+        ctx.log({ part: offset / partSize + 1, confirmedBytes: confirmed })
+      }
+      check(confirmed === file.size, 'Uploaded file byte count mismatch')
+      ctx.log({ upload: { parts: file.size / partSize, bytes: confirmed, receivedBytes } })
       const blob = await api.get('/download', { extensions: { download: { onProgress: value => ctx.progress('download', value) } } })
       check(blob.size === 1024 * 1024, 'Downloaded byte count mismatch'); ctx.log({ download: { bytes: blob.size, type: blob.type } })
     } },
