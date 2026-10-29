@@ -1,5 +1,11 @@
 # @npora/request
 
+## 1.21.2
+
+### Patch Changes
+
+- 7e9b0c3: Refresh the published README with the official website, ten live request demonstrations, and local website setup. Point npm's homepage metadata to the official site. The request API and runtime dependencies are unchanged.
+
 ## 1.21.1
 
 ### Patch Changes
