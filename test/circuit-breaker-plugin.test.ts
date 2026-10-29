@@ -12,6 +12,87 @@ afterEach(() => {
 })
 
 describe('circuitBreakerPlugin', () => {
+  it('releases a shared probe during pending failure classification exactly once', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(0)
+    let classify!: (counted: boolean) => void
+    let enter!: () => void
+    const entered = new Promise<void>(resolve => { enter = resolve })
+    let failures = 0
+    let complete!: (response: Response) => void
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response('busy', { status: 503 }))
+      .mockResolvedValueOnce(new Response('probe failure', { status: 503 }))
+      .mockImplementation(() => new Promise<Response>(resolve => { complete = resolve }))
+    const breaker = circuitBreakerPlugin({
+      failureThreshold: 1, resetTimeout: 10,
+      shouldCountFailure() {
+        if (++failures === 1) return true
+        enter()
+        return new Promise<boolean>(resolve => { classify = resolve })
+      }
+    })
+    const first = createClient({ fetch: fetchMock }).use(breaker)
+    const second = createClient({ fetch: fetchMock }).use(breaker)
+    await expect(first.get('/resource')).rejects.toMatchObject({ status: 503 })
+    await vi.advanceTimersByTimeAsync(10)
+    const probe = first.get('/resource').catch(error => error)
+    await entered
+    first.unuse('circuit-breaker')
+    const survivor = second.get('/resource').catch(error => error)
+    await Promise.resolve()
+    expect(fetchMock).toHaveBeenCalledTimes(3)
+    classify(true)
+    expect(await probe).toMatchObject({ status: 503 })
+    await expect(second.get('/blocked')).rejects.toMatchObject({ code: 'CIRCUIT_OPEN' })
+    expect(fetchMock).toHaveBeenCalledTimes(3)
+    complete(new Response('recovered'))
+    expect(await survivor).toBe('recovered')
+    expect(breaker.getState('default')).toBe('closed')
+  })
+
+  it('releases a detached client\'s half-open probe without counting its late failure', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(0)
+    let complete!: (response: Response) => void
+    let enter!: () => void
+    const entered = new Promise<void>(resolve => { enter = resolve })
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response('busy', { status: 503 }))
+      .mockImplementationOnce(() => {
+        enter()
+        return new Promise<Response>(resolve => { complete = resolve })
+      })
+      .mockResolvedValue(new Response('recovered'))
+    const breaker = circuitBreakerPlugin({ failureThreshold: 1, resetTimeout: 10 })
+    const first = createClient({ fetch: fetchMock }).use(breaker)
+    const second = createClient({ fetch: fetchMock }).use(breaker)
+    await expect(first.get('/resource')).rejects.toMatchObject({ status: 503 })
+    await vi.advanceTimersByTimeAsync(10)
+    const probe = first.get('/resource').catch(error => error)
+    await entered
+    first.unuse('circuit-breaker')
+    await expect(second.get('/resource')).resolves.toBe('recovered')
+    complete(new Response('late failure', { status: 503 }))
+    expect(await probe).toMatchObject({ status: 503 })
+    expect(breaker.getState('default')).toBe('closed')
+    expect(fetchMock).toHaveBeenCalledTimes(3)
+  })
+
+  it('keeps a shared circuit open until its final installation is removed', async () => {
+    const adapter = new MockAdapter()
+    adapter.onGet('/down').reply(503)
+    const breaker = circuitBreakerPlugin({ failureThreshold: 1 })
+    const first = createClient({ adapter }).use(breaker)
+    const second = createClient({ adapter }).use(breaker)
+    await expect(first.get('/down')).rejects.toMatchObject({ code: 'HTTP_ERROR' })
+    first.unuse('circuit-breaker')
+    await expect(second.get('/down')).rejects.toMatchObject({ code: 'CIRCUIT_OPEN' })
+    expect(adapter.history).toHaveLength(1)
+    second.unuse('circuit-breaker')
+    expect(breaker.getState('default')).toBe('closed')
+  })
+
   it.each([false, true])('keeps the circuit closed after retry recovery (breaker installed first: %s)', async breakerFirst => {
     let attempts = 0
     const breaker = circuitBreakerPlugin({ failureThreshold: 1 })
