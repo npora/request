@@ -1,5 +1,11 @@
 # @npora/request
 
+## 1.21.4
+
+### Patch Changes
+
+- ba91087: Reduce browser bundle size by moving internal configuration-merging helpers from private static methods to module-local functions and sharing the existing object guard. Public client APIs and configuration semantics are unchanged. Tighten consumer bundle budgets to preserve the measured savings.
+
 ## 1.21.3
 
 ### Patch Changes
