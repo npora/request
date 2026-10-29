@@ -1,6 +1,8 @@
 allowBuilds:
   esbuild: true
 
+strictPeerDependencies: true
+
 blockExoticSubdeps: true
 minimumReleaseAge: 4320
 minimumReleaseAgeIgnoreMissingTime: false
