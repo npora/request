@@ -93,6 +93,7 @@ interface Admission {
   generation: number
   probe: boolean
   record: CircuitRecord
+  released?: boolean
 }
 
 interface NormalizedOptions {
@@ -205,12 +206,15 @@ export function circuitBreakerPlugin(
           return
         }
 
-        admissions.delete(requestContext)
+        const finish = () => {
+          admissions.delete(requestContext)
+          finishAdmission(admission, circuits, normalized.maxCircuits)
+        }
 
         const record = admission.record
 
         if (!active) {
-          finishAdmission(admission, circuits, normalized.maxCircuits)
+          finish()
           return
         }
 
@@ -218,7 +222,7 @@ export function circuitBreakerPlugin(
           circuits.get(admission.key) !== record ||
           record.generation !== admission.generation
         ) {
-          finishAdmission(admission, circuits, normalized.maxCircuits)
+          finish()
           return
         }
 
@@ -233,7 +237,7 @@ export function circuitBreakerPlugin(
             }
           }
 
-          finishAdmission(admission, circuits, normalized.maxCircuits)
+          finish()
           return
         }
 
@@ -255,7 +259,7 @@ export function circuitBreakerPlugin(
             )
           }
         } catch (error) {
-          finishAdmission(admission, circuits, normalized.maxCircuits)
+          finish()
           throw error
         }
 
@@ -270,19 +274,13 @@ export function circuitBreakerPlugin(
                 normalized
               )
             })
-            .finally(() => {
-              finishAdmission(
-                admission,
-                circuits,
-                normalized.maxCircuits
-              )
-            })
+            .finally(finish)
         }
 
         try {
           applyFailure(counted, active, circuits, admission, normalized)
         } finally {
-          finishAdmission(admission, circuits, normalized.maxCircuits)
+          finish()
         }
       })
 
@@ -341,6 +339,8 @@ function finishAdmission(
   circuits: Map<string, CircuitRecord>,
   maxCircuits: number
 ): void {
+  if (admission.released) return
+  admission.released = true
   const record = admission.record
 
   if (admission.probe) {
