@@ -52,11 +52,12 @@ try {
     }
   `)
   run(process.execPath, ['streaming.mjs'], directory)
-  for (const name of ['capabilities.mjs', 'capability-contract.mjs']) {
+  for (const name of ['capabilities.mjs', 'capability-contract.mjs', 'session.mjs', 'session-contract.mjs']) {
     writeFileSync(join(directory, name), readFileSync(new URL(name, import.meta.url)))
   }
   run(process.execPath, ['capabilities.mjs'], directory)
-  console.log('Installed package consumer, onboarding workflows, and ESM/CommonJS streaming passed.')
+  run(process.execPath, ['session.mjs'], directory)
+  console.log('Installed package consumer, onboarding workflows, HTTP sessions, and ESM/CommonJS streaming passed.')
 } finally {
   rmSync(directory, { recursive: true, force: true })
 }

@@ -185,6 +185,21 @@ and early-closure states, malformed lock/channel rejection, and cache operation
 without coordination. Thus new entrypoints and lifecycle behavior are checked
 against the actual installed artifact, not only source imports.
 
+Both runners also execute [`session-contract.mjs`](../test/consumer/session-contract.mjs)
+through public ESM and CommonJS imports. This fixture starts an ephemeral
+loopback HTTP server and uses native Fetch, without injecting Fetch or a mock
+adapter. It verifies two expired-token requests sharing one refresh, a transient
+read retry, account-private cache hits, failed-write cache preservation,
+successful-write tag invalidation, view cancellation, logout during refresh,
+and logout isolation.
+Cancellation must close the corresponding server response; another account's
+token and cached list must survive. Gates synchronize the refresh race, and
+bounded waits and server cleanup prevent hanging socket fixtures.
+
+This is controlled HTTP integration coverage, not acceptance against an
+external production backend or a browser CORS/cookie test. It needs no real
+credentials and adds no dependencies to the published library.
+
 The published `latest` package can be tested in an isolated temporary project:
 
 ```sh
@@ -192,8 +207,10 @@ pnpm test:registry
 ```
 
 This installs from npm with lifecycle scripts disabled, then verifies both ESM
-and CommonJS consumers. A scheduled GitHub Actions matrix repeats the check on
-Node.js 22, 24, and 26.
+and CommonJS consumers, including the HTTP session contract above. A scheduled
+GitHub Actions matrix repeats the check on Node.js 22, 24, and 26; it can also
+be started manually with the **Published Package** workflow. Set
+`EXPECTED_PACKAGE_VERSION` to check an exact version rather than `latest`.
 
 ## Browser checks
 
@@ -288,7 +305,7 @@ workflow runs only after the exact `main` commit completes that matrix
 successfully. Merging the generated version PR then publishes to npm with
 trusted publishing and creates a Git tag and GitHub Release. A separate
 `Verify published package` job installs the exact version for ESM and CommonJS
-smoke tests. It receives the published version through job outputs, checks out
+capability and HTTP session checks. It receives the published version through job outputs, checks out
 the same release commit, and has only repository read permission. When creating
 a version PR without publishing, this verification job is skipped.
 
@@ -304,5 +321,5 @@ version output. Do not republish or bump a version just to rerun verification.
 The release workflow uses Changesets CLI v3 with an immutable-pinned
 Changesets Action v2. Run `pnpm test:release-workflow` after changing release
 automation; it verifies the CLI/config generation, action pin, token input,
-and v2 input names. Infrastructure-only changes use an empty changeset and do
-not bump the published package version.
+and v2 input names. Changes limited to verification or development tools do not
+require a published package version bump.

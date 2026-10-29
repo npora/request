@@ -48,6 +48,13 @@ Logging out cancels an active old-session request, clears its cache and token,
 and rejects further use; the other account's token and cached profile survive.
 The example runs in CI without a server or credentials.
 
+For installed-package verification over actual HTTP, run `pnpm build` followed
+by `pnpm test:package`, or run `pnpm test:registry` against the published npm
+package. These checks repeat the session workflow through native Fetch and a
+local HTTP server in ESM and CommonJS, including server-observed cancellation.
+See [installed session verification](testing.md#package-checks) for coverage
+and limits.
+
 Give each session its own AbortController, client, auth plugin, token storage,
 and cache. Combine the session signal with any view/query signal:
 
