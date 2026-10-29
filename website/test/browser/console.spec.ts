@@ -41,7 +41,12 @@ test('all ten real scenarios complete and report actual network activity', async
       expect(requests.match(/401/g)).toHaveLength(2)
       expect(requests.match(/GET \/api\/auth/g)).toHaveLength(4)
     }
-    if (id === 'traffic') expect(output).toContain('RATE_LIMIT')
+    if (id === 'traffic') {
+      expect(output).toContain('RATE_LIMIT')
+      const probe = await page.locator('#requests').innerText()
+      expect(probe.match(/GET \/api\/traffic-probe/g)).toHaveLength(2)
+      expect(probe).toMatch(/traffic-probe\s+429[\s\S]*traffic-probe\s+200/)
+    }
   }
   expect(errors).toEqual([])
   await page.screenshot({ path: testInfo.outputPath('console-complete.png'), fullPage: true })

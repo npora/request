@@ -15,7 +15,7 @@ export function json(data, status = 200, headers = {}) {
 const methods = {
   user: 'GET', schema: 'GET', query: 'QUERY', sse: 'GET', ndjson: 'GET',
   retry: 'GET', timeout: 'GET', upload: 'POST', download: 'GET',
-  auth: 'GET', refresh: 'POST', traffic: 'GET', health: 'GET'
+  auth: 'GET', refresh: 'POST', traffic: 'GET', 'traffic-probe': 'GET', health: 'GET'
 }
 const limit = 2 * 1024 * 1024
 
@@ -25,7 +25,7 @@ export async function handleApi(request, env) {
   if (request.method !== methods[route]) {
     return json({ error: `Use ${methods[route]}` }, 405, { allow: methods[route] })
   }
-  if (['retry', 'auth', 'refresh', 'traffic', 'health'].includes(route)) {
+  if (['retry', 'auth', 'refresh', 'traffic', 'traffic-probe', 'health'].includes(route)) {
     if (!env.DEMO_STATE) return json({ error: 'Deploy the demo state Worker and bind DEMO_STATE first', code: 'DEMO_SETUP_REQUIRED' }, 503)
     const session = request.headers.get('x-demo-session') ?? ''
     if (route !== 'health' && !/^[a-zA-Z0-9-]{1,64}$/.test(session)) {
@@ -177,6 +177,13 @@ export class DemoState {
         response = state.token && request.headers.get('authorization') === `Bearer ${state.token}`
           ? json({ ...user, authenticated: true })
           : json({ error: 'Demo access token expired' }, 401)
+      } else if (route === 'traffic-probe') {
+        // A separately labelled fault probe guarantees a Retry-After example
+        // even when the visitor's network cannot deliver >5 requests/second.
+        state.probeUntil ??= now + 5000
+        response = now < state.probeUntil
+          ? json({ error: 'Intentional 429 recovery probe', probe: true }, 429, { 'retry-after': '5' })
+          : json({ accepted: true, probe: true })
       } else if (route === 'traffic') {
         state.hits = (state.hits ?? []).filter(time => now - time < 1000)
         if ((state.blockedUntil ?? 0) > now) {

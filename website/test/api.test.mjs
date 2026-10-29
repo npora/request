@@ -150,3 +150,13 @@ test('stream readers can cancel without leaving unresolved pulls', async () => {
     assert.equal((await reader.read()).done, true)
   }
 })
+
+test('the explicitly labelled recovery probe emits 429 then recovers independently of IP traffic', async () => {
+  const first = await request('/api/traffic-probe')
+  assert.equal(first.status, 429); assert.equal(first.headers.get('retry-after'), '5')
+  assert.equal((await first.json()).probe, true)
+  await new Promise(resolve => setTimeout(resolve, 5100))
+  const recovered = await request('/api/traffic-probe')
+  assert.equal(recovered.status, 200)
+  assert.deepEqual(await recovered.json(), { accepted: true, probe: true })
+})
