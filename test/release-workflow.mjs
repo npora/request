@@ -62,7 +62,8 @@ assert.equal(
 )
 assert.match(
   actionStep,
-  /uses: changesets\/action@72b60a2c449090fd1871c5578768a32a76011a9d # v2\.1\.0/
+  /uses: changesets\/action@[a-f0-9]{40} # v2\.\d+\.\d+\b/,
+  'The release action must use an immutable SHA and the supported v2 contract.'
 )
 assert.match(
   actionStep,
