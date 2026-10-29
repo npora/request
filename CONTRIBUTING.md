@@ -31,6 +31,11 @@ pnpm typecheck
 pnpm test
 ```
 
+Dependency resolution enforces peer compatibility. Keep the OpenTelemetry API
+within both test SDKs' declared peer ranges; the current `~1.9.1` range avoids
+API 1.10 while those SDKs require `<1.10.0`. Review these ranges together when
+updating the observability test dependencies.
+
 ## Making changes
 
 - Keep core request behavior small and stable.
