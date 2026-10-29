@@ -1,6 +1,6 @@
 {
   "name": "@npora/request",
-  "version": "1.21.0",
+  "version": "1.21.4",
   "description": "A modern, TypeScript-first HTTP client powered by the Fetch API.",
   "keywords": [
     "npora",
@@ -20,7 +20,7 @@
     "circuit-breaker",
     "web-worker"
   ],
-  "homepage": "https://github.com/npora/request",
+  "homepage": "https://npora.pages.dev",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/npora/request.git"
@@ -138,6 +138,10 @@
     "access": "public"
   },
   "scripts": {
+    "website:build": "npm --prefix website run build",
+    "website:dev": "npm --prefix website run dev",
+    "test:website": "npm --prefix website test",
+    "test:website:browser": "playwright test --config=website/playwright.config.ts",
     "clean": "node scripts/clean.mjs",
     "clean:dry-run": "node scripts/clean.mjs --dry-run",
     "dev": "tsdown --watch",

@@ -35,3 +35,8 @@ browser/test-results
 # Environment
 .env
 .env.*
+
+# Cloudflare local configuration and runtime metadata
+.wrangler/
+.dev.vars
+.dev.vars.*

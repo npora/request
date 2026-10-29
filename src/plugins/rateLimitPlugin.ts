@@ -57,6 +57,7 @@ interface RateLimitRecord {
 }
 
 interface QueueEntry {
+  owner: object
   config: RequestConfig
   prev?: QueueEntry
   next?: QueueEntry
@@ -81,6 +82,7 @@ export function rateLimitPlugin(
 ): RateLimitPlugin {
   const normalized = normalizeOptions(options)
   const records = new Map<string, RateLimitRecord>()
+  let installations = 0
 
   return {
     name: 'rate-limit',
@@ -104,6 +106,8 @@ export function rateLimitPlugin(
 
     install(context) {
       let active = true
+      const owner = {}
+      installations += 1
 
       context.hooks.onTransport(requestContext => {
         const requestOptions = resolveExtensionConfig(
@@ -160,7 +164,7 @@ export function rateLimitPlugin(
 
         const startedAt = Date.now()
 
-        return enqueue(record, requestContext.config, timeout, () => {
+        return enqueue(record, requestContext.config, timeout, owner, () => {
           schedule(record, records, normalized, active)
         }).then(() => {
           requestContext.rateLimitWaitTime += Math.max(
@@ -237,18 +241,22 @@ export function rateLimitPlugin(
 
       return () => {
         active = false
+        installations -= 1
 
         for (const record of records.values()) {
-          clearRecordTimer(record)
-
-          let entry: QueueEntry | undefined
-
-          while ((entry = shiftQueue(record))) {
-            entry.reject(createRemovedError(entry.config))
+          let entry = record.head
+          while (entry) {
+            const next = entry.next
+            if (entry.owner === owner) {
+              removeQueuedEntry(record, entry)
+              entry.reject(createRemovedError(entry.config))
+            }
+            entry = next
           }
+          if (record.size === 0) clearRecordTimer(record)
         }
 
-        records.clear()
+        if (installations === 0) records.clear()
       }
     }
   }
@@ -268,6 +276,7 @@ function enqueue(
   record: RateLimitRecord,
   config: RequestConfig,
   timeout: number,
+  owner: object,
   onQueued: () => void
 ): Promise<void> {
   const signal = config.signal
@@ -320,6 +329,7 @@ function enqueue(
       rejectOnce(createAbortError(signal?.reason, config))
     }
     const entry: QueueEntry = {
+      owner,
       config,
       linked: false,
       resolve: resolveOnce,

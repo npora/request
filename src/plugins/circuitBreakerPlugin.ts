@@ -93,6 +93,7 @@ interface Admission {
   generation: number
   probe: boolean
   record: CircuitRecord
+  released?: boolean
 }
 
 interface NormalizedOptions {
@@ -114,6 +115,7 @@ export function circuitBreakerPlugin(
   const normalized = normalizeOptions(options)
   const circuits = new Map<string, CircuitRecord>()
   let latestCircuit: CircuitRecord | undefined
+  let installations = 0
 
   const plugin: CircuitBreakerPlugin = {
     name: 'circuit-breaker',
@@ -136,8 +138,9 @@ export function circuitBreakerPlugin(
     },
 
     install(context) {
-      const admissions = new WeakMap<object, Admission>()
+      const admissions = new Map<object, Admission>()
       let active = true
+      installations += 1
 
       context.hooks.onRequest(requestContext => {
         const requestOptions = resolveExtensionConfig(
@@ -203,12 +206,15 @@ export function circuitBreakerPlugin(
           return
         }
 
-        admissions.delete(requestContext)
+        const finish = () => {
+          admissions.delete(requestContext)
+          finishAdmission(admission, circuits, normalized.maxCircuits)
+        }
 
         const record = admission.record
 
         if (!active) {
-          finishAdmission(admission, circuits, normalized.maxCircuits)
+          finish()
           return
         }
 
@@ -216,7 +222,7 @@ export function circuitBreakerPlugin(
           circuits.get(admission.key) !== record ||
           record.generation !== admission.generation
         ) {
-          finishAdmission(admission, circuits, normalized.maxCircuits)
+          finish()
           return
         }
 
@@ -231,7 +237,7 @@ export function circuitBreakerPlugin(
             }
           }
 
-          finishAdmission(admission, circuits, normalized.maxCircuits)
+          finish()
           return
         }
 
@@ -253,7 +259,7 @@ export function circuitBreakerPlugin(
             )
           }
         } catch (error) {
-          finishAdmission(admission, circuits, normalized.maxCircuits)
+          finish()
           throw error
         }
 
@@ -268,26 +274,27 @@ export function circuitBreakerPlugin(
                 normalized
               )
             })
-            .finally(() => {
-              finishAdmission(
-                admission,
-                circuits,
-                normalized.maxCircuits
-              )
-            })
+            .finally(finish)
         }
 
         try {
           applyFailure(counted, active, circuits, admission, normalized)
         } finally {
-          finishAdmission(admission, circuits, normalized.maxCircuits)
+          finish()
         }
       })
 
       return () => {
         active = false
-        latestCircuit = undefined
-        circuits.clear()
+        installations -= 1
+        for (const admission of admissions.values()) {
+          finishAdmission(admission, circuits, normalized.maxCircuits)
+        }
+        admissions.clear()
+        if (installations === 0) {
+          latestCircuit = undefined
+          circuits.clear()
+        }
       }
     }
   }
@@ -332,6 +339,8 @@ function finishAdmission(
   circuits: Map<string, CircuitRecord>,
   maxCircuits: number
 ): void {
+  if (admission.released) return
+  admission.released = true
   const record = admission.record
 
   if (admission.probe) {

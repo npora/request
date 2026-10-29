@@ -1,0 +1,559 @@
+{
+  "schemaVersion": 3,
+  "package": {
+    "name": "@npora/request",
+    "version": "1.21.3"
+  },
+  "runtime": {
+    "node": "v24.18.0",
+    "platform": "darwin",
+    "architecture": "arm64",
+    "cpuModel": "Apple M3",
+    "logicalCpus": 8
+  },
+  "provenance": {
+    "gitCommit": "1a86ff8d3b5968f9ef74d5f04911166fca10d9d5",
+    "gitDirty": false,
+    "buildSha256": "f7a12464a42ed8fdd815ae565c2a2db66cbdb8ddb17475955ada04f523f3c88b",
+    "dependencyLockSha256": "baeaa6e8e260b2cd6a2f1ec294260addac1193667313ee330c0fe2cf8d338609"
+  },
+  "generatedAt": "2026-10-29T08:12:36.585Z",
+  "bundler": "esbuild",
+  "bundlerVersion": "0.28.2",
+  "gzipLevel": 9,
+  "platform": "browser",
+  "format": "esm",
+  "target": "es2020",
+  "results": {
+    "schema errors only": {
+      "bytes": 370,
+      "gzipBytes": 268,
+      "inputFiles": 2,
+      "contributions": [
+        {
+          "path": "dist/schema-errors.js",
+          "bytesInOutput": 343
+        },
+        {
+          "path": "consumer-entry.js",
+          "bytesInOutput": 0
+        }
+      ]
+    },
+    "root: basic": {
+      "bytes": 47699,
+      "gzipBytes": 14522,
+      "inputFiles": 28,
+      "contributions": [
+        {
+          "path": "dist/createClient-BttEtWHl.js",
+          "bytesInOutput": 28210
+        },
+        {
+          "path": "dist/errorResponseTimeout-BEEJV0xA.js",
+          "bytesInOutput": 16498
+        },
+        {
+          "path": "dist/waitForSignal-BcVEtAgx.js",
+          "bytesInOutput": 742
+        },
+        {
+          "path": "dist/RequestError-B0HIY1zK.js",
+          "bytesInOutput": 579
+        },
+        {
+          "path": "dist/validateResponseStatus-BzkEtZZi.js",
+          "bytesInOutput": 532
+        },
+        {
+          "path": "dist/isBinaryBody-D-Wp2IPk.js",
+          "bytesInOutput": 525
+        },
+        {
+          "path": "dist/isReadableStream-DBMPCr6B.js",
+          "bytesInOutput": 209
+        },
+        {
+          "path": "dist/PluginError-CcuPSIRv.js",
+          "bytesInOutput": 200
+        },
+        {
+          "path": "dist/isPromiseLike-B6ok3Q-C.js",
+          "bytesInOutput": 101
+        },
+        {
+          "path": "consumer-entry.js",
+          "bytesInOutput": 73
+        }
+      ]
+    },
+    "core: basic": {
+      "bytes": 47699,
+      "gzipBytes": 14524,
+      "inputFiles": 12,
+      "contributions": [
+        {
+          "path": "dist/createClient-BttEtWHl.js",
+          "bytesInOutput": 28210
+        },
+        {
+          "path": "dist/errorResponseTimeout-BEEJV0xA.js",
+          "bytesInOutput": 16498
+        },
+        {
+          "path": "dist/waitForSignal-BcVEtAgx.js",
+          "bytesInOutput": 742
+        },
+        {
+          "path": "dist/RequestError-B0HIY1zK.js",
+          "bytesInOutput": 579
+        },
+        {
+          "path": "dist/validateResponseStatus-BzkEtZZi.js",
+          "bytesInOutput": 532
+        },
+        {
+          "path": "dist/isBinaryBody-D-Wp2IPk.js",
+          "bytesInOutput": 525
+        },
+        {
+          "path": "dist/isReadableStream-DBMPCr6B.js",
+          "bytesInOutput": 209
+        },
+        {
+          "path": "dist/PluginError-CcuPSIRv.js",
+          "bytesInOutput": 200
+        },
+        {
+          "path": "dist/isPromiseLike-B6ok3Q-C.js",
+          "bytesInOutput": 101
+        },
+        {
+          "path": "consumer-entry.js",
+          "bytesInOutput": 73
+        }
+      ]
+    },
+    "core + retry": {
+      "bytes": 52341,
+      "gzipBytes": 15880,
+      "inputFiles": 14,
+      "contributions": [
+        {
+          "path": "dist/createClient-BttEtWHl.js",
+          "bytesInOutput": 28210
+        },
+        {
+          "path": "dist/errorResponseTimeout-BEEJV0xA.js",
+          "bytesInOutput": 16502
+        },
+        {
+          "path": "dist/plugins/retry.js",
+          "bytesInOutput": 4575
+        },
+        {
+          "path": "dist/waitForSignal-BcVEtAgx.js",
+          "bytesInOutput": 742
+        },
+        {
+          "path": "dist/RequestError-B0HIY1zK.js",
+          "bytesInOutput": 579
+        },
+        {
+          "path": "dist/validateResponseStatus-BzkEtZZi.js",
+          "bytesInOutput": 532
+        },
+        {
+          "path": "dist/isBinaryBody-D-Wp2IPk.js",
+          "bytesInOutput": 525
+        },
+        {
+          "path": "dist/isReadableStream-DBMPCr6B.js",
+          "bytesInOutput": 209
+        },
+        {
+          "path": "dist/PluginError-CcuPSIRv.js",
+          "bytesInOutput": 200
+        },
+        {
+          "path": "dist/isPromiseLike-B6ok3Q-C.js",
+          "bytesInOutput": 101
+        },
+        {
+          "path": "consumer-entry.js",
+          "bytesInOutput": 94
+        },
+        {
+          "path": "dist/resolveExtensionConfig-C_MshvkE.js",
+          "bytesInOutput": 42
+        }
+      ]
+    },
+    "core + cache": {
+      "bytes": 68868,
+      "gzipBytes": 21022,
+      "inputFiles": 15,
+      "contributions": [
+        {
+          "path": "dist/createClient-BttEtWHl.js",
+          "bytesInOutput": 28225
+        },
+        {
+          "path": "dist/cachePlugin-BGfwCJRI.js",
+          "bytesInOutput": 21051
+        },
+        {
+          "path": "dist/errorResponseTimeout-BEEJV0xA.js",
+          "bytesInOutput": 16515
+        },
+        {
+          "path": "dist/waitForSignal-BcVEtAgx.js",
+          "bytesInOutput": 742
+        },
+        {
+          "path": "dist/RequestError-B0HIY1zK.js",
+          "bytesInOutput": 579
+        },
+        {
+          "path": "dist/validateResponseStatus-BzkEtZZi.js",
+          "bytesInOutput": 533
+        },
+        {
+          "path": "dist/isBinaryBody-D-Wp2IPk.js",
+          "bytesInOutput": 527
+        },
+        {
+          "path": "dist/isReadableStream-DBMPCr6B.js",
+          "bytesInOutput": 209
+        },
+        {
+          "path": "dist/PluginError-CcuPSIRv.js",
+          "bytesInOutput": 200
+        },
+        {
+          "path": "consumer-entry.js",
+          "bytesInOutput": 115
+        },
+        {
+          "path": "dist/isPromiseLike-B6ok3Q-C.js",
+          "bytesInOutput": 101
+        },
+        {
+          "path": "dist/resolveExtensionConfig-C_MshvkE.js",
+          "bytesInOutput": 41
+        }
+      ]
+    },
+    "core + memory cache": {
+      "bytes": 51575,
+      "gzipBytes": 15730,
+      "inputFiles": 14,
+      "contributions": [
+        {
+          "path": "dist/createClient-BttEtWHl.js",
+          "bytesInOutput": 28210
+        },
+        {
+          "path": "dist/errorResponseTimeout-BEEJV0xA.js",
+          "bytesInOutput": 16498
+        },
+        {
+          "path": "dist/plugins/memory-cache.js",
+          "bytesInOutput": 3752
+        },
+        {
+          "path": "dist/waitForSignal-BcVEtAgx.js",
+          "bytesInOutput": 742
+        },
+        {
+          "path": "dist/RequestError-B0HIY1zK.js",
+          "bytesInOutput": 579
+        },
+        {
+          "path": "dist/validateResponseStatus-BzkEtZZi.js",
+          "bytesInOutput": 532
+        },
+        {
+          "path": "dist/isBinaryBody-D-Wp2IPk.js",
+          "bytesInOutput": 525
+        },
+        {
+          "path": "dist/isReadableStream-DBMPCr6B.js",
+          "bytesInOutput": 209
+        },
+        {
+          "path": "dist/PluginError-CcuPSIRv.js",
+          "bytesInOutput": 200
+        },
+        {
+          "path": "consumer-entry.js",
+          "bytesInOutput": 155
+        },
+        {
+          "path": "dist/isPromiseLike-B6ok3Q-C.js",
+          "bytesInOutput": 101
+        },
+        {
+          "path": "dist/resolveExtensionConfig-C_MshvkE.js",
+          "bytesInOutput": 42
+        }
+      ]
+    },
+    "root: retry + cache": {
+      "bytes": 73468,
+      "gzipBytes": 22368,
+      "inputFiles": 28,
+      "contributions": [
+        {
+          "path": "dist/createClient-BttEtWHl.js",
+          "bytesInOutput": 28225
+        },
+        {
+          "path": "dist/cachePlugin-BGfwCJRI.js",
+          "bytesInOutput": 21051
+        },
+        {
+          "path": "dist/errorResponseTimeout-BEEJV0xA.js",
+          "bytesInOutput": 16515
+        },
+        {
+          "path": "dist/plugins/retry.js",
+          "bytesInOutput": 4579
+        },
+        {
+          "path": "dist/waitForSignal-BcVEtAgx.js",
+          "bytesInOutput": 742
+        },
+        {
+          "path": "dist/RequestError-B0HIY1zK.js",
+          "bytesInOutput": 579
+        },
+        {
+          "path": "dist/validateResponseStatus-BzkEtZZi.js",
+          "bytesInOutput": 533
+        },
+        {
+          "path": "dist/isBinaryBody-D-Wp2IPk.js",
+          "bytesInOutput": 527
+        },
+        {
+          "path": "dist/isReadableStream-DBMPCr6B.js",
+          "bytesInOutput": 209
+        },
+        {
+          "path": "dist/PluginError-CcuPSIRv.js",
+          "bytesInOutput": 200
+        },
+        {
+          "path": "consumer-entry.js",
+          "bytesInOutput": 136
+        },
+        {
+          "path": "dist/isPromiseLike-B6ok3Q-C.js",
+          "bytesInOutput": 101
+        },
+        {
+          "path": "dist/resolveExtensionConfig-C_MshvkE.js",
+          "bytesInOutput": 41
+        }
+      ]
+    },
+    "core + retry + cache": {
+      "bytes": 73468,
+      "gzipBytes": 22421,
+      "inputFiles": 16,
+      "contributions": [
+        {
+          "path": "dist/createClient-BttEtWHl.js",
+          "bytesInOutput": 28225
+        },
+        {
+          "path": "dist/cachePlugin-BGfwCJRI.js",
+          "bytesInOutput": 21051
+        },
+        {
+          "path": "dist/errorResponseTimeout-BEEJV0xA.js",
+          "bytesInOutput": 16515
+        },
+        {
+          "path": "dist/plugins/retry.js",
+          "bytesInOutput": 4579
+        },
+        {
+          "path": "dist/waitForSignal-BcVEtAgx.js",
+          "bytesInOutput": 742
+        },
+        {
+          "path": "dist/RequestError-B0HIY1zK.js",
+          "bytesInOutput": 579
+        },
+        {
+          "path": "dist/validateResponseStatus-BzkEtZZi.js",
+          "bytesInOutput": 533
+        },
+        {
+          "path": "dist/isBinaryBody-D-Wp2IPk.js",
+          "bytesInOutput": 527
+        },
+        {
+          "path": "dist/isReadableStream-DBMPCr6B.js",
+          "bytesInOutput": 209
+        },
+        {
+          "path": "dist/PluginError-CcuPSIRv.js",
+          "bytesInOutput": 200
+        },
+        {
+          "path": "consumer-entry.js",
+          "bytesInOutput": 136
+        },
+        {
+          "path": "dist/isPromiseLike-B6ok3Q-C.js",
+          "bytesInOutput": 101
+        },
+        {
+          "path": "dist/resolveExtensionConfig-C_MshvkE.js",
+          "bytesInOutput": 41
+        }
+      ]
+    }
+  },
+  "splitResults": {
+    "schema errors only": {
+      "initial": {
+        "bytes": 370,
+        "gzipBytes": 268,
+        "files": 1
+      },
+      "lazy": {
+        "bytes": 0,
+        "gzipBytes": 0,
+        "files": 0
+      },
+      "total": {
+        "bytes": 370,
+        "gzipBytes": 268,
+        "files": 1
+      }
+    },
+    "root: basic": {
+      "initial": {
+        "bytes": 47699,
+        "gzipBytes": 14522,
+        "files": 1
+      },
+      "lazy": {
+        "bytes": 0,
+        "gzipBytes": 0,
+        "files": 0
+      },
+      "total": {
+        "bytes": 47699,
+        "gzipBytes": 14522,
+        "files": 1
+      }
+    },
+    "core: basic": {
+      "initial": {
+        "bytes": 47699,
+        "gzipBytes": 14524,
+        "files": 1
+      },
+      "lazy": {
+        "bytes": 0,
+        "gzipBytes": 0,
+        "files": 0
+      },
+      "total": {
+        "bytes": 47699,
+        "gzipBytes": 14524,
+        "files": 1
+      }
+    },
+    "core + retry": {
+      "initial": {
+        "bytes": 52341,
+        "gzipBytes": 15880,
+        "files": 1
+      },
+      "lazy": {
+        "bytes": 0,
+        "gzipBytes": 0,
+        "files": 0
+      },
+      "total": {
+        "bytes": 52341,
+        "gzipBytes": 15880,
+        "files": 1
+      }
+    },
+    "core + cache": {
+      "initial": {
+        "bytes": 68868,
+        "gzipBytes": 21022,
+        "files": 1
+      },
+      "lazy": {
+        "bytes": 0,
+        "gzipBytes": 0,
+        "files": 0
+      },
+      "total": {
+        "bytes": 68868,
+        "gzipBytes": 21022,
+        "files": 1
+      }
+    },
+    "core + memory cache": {
+      "initial": {
+        "bytes": 51575,
+        "gzipBytes": 15730,
+        "files": 1
+      },
+      "lazy": {
+        "bytes": 0,
+        "gzipBytes": 0,
+        "files": 0
+      },
+      "total": {
+        "bytes": 51575,
+        "gzipBytes": 15730,
+        "files": 1
+      }
+    },
+    "root: retry + cache": {
+      "initial": {
+        "bytes": 73468,
+        "gzipBytes": 22368,
+        "files": 1
+      },
+      "lazy": {
+        "bytes": 0,
+        "gzipBytes": 0,
+        "files": 0
+      },
+      "total": {
+        "bytes": 73468,
+        "gzipBytes": 22368,
+        "files": 1
+      }
+    },
+    "core + retry + cache": {
+      "initial": {
+        "bytes": 73468,
+        "gzipBytes": 22421,
+        "files": 1
+      },
+      "lazy": {
+        "bytes": 0,
+        "gzipBytes": 0,
+        "files": 0
+      },
+      "total": {
+        "bytes": 73468,
+        "gzipBytes": 22421,
+        "files": 1
+      }
+    }
+  }
+}

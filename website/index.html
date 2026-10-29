@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="@npora/request — TypeScript 优先、零运行时依赖的 Fetch 请求库。在线体验校验、流式响应、自动重试和流量控制。">
+  <meta name="theme-color" content="#f5f6f8">
+  <title>Npora Request · 每一次请求，都从容可控</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/style.css">
+  <script type="module" src="/app.js"></script>
+</head>
+<body>
+  <a class="skip" href="#playground">跳到测试控制台</a>
+  <header class="nav wrap">
+    <a class="brand" href="/" aria-label="Npora Request 首页"><span class="brand-mark">n<span>↗</span></span> npora<span class="brand-light">/ request</span></a>
+    <nav aria-label="主导航"><a href="#playground">在线体验</a><a href="https://github.com/npora/request#readme">文档 ↗</a><a class="github" href="https://github.com/npora/request">GitHub ↗</a></nav>
+  </header>
+  <main>
+    <section class="hero wrap">
+      <div class="hero-copy">
+        <div class="eyebrow"><span class="dot"></span> THE REQUESTS, UNDER CONTROL. <span class="version">v<span data-version>—</span></span></div>
+        <h1>每一次请求，<br>都<span class="accent">从容可控。</span></h1>
+        <p class="intro">从第一行 Fetch，到复杂的生产链路。<br>类型安全、流式响应与可组合的韧性，一套轻盈的请求体验。</p>
+        <div class="hero-actions"><a class="primary link-button" href="#playground">亲手试一次 <span>↗</span></a><button id="copy-install" class="install" type="button"><span class="prompt">$</span> npm i @npora/request <span aria-hidden="true">⧉</span></button></div>
+        <p id="copy-status" class="small" role="status"></p>
+        <div class="features"><span><b>0</b> 运行时依赖</span><span><b>TS</b> 类型优先</span><span><b>Fetch</b> 原生内核</span></div>
+      </div>
+      <div class="hero-code" aria-label="请求库代码示例">
+        <div class="code-bar"><span class="window-dots">● ● ●</span><span>your-next-request.ts</span><span>TypeScript</span></div>
+        <pre><code><span class="purple">import</span> { createClient } <span class="purple">from</span> <span class="green">'@npora/request/core'</span>
+<span class="purple">import</span> { retryPlugin } <span class="purple">from</span>
+  <span class="green">'@npora/request/plugins/retry'</span>
+
+<span class="purple">const</span> api = <span class="blue">createClient</span>({ baseURL: <span class="green">'/api'</span> })
+  .<span class="blue">use</span>(<span class="blue">retryPlugin</span>({ retries: <span class="orange">2</span> }))
+
+<span class="muted-code">// 少一点样板，多一点确定。</span>
+<span class="purple">const</span> user = <span class="purple">await</span> api.<span class="blue">get</span>&lt;User&gt;(<span class="green">'/user'</span>)
+console.<span class="blue">log</span>(user.name)</code></pre>
+        <div class="code-footer"><span class="dot"></span> Ready for your next idea <span>↗</span></div>
+      </div>
+    </section>
+    <section id="playground" class="playground wrap" aria-labelledby="playground-title">
+      <div class="section-heading"><div><div class="eyebrow">LIVE PLAYGROUND / 01—10</div><h2 id="playground-title">代码的事，让请求说话。</h2><p>每次点击都发出真实请求。失败、恢复与每一个数据块，都看得见。</p></div><div class="connection"><span class="dot"></span> 同源 Cloudflare API</div></div>
+      <div class="workspace">
+        <aside class="scenario-nav"><div class="sidebar-title">选择一个场景 <span>10</span></div><div id="scenarios" role="group" aria-label="测试场景"></div><div class="sidebar-note">真实运行当前仓库的请求库<br>无需 API Key · 无需登录</div></aside>
+        <div class="workspace-main">
+          <div class="demo-heading"><div><span id="demo-tag" class="tag"></span><h3 id="demo-title"></h3><p id="demo-description"></p></div><span id="outcome" class="outcome" role="status" data-outcome="idle">等待运行</span></div>
+          <div class="demo-body"><div class="snippet"><div class="panel-label"><span>示例代码</span><span>TypeScript</span></div><pre><code id="demo-code"></code></pre></div><div class="result-panel"><div class="panel-label"><span>实时输出</span><span id="stream-state">READY</span></div><pre id="output" aria-label="实时测试输出" aria-live="polite">选择运行，观察真实响应。</pre><div id="transfers" hidden><label>上传 <span id="upload-label">0%</span><progress id="upload-progress" max="1" value="0"></progress></label><label>下载 <span id="download-label">0%</span><progress id="download-progress" max="1" value="0"></progress></label></div></div></div>
+          <div class="runbar"><div class="run-actions"><button id="run" class="primary" type="button">▶ 运行场景</button><button id="stop" type="button" disabled>停止</button><button id="run-all" type="button">依次运行全部</button></div><span id="elapsed">准备就绪</span></div>
+          <div class="network"><div class="network-heading"><h4><span class="dot"></span> 请求记录 <span id="request-count">0</span></h4><button id="clear" type="button">清空</button></div><div class="table-scroll"><table><caption class="sr-only">本次测试的真实网络请求</caption><thead><tr><th>方法 / 路径</th><th>状态</th><th>耗时</th></tr></thead><tbody id="requests"><tr class="empty-row"><td colspan="3">运行后，实际发出的每次请求会显示在这里。</td></tr></tbody></table></div></div>
+        </div>
+      </div>
+      <p class="playground-note">这是有意制造故障的演示环境：Schema 拒绝、超时和限流是预期结果。上传使用 1 MiB 示例文件，接口最大接收 2 MiB；不会保存上传文件。</p>
+    </section>
+    <section class="principles wrap"><div><span>01 / TYPES</span><h3>让边界，更明确。</h3><p>泛型描述预期，Standard Schema 校验现实。错误有稳定的代码，也有具体的字段路径。</p></div><div><span>02 / STREAMS</span><h3>让数据，先一步到达。</h3><p>SSE 与 NDJSON 增量消费。异步迭代、取消和背压，贴近 Web 平台本来的样子。</p></div><div><span>03 / PLUGINS</span><h3>让复杂，按需组合。</h3><p>重试、鉴权、熔断与流量控制。只引入业务需要的插件，保留轻量的核心。</p></div></section>
+  </main>
+  <footer class="wrap"><a class="brand" href="/">npora<span class="brand-light">/ request</span></a><span>Built on Fetch. Made for what’s next.</span><a href="https://github.com/npora/request/blob/main/LICENSE">MIT License ↗</a></footer>
+</body>
+</html>
