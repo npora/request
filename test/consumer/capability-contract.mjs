@@ -1,7 +1,28 @@
 import assert from 'node:assert/strict'
 
 /** Shared by offline tarball and actual registry-installed ESM/CJS consumers. */
-export async function checkCapabilityContract({ createClient, TieredCacheStore, MemoryCacheStore, toFormErrors }, format) {
+export async function checkCapabilityContract({ createClient, TieredCacheStore, MemoryCacheStore, toFormErrors, concurrencyPlugin }, format) {
+  const releases = []
+  let started
+  const firstStarted = new Promise(resolve => { started = resolve })
+  const fetch = () => new Promise(resolve => { releases.push(resolve); started() })
+  const permits = concurrencyPlugin({ maxConcurrent: 1 })
+  const firstClient = createClient({ fetch }).use(permits)
+  const secondClient = createClient({ fetch }).use(permits)
+  const first = firstClient.get('/first')
+  await firstStarted
+  const secondStarted = new Promise(resolve => { started = resolve })
+  const second = secondClient.get('/second')
+  releases[0](new Response('first'))
+  assert.equal(await first, 'first')
+  await secondStarted
+  firstClient.unuse('concurrency')
+  assert.deepEqual(permits.getState('default'), { active: 1, queued: 0 })
+  releases[1](new Response('second'))
+  assert.equal(await second, 'second')
+  assert.deepEqual(permits.getState('default'), { active: 0, queued: 0 })
+  secondClient.unuse('concurrency')
+
   const errors = toFormErrors([
     { path: ['users', 0, 'name'], message: 'Required' },
     { path: ['users', 0, 'name'], message: 'Too short' },
@@ -47,5 +68,5 @@ export async function checkCapabilityContract({ createClient, TieredCacheStore, 
   store.set('installed', { data: 'cached', expiresAt: Infinity, status: 200, statusText: 'OK', headers: [] })
   assert.equal(store.get('installed').data, 'cached')
   store.dispose()
-  console.log(`${format}: installed SSE, form mapping and cache capability contracts passed.`)
+  console.log(`${format}: installed shared concurrency, SSE, form mapping and cache capability contracts passed.`)
 }

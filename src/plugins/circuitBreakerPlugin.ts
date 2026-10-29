@@ -114,6 +114,7 @@ export function circuitBreakerPlugin(
   const normalized = normalizeOptions(options)
   const circuits = new Map<string, CircuitRecord>()
   let latestCircuit: CircuitRecord | undefined
+  let installations = 0
 
   const plugin: CircuitBreakerPlugin = {
     name: 'circuit-breaker',
@@ -136,8 +137,9 @@ export function circuitBreakerPlugin(
     },
 
     install(context) {
-      const admissions = new WeakMap<object, Admission>()
+      const admissions = new Map<object, Admission>()
       let active = true
+      installations += 1
 
       context.hooks.onRequest(requestContext => {
         const requestOptions = resolveExtensionConfig(
@@ -286,8 +288,15 @@ export function circuitBreakerPlugin(
 
       return () => {
         active = false
-        latestCircuit = undefined
-        circuits.clear()
+        installations -= 1
+        for (const admission of admissions.values()) {
+          finishAdmission(admission, circuits, normalized.maxCircuits)
+        }
+        admissions.clear()
+        if (installations === 0) {
+          latestCircuit = undefined
+          circuits.clear()
+        }
       }
     }
   }

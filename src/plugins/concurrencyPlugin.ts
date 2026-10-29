@@ -63,7 +63,7 @@ interface ConcurrencyRecord {
 }
 
 interface QueueEntry {
-  context: object
+  owner: object
   config: RequestConfig
   prev?: QueueEntry
   next?: QueueEntry
@@ -85,6 +85,7 @@ export function concurrencyPlugin(
 ): ConcurrencyPlugin {
   const normalized = normalizeOptions(options)
   const records = new Map<string, ConcurrencyRecord>()
+  let installations = 0
 
   return {
     name: 'concurrency',
@@ -99,7 +100,9 @@ export function concurrencyPlugin(
     },
 
     install(context) {
-      const admissions = new WeakMap<object, ConcurrencyRecord>()
+      const admissions = new Map<object, ConcurrencyRecord>()
+      const owner = {}
+      installations += 1
       let active = true
 
       context.hooks.onRequest(requestContext => {
@@ -142,7 +145,9 @@ export function concurrencyPlugin(
           normalized.queueTimeout
         )
 
-        return enqueue(record, requestContext, timeout).then(() => {
+        return enqueue(record, requestContext, timeout, owner, () => {
+          admissions.set(requestContext, record)
+        }).then(() => {
           if (!active) {
             throw createRemovedError(requestContext.config)
           }
@@ -162,32 +167,30 @@ export function concurrencyPlugin(
           return
         }
 
-        releaseNext(record, entry => {
-          admissions.set(entry.context, record)
-          entry.resolve()
-        })
-
-        if (
-          record.active === 0 &&
-          record.size === 0
-        ) {
-          touchRecord(records, record.key, record)
-          trimRecords(records, normalized.maxKeys)
-        }
+        releaseAdmission(record, records, normalized.maxKeys)
       })
 
       return () => {
         active = false
+        installations -= 1
 
         for (const record of records.values()) {
-          let entry: QueueEntry | undefined
-
-          while ((entry = shiftQueue(record))) {
-            entry.reject(createRemovedError(entry.config))
+          let entry = record.head
+          while (entry) {
+            const next = entry.next
+            if (entry.owner === owner) {
+              removeQueuedEntry(record, entry)
+              entry.reject(createRemovedError(entry.config))
+            }
+            entry = next
           }
         }
 
-        records.clear()
+        for (const record of admissions.values()) {
+          releaseAdmission(record, records, normalized.maxKeys)
+        }
+        admissions.clear()
+        if (installations === 0) records.clear()
       }
     }
   }
@@ -198,7 +201,9 @@ function enqueue(
   context: {
     config: RequestConfig
   },
-  timeout: number
+  timeout: number,
+  owner: object,
+  onAdmitted: () => void
 ): Promise<void> {
   const { config } = context
   const signal = config.signal
@@ -246,6 +251,7 @@ function enqueue(
 
       settled = true
       cleanup()
+      onAdmitted()
       resolve()
     }
     const onAbort = () => {
@@ -253,7 +259,7 @@ function enqueue(
       rejectOnce(createAbortError(signal?.reason, config))
     }
     const entry: QueueEntry = {
-      context,
+      owner,
       config,
       linked: false,
       resolve: resolveOnce,
@@ -301,18 +307,23 @@ function enqueue(
   })
 }
 
-function releaseNext(
+function releaseAdmission(
   record: ConcurrencyRecord,
-  grant: (entry: QueueEntry) => void
+  records: Map<string, ConcurrencyRecord>,
+  maxKeys: number
 ): void {
   const next = shiftQueue(record)
 
   if (next) {
-    grant(next)
+    next.resolve()
     return
   }
 
   record.active = Math.max(0, record.active - 1)
+  if (record.active === 0) {
+    touchRecord(records, record.key, record)
+    trimRecords(records, maxKeys)
+  }
 }
 
 function getRecord(
