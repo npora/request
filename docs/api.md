@@ -935,6 +935,14 @@ const metricsPlugin: Plugin = {
 - A plugin cannot be removed while another installed plugin requires it.
 - Failed plugin installation automatically rolls back scoped registrations.
 
+The same concurrency, rate-limit, or circuit-breaker plugin instance can be
+installed on multiple clients to share its limits and state. Create separate
+instances for independent budgets. Removing it from one client rejects only
+that client's queued requests and releases its concurrency/probe admissions;
+other installations retain their queues, rolling budgets, Retry-After cooldowns,
+and circuit state. Removing the last installation clears the shared state and
+queue timers. Removal does not cancel an already-started transport.
+
 Plugin lifecycle failures throw `PluginError` with one of these codes:
 
 ```ts

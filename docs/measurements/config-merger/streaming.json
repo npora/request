@@ -1,0 +1,68 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-10-29T08:27:12.870Z",
+  "runtime": {
+    "node": "v24.18.0",
+    "platform": "darwin",
+    "architecture": "arm64"
+  },
+  "configuration": {
+    "recordsPerFormat": 1000000,
+    "warmup": 1000,
+    "chunkSize": 65521
+  },
+  "summary": {
+    "recordsValidated": 2000000,
+    "validationFailuresVerified": 2,
+    "cancellationPropagationsVerified": 2
+  },
+  "scenarios": {
+    "ndjson": {
+      "records": 1000000,
+      "durationMs": 1274.568584,
+      "recordsPerSecond": 784579.2000158071,
+      "retainedHeapDeltaBytes": 189264,
+      "preCollectionHeapDeltaBytes": 66994720,
+      "checksum": 499999500000,
+      "chunks": 258,
+      "slowConsumerYields": 100,
+      "sourceCancelled": false
+    },
+    "sse": {
+      "records": 1000000,
+      "durationMs": 2257.9715,
+      "recordsPerSecond": 442875.38615965704,
+      "retainedHeapDeltaBytes": 87448,
+      "preCollectionHeapDeltaBytes": 15615808,
+      "checksum": 499999500000,
+      "chunks": 562,
+      "slowConsumerYields": 100,
+      "sourceCancelled": false
+    }
+  },
+  "validationFailures": {
+    "ndjson": {
+      "code": "SCHEMA_ERROR",
+      "itemIndex": 1,
+      "lineNumber": 2,
+      "sourceCancelled": true
+    },
+    "sse": {
+      "code": "SCHEMA_ERROR",
+      "itemIndex": 1,
+      "event": "item",
+      "eventId": "1",
+      "sourceCancelled": true
+    }
+  },
+  "cancellation": {
+    "ndjson": {
+      "consumed": 10,
+      "sourceCancelled": true
+    },
+    "sse": {
+      "consumed": 10,
+      "sourceCancelled": true
+    }
+  }
+}

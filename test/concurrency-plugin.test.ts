@@ -11,6 +11,64 @@ afterEach(() => {
 })
 
 describe('concurrencyPlugin', () => {
+  it('does not release another installation\'s active permit during removal', async () => {
+    const adapter = new ControlledAdapter()
+    const permits = concurrencyPlugin({ maxConcurrent: 1 })
+    const firstClient = createClient({ adapter }).use(permits)
+    const secondClient = createClient({ adapter }).use(permits)
+    const first = secondClient.get('/active')
+    const removed = firstClient.get('/removed').catch(error => error)
+    const next = secondClient.get('/next')
+    await flush()
+    firstClient.unuse('concurrency')
+    expect(await removed).toMatchObject({ code: 'ABORT_ERROR' })
+    expect(permits.getState('default')).toEqual({ active: 1, queued: 1 })
+    expect(adapter.started).toEqual(['/active'])
+    adapter.complete('/active')
+    await first
+    await flush()
+    adapter.complete('/next')
+    await next
+    expect(permits.getState('default')).toEqual({ active: 0, queued: 0 })
+  })
+
+  it('releases permits granted to another client sharing the plugin', async () => {
+    const adapter = new ControlledAdapter()
+    const permits = concurrencyPlugin({ maxConcurrent: 1 })
+    const firstClient = createClient({ adapter }).use(permits)
+    const secondClient = createClient({ adapter }).use(permits)
+    const first = firstClient.get('/first')
+    const second = secondClient.get('/second')
+    await flush()
+    adapter.complete('/first')
+    await first
+    await flush()
+    adapter.complete('/second')
+    await second
+    expect(permits.getState('default')).toEqual({ active: 0, queued: 0 })
+  })
+
+  it('removes only its own queued requests and hands off its active permits', async () => {
+    const adapter = new ControlledAdapter()
+    const permits = concurrencyPlugin({ maxConcurrent: 1 })
+    const firstClient = createClient({ adapter }).use(permits)
+    const secondClient = createClient({ adapter }).use(permits)
+    const first = firstClient.get('/first')
+    const removed = firstClient.get('/removed').catch(error => error)
+    const second = secondClient.get('/second').catch(error => error)
+    await flush()
+    firstClient.unuse('concurrency')
+    expect(await removed).toMatchObject({ code: 'ABORT_ERROR' })
+    await flush()
+    expect(adapter.started).toEqual(['/first', '/second'])
+    adapter.complete('/first')
+    await first
+    expect(permits.getState('default')).toEqual({ active: 1, queued: 0 })
+    adapter.complete('/second')
+    expect(await second).toEqual({ ok: true })
+    expect(permits.getState('default')).toEqual({ active: 0, queued: 0 })
+  })
+
   it('should limit active requests and admit queued requests in FIFO order', async () => {
     const adapter = new ControlledAdapter()
     const concurrency = concurrencyPlugin({

@@ -1,0 +1,543 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-29T08:27:09.105Z",
+  "runtime": {
+    "node": "v24.18.0",
+    "platform": "darwin",
+    "architecture": "arm64"
+  },
+  "configuration": {
+    "operations": 5000,
+    "concurrency": 50,
+    "warmup": 250,
+    "samples": 4096,
+    "budgetOperationsPerRound": 1000,
+    "budgetRounds": 5
+  },
+  "pairedRatios": {
+    "bareSequentialClient/directAdapter": [
+      0.5380644117051427,
+      0.5571972609311803,
+      0.5720069029576225,
+      0.5830904699078069,
+      0.5287574608727938
+    ],
+    "jsonBodySequentialClient/bareSequentialClient": [
+      0.8417004765147944,
+      0.9109081644924378,
+      0.8213257809448258,
+      0.8226146008290652,
+      0.8221243640905826
+    ],
+    "sequentialPluginPipeline/bareSequentialClient": [
+      0.17920873346286328,
+      0.18705088486853302,
+      0.18146843399460325,
+      0.1874418715955532,
+      0.205641704151047
+    ],
+    "cachePrimitiveHitClient/bareSequentialClient": [
+      0.28816276955445214,
+      0.24303137131469332,
+      0.2684882829389659,
+      0.27272647398840305,
+      0.27483939100586097
+    ],
+    "rateLimitImmediateClient/bareSequentialClient": [
+      0.5342063071207322,
+      0.6125799270935166,
+      0.510341470828923,
+      0.5179844019481458,
+      0.5261120076494092
+    ],
+    "openTelemetryMetricsImmediateClient/bareSequentialClient": [
+      0.43352306365871646,
+      0.3708936102868804,
+      0.3691235530356833,
+      0.3539647308726027,
+      0.37550436107975776
+    ]
+  },
+  "scenarios": {
+    "directAdapter": {
+      "operations": 5000,
+      "latencySamples": 4096,
+      "durationMs": 4.967833000000013,
+      "operationsPerSecond": 1006475.0566293165,
+      "heapDeltaBytes": 284832,
+      "latencyMs": {
+        "mean": 0.0009270568847656938,
+        "p50": 0.0007919999999899119,
+        "p95": 0.0010000000000047748,
+        "p99": 0.001458000000013726,
+        "max": 0.13954200000000583
+      }
+    },
+    "bareRequestApi": {
+      "operations": 5000,
+      "latencySamples": 4096,
+      "durationMs": 8.152542000000011,
+      "operationsPerSecond": 613305.641357014,
+      "heapDeltaBytes": 1260512,
+      "latencyMs": {
+        "mean": 0.0015691813964842719,
+        "p50": 0.001333000000016682,
+        "p95": 0.0018750000000125056,
+        "p99": 0.0030000000000143245,
+        "max": 0.16833300000001827
+      }
+    },
+    "bareRequestResponseApi": {
+      "operations": 5000,
+      "latencySamples": 4096,
+      "durationMs": 6.155500000000018,
+      "operationsPerSecond": 812281.6992933126,
+      "heapDeltaBytes": 418640,
+      "latencyMs": {
+        "mean": 0.001198987304687607,
+        "p50": 0.001125000000001819,
+        "p95": 0.0012499999999988631,
+        "p99": 0.0015420000000005984,
+        "max": 0.12999999999999545
+      }
+    },
+    "sequentialClient": {
+      "operations": 5000,
+      "latencySamples": 4096,
+      "durationMs": 12.591791,
+      "operationsPerSecond": 397084.10026818264,
+      "heapDeltaBytes": 1200736,
+      "latencyMs": {
+        "mean": 0.002488414794921935,
+        "p50": 0.002375000000000682,
+        "p95": 0.0025420000000053733,
+        "p99": 0.0030000000000143245,
+        "max": 0.17062500000000114
+      }
+    },
+    "bareSequentialClient": {
+      "operations": 5000,
+      "latencySamples": 4096,
+      "durationMs": 5.345832999999999,
+      "operationsPerSecond": 935307.9304946491,
+      "heapDeltaBytes": 50816,
+      "latencyMs": {
+        "mean": 0.0010424606933594482,
+        "p50": 0.0009589999999946031,
+        "p95": 0.0010410000000149466,
+        "p99": 0.0012920000000065102,
+        "max": 0.10020900000000665
+      }
+    },
+    "jsonBodySequentialClient": {
+      "operations": 5000,
+      "latencySamples": 4096,
+      "durationMs": 6.523458000000005,
+      "operationsPerSecond": 766464.6572416035,
+      "heapDeltaBytes": 365752,
+      "latencyMs": {
+        "mean": 0.0012449631347655893,
+        "p50": 0.0012080000000196378,
+        "p95": 0.0013749999999959073,
+        "p99": 0.0015409999999747015,
+        "max": 0.030583000000007132
+      }
+    },
+    "sequentialPluginPipeline": {
+      "operations": 5000,
+      "latencySamples": 4096,
+      "durationMs": 32.04620799999998,
+      "operationsPerSecond": 156024.70033271966,
+      "heapDeltaBytes": -1934832,
+      "latencyMs": {
+        "mean": 0.006365297363282008,
+        "p50": 0.0061249999999972715,
+        "p95": 0.006666999999993095,
+        "p99": 0.009208999999998468,
+        "max": 0.11212500000004866
+      }
+    },
+    "singleAsyncHookLifecycleClient": {
+      "operations": 5000,
+      "latencySamples": 4096,
+      "durationMs": 14.828041999999982,
+      "operationsPerSecond": 337198.9369870955,
+      "heapDeltaBytes": -3765296,
+      "latencyMs": {
+        "mean": 0.0029426943359369684,
+        "p50": 0.0027499999999918145,
+        "p95": 0.002916999999968084,
+        "p99": 0.004541000000017448,
+        "max": 0.14291699999995444
+      }
+    },
+    "concurrentClient": {
+      "operations": 5000,
+      "latencySamples": 4096,
+      "durationMs": 12.140999999999963,
+      "operationsPerSecond": 411827.6912939639,
+      "heapDeltaBytes": -1867720,
+      "latencyMs": {
+        "mean": 0.11981352099609306,
+        "p50": 0.11204200000003084,
+        "p95": 0.15383299999996325,
+        "p99": 0.27124999999995225,
+        "max": 0.27625000000000455
+      }
+    },
+    "concurrentPluginPipeline": {
+      "operations": 5000,
+      "latencySamples": 4096,
+      "durationMs": 30.835542000000032,
+      "operationsPerSecond": 162150.54692406557,
+      "heapDeltaBytes": 6389968,
+      "latencyMs": {
+        "mean": 0.3060246679687503,
+        "p50": 0.2988339999999994,
+        "p95": 0.3509159999999838,
+        "p99": 0.47424999999998363,
+        "max": 0.49937499999998636
+      }
+    },
+    "cacheHitClient": {
+      "operations": 5000,
+      "latencySamples": 4096,
+      "durationMs": 31.156665999999973,
+      "operationsPerSecond": 160479.30160435024,
+      "heapDeltaBytes": -2081784,
+      "latencyMs": {
+        "mean": 0.006152280517577588,
+        "p50": 0.005625000000009095,
+        "p95": 0.007125000000030468,
+        "p99": 0.012791999999990367,
+        "max": 0.43100000000004
+      }
+    },
+    "cachePrimitiveHitClient": {
+      "operations": 5000,
+      "latencySamples": 4096,
+      "durationMs": 21.658042000000023,
+      "operationsPerSecond": 230861.1277048957,
+      "heapDeltaBytes": 1555376,
+      "latencyMs": {
+        "mean": 0.004336156494140611,
+        "p50": 0.003958000000011452,
+        "p95": 0.004583000000025095,
+        "p99": 0.0077500000000441105,
+        "max": 0.5116250000000377
+      }
+    },
+    "cacheStaleWhileRevalidateClient": {
+      "operations": 5000,
+      "latencySamples": 4096,
+      "durationMs": 112.22449999999998,
+      "operationsPerSecond": 44553.55114079369,
+      "heapDeltaBytes": -5057384,
+      "latencyMs": {
+        "mean": 0.022459297119141117,
+        "p50": 0.021374999999977717,
+        "p95": 0.024583999999947537,
+        "p99": 0.03329100000001972,
+        "max": 0.6562080000000492
+      }
+    },
+    "cacheMissClient": {
+      "operations": 5000,
+      "latencySamples": 4096,
+      "durationMs": 26.112042000000088,
+      "operationsPerSecond": 191482.53514604422,
+      "heapDeltaBytes": 1968768,
+      "latencyMs": {
+        "mean": 0.005170740234374804,
+        "p50": 0.004667000000040389,
+        "p95": 0.0060000000000854925,
+        "p99": 0.011665999999991072,
+        "max": 0.1956670000000713
+      }
+    },
+    "cacheDedupeClient": {
+      "operations": 5000,
+      "latencySamples": 4096,
+      "durationMs": 28.018374999999992,
+      "operationsPerSecond": 178454.31792529015,
+      "heapDeltaBytes": -2174592,
+      "latencyMs": {
+        "mean": 0.2786677951660157,
+        "p50": 0.26237500000002,
+        "p95": 0.35775000000001,
+        "p99": 0.851415999999972,
+        "max": 1.0321249999999509
+      }
+    },
+    "concurrencyImmediateClient": {
+      "operations": 5000,
+      "latencySamples": 4096,
+      "durationMs": 23.397333000000003,
+      "operationsPerSecond": 213699.56994671142,
+      "heapDeltaBytes": 4464592,
+      "latencyMs": {
+        "mean": 0.004646853027343856,
+        "p50": 0.00437499999998181,
+        "p95": 0.005083000000013271,
+        "p99": 0.008541000000036547,
+        "max": 0.15491700000006858
+      }
+    },
+    "rateLimitImmediateClient": {
+      "operations": 5000,
+      "latencySamples": 4096,
+      "durationMs": 10.651583000000073,
+      "operationsPerSecond": 469413.795113831,
+      "heapDeltaBytes": -2041856,
+      "latencyMs": {
+        "mean": 0.0020894755859378333,
+        "p50": 0.001958000000058746,
+        "p95": 0.002250000000003638,
+        "p99": 0.0029999999999290594,
+        "max": 0.17608400000005986
+      }
+    },
+    "openTelemetryMetricsImmediateClient": {
+      "operations": 5000,
+      "latencySamples": 4096,
+      "durationMs": 15.570749999999975,
+      "operationsPerSecond": 321114.9109708914,
+      "heapDeltaBytes": -169048,
+      "latencyMs": {
+        "mean": 0.0031011372070307575,
+        "p50": 0.0028750000000172804,
+        "p95": 0.003458000000023276,
+        "p99": 0.006458000000066022,
+        "max": 0.1371670000000904
+      }
+    },
+    "concurrencyContendedClient": {
+      "operations": 5000,
+      "latencySamples": 4096,
+      "durationMs": 33.77100000000007,
+      "operationsPerSecond": 148056.0243996325,
+      "heapDeltaBytes": 1936968,
+      "latencyMs": {
+        "mean": 0.3318192861328123,
+        "p50": 0.30845899999997073,
+        "p95": 0.4737920000000031,
+        "p99": 1.0695840000000771,
+        "max": 1.0876250000000027
+      }
+    },
+    "circuitBreakerSuccessClient": {
+      "operations": 5000,
+      "latencySamples": 4096,
+      "durationMs": 26.580874999999992,
+      "operationsPerSecond": 188105.1696003236,
+      "heapDeltaBytes": -2487920,
+      "latencyMs": {
+        "mean": 0.0053023664550773675,
+        "p50": 0.004749999999944521,
+        "p95": 0.006750000000010914,
+        "p99": 0.009667000000035841,
+        "max": 0.18741700000009587
+      }
+    },
+    "concurrencyBaseClient": {
+      "operations": 5000,
+      "latencySamples": 4096,
+      "durationMs": 24.020500000000084,
+      "operationsPerSecond": 208155.53381486575,
+      "heapDeltaBytes": 13732320,
+      "latencyMs": {
+        "mean": 0.00477009960937555,
+        "p50": 0.004542000000014923,
+        "p95": 0.00566599999990558,
+        "p99": 0.006957999999940512,
+        "max": 0.12554199999999582
+      }
+    },
+    "circuitBreakerBaseClient": {
+      "operations": 5000,
+      "latencySamples": 4096,
+      "durationMs": 25.014415999999983,
+      "operationsPerSecond": 199884.73846441202,
+      "heapDeltaBytes": -1481296,
+      "latencyMs": {
+        "mean": 0.004985619384766493,
+        "p50": 0.004792000000065855,
+        "p95": 0.005167000000028565,
+        "p99": 0.007041999999955806,
+        "max": 0.12075000000004366
+      }
+    },
+    "authStaticTokenClient": {
+      "operations": 5000,
+      "latencySamples": 4096,
+      "durationMs": 21.200249999999983,
+      "operationsPerSecond": 235846.27539769598,
+      "heapDeltaBytes": -2157328,
+      "latencyMs": {
+        "mean": 0.0042183273925779086,
+        "p50": 0.004000000000019099,
+        "p95": 0.00437499999998181,
+        "p99": 0.006917000000044027,
+        "max": 0.13837499999999636
+      }
+    },
+    "authBareTokenClient": {
+      "operations": 5000,
+      "latencySamples": 4096,
+      "durationMs": 10.891458000000057,
+      "operationsPerSecond": 459075.3597911293,
+      "heapDeltaBytes": 1524960,
+      "latencyMs": {
+        "mean": 0.0021528251953129296,
+        "p50": 0.002083000000084212,
+        "p95": 0.002207999999995991,
+        "p99": 0.0025409999999510546,
+        "max": 0.08704199999999673
+      }
+    },
+    "retryOnceClient": {
+      "operations": 5000,
+      "latencySamples": 4096,
+      "durationMs": 70.20399999999995,
+      "operationsPerSecond": 71221.01304768964,
+      "heapDeltaBytes": 788528,
+      "latencyMs": {
+        "mean": 0.014029606201171413,
+        "p50": 0.013084000000048945,
+        "p95": 0.017790999999988344,
+        "p99": 0.02320899999995163,
+        "max": 0.7441670000000613
+      }
+    },
+    "httpErrorClient": {
+      "operations": 5000,
+      "latencySamples": 4096,
+      "durationMs": 48.336374999999975,
+      "operationsPerSecond": 103441.76616471555,
+      "heapDeltaBytes": -2913176,
+      "latencyMs": {
+        "mean": 0.00964539599609357,
+        "p50": 0.009500000000002728,
+        "p95": 0.009916999999973086,
+        "p99": 0.014374999999972715,
+        "max": 0.18650000000002365
+      }
+    },
+    "loggerNoopClient": {
+      "operations": 5000,
+      "latencySamples": 4096,
+      "durationMs": 24.95691700000009,
+      "operationsPerSecond": 200345.2589917249,
+      "heapDeltaBytes": -3504712,
+      "latencyMs": {
+        "mean": 0.004917370849609304,
+        "p50": 0.004541999999901236,
+        "p95": 0.0049579999999878055,
+        "p99": 0.00687500000003638,
+        "max": 1.02212499999996
+      }
+    },
+    "loggerSensitiveQueryClient": {
+      "operations": 5000,
+      "latencySamples": 4096,
+      "durationMs": 30.995249999999942,
+      "operationsPerSecond": 161315.04020777406,
+      "heapDeltaBytes": 2834440,
+      "latencyMs": {
+        "mean": 0.006010121093749959,
+        "p50": 0.005374999999958163,
+        "p95": 0.006791000000021086,
+        "p99": 0.009957999999983258,
+        "max": 0.7332920000000058
+      }
+    },
+    "authNonRefreshErrorClient": {
+      "operations": 5000,
+      "latencySamples": 4096,
+      "durationMs": 82.07333400000005,
+      "operationsPerSecond": 60921.126952147424,
+      "heapDeltaBytes": -658784,
+      "latencyMs": {
+        "mean": 0.016445530761718313,
+        "p50": 0.014416999999980362,
+        "p95": 0.027291999999988548,
+        "p99": 0.030292000000031294,
+        "max": 0.5971250000000055
+      }
+    },
+    "fetchAdapterClient": {
+      "operations": 5000,
+      "latencySamples": 4096,
+      "durationMs": 46.81904200000008,
+      "operationsPerSecond": 106794.15439555536,
+      "heapDeltaBytes": 34872,
+      "latencyMs": {
+        "mean": 0.009332273681642855,
+        "p50": 0.00845900000012989,
+        "p95": 0.012291000000004715,
+        "p99": 0.020042000000103144,
+        "max": 0.2899159999999483
+      }
+    },
+    "fetchAdapterAutoTextClient": {
+      "operations": 5000,
+      "latencySamples": 4096,
+      "durationMs": 41.07720799999993,
+      "operationsPerSecond": 121722.00213802284,
+      "heapDeltaBytes": -2083272,
+      "latencyMs": {
+        "mean": 0.008230441162106916,
+        "p50": 0.007749999999987267,
+        "p95": 0.008667000000059488,
+        "p99": 0.016458999999940715,
+        "max": 0.17004100000008293
+      }
+    },
+    "fetchAdapterCompleteResponse": {
+      "operations": 5000,
+      "latencySamples": 4096,
+      "durationMs": 86.99116700000013,
+      "operationsPerSecond": 57477.09994510123,
+      "heapDeltaBytes": -5440816,
+      "latencyMs": {
+        "mean": 0.017304118896483978,
+        "p50": 0.015542000000095868,
+        "p95": 0.02254199999993034,
+        "p99": 0.038875000000189175,
+        "max": 0.9515830000000278
+      }
+    },
+    "fetchAdapterBoundedClient": {
+      "operations": 5000,
+      "latencySamples": 4096,
+      "durationMs": 52.629249999999956,
+      "operationsPerSecond": 95004.20393602425,
+      "heapDeltaBytes": 3405104,
+      "latencyMs": {
+        "mean": 0.010626697265623819,
+        "p50": 0.00874999999996362,
+        "p95": 0.011625000000094587,
+        "p99": 0.020665999999891937,
+        "max": 4.752917000000025
+      }
+    },
+    "fetchAdapterQueryClient": {
+      "operations": 5000,
+      "latencySamples": 4096,
+      "durationMs": 46.63883299999998,
+      "operationsPerSecond": 107206.79910665865,
+      "heapDeltaBytes": 2098032,
+      "latencyMs": {
+        "mean": 0.009337369140625829,
+        "p50": 0.00845900000012989,
+        "p95": 0.011833000000024185,
+        "p99": 0.018667000000050393,
+        "max": 0.3359170000001086
+      }
+    }
+  },
+  "comparison": {
+    "sequentialClientOverhead": 2.534664711957904,
+    "pluginPipelineThroughputRatio": 0.3937339580410148
+  }
+}
