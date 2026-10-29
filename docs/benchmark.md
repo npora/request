@@ -1,5 +1,9 @@
 # Performance Benchmarks
 
+The [configuration merger snapshot](measurements/config-merger/README.md)
+records the subsequent internal bundle reduction and passing regression budgets.
+It does not include a new competitor timing comparison.
+
 See the [Fetch capability patch report](measurements/fetch-capability/README.md)
 for the Axios 1.21.0 comparison and patch size costs. The
 [1.21.0 feature baseline](measurements/runtime-hardening/README.md) preserves
