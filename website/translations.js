@@ -1,4 +1,8 @@
 export const messages = {
+  "not-found.title": {"en": "Page not found · Npora Request", "zh-CN": "页面不存在 · Npora Request"},
+  "not-found.heading": {"en": "This request took a wrong turn.", "zh-CN": "这次请求，走错了路。"},
+  "not-found.description": {"en": "This page is unavailable. Head back to the playground and try a request that works.", "zh-CN": "这个页面不存在。回到官网控制台，体验一次真实请求。"},
+  "not-found.home": {"en": "Back to the homepage ↗", "zh-CN": "返回官网主页 ↗"},
   "nav.features": {"en": "Features", "zh-CN": "功能"},
   "hero.response": {"en": "EXAMPLE RESPONSE", "zh-CN": "响应示例"},
   "hero.transport": {"en": "Native Fetch. Familiar by design.", "zh-CN": "原生 Fetch，熟悉的请求体验。"},

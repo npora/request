@@ -11,8 +11,10 @@ await mkdir(output, { recursive: true })
 for (const name of ['index.html', 'style.css', 'favicon.svg', '_headers', '_routes.json', '404.html']) {
   await copyFile(new URL(name, root), new URL(name, output))
 }
-await build({ entryPoints: [fileURLToPath(new URL('app.js', root))],
-  outfile: fileURLToPath(new URL('app.js', output)), bundle: true,
+await build({ entryPoints: {
+    app: fileURLToPath(new URL('app.js', root)),
+    'not-found': fileURLToPath(new URL('not-found.js', root))
+  }, outdir: fileURLToPath(output), bundle: true,
   platform: 'browser', format: 'esm', target: 'es2022', minify: true,
   define: { __VERSION__: JSON.stringify(version) } })
 await writeFile(new URL('build.json', output), JSON.stringify({ version }))

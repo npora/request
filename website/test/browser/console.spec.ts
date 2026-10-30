@@ -171,3 +171,18 @@ test('records a real response into a reusable fixture and preserves it across la
   await expect(page.locator('#fixture-output')).toHaveText(script)
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
 })
+
+
+test('the branded 404 defaults to English and retains language on return home', async ({ page }) => {
+  const response = await page.goto('/this-page-does-not-exist')
+  expect(response?.status()).toBe(404)
+  await expect(page.locator('html')).toHaveAttribute('lang', 'en')
+  await expect(page).toHaveTitle('Page not found · Npora Request')
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('This request took a wrong turn.')
+  await page.locator('#language').selectOption('zh-CN')
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('这次请求，走错了路。')
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+  await page.locator('#not-found-home').click()
+  await expect(page.locator('#language')).toHaveValue('zh-CN')
+  await expect(page.locator('#demo-title')).toHaveText('标准数据获取')
+})

@@ -50,3 +50,6 @@ is aborted on page exit, and language changes preserve the generated fixture.
 `recording.js` owns this preview. `style.css` includes mobile layouts and a
 reduced-motion override. The browser suite exercises the ten scenarios, both
 languages, fixture generation and responsive layout.
+
+The branded 404 uses the same English default, language preference and stylesheet.
+Its separate `not-found.js` bundle keeps missing pages independent of console setup.
