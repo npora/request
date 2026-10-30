@@ -1,3 +1,4 @@
+import { t } from './i18n.js'
 import { createClient } from '../src/core-entry.ts'
 import { toFormErrors } from '../src/schema-errors.ts'
 import { retryPlugin } from '../src/plugins/retryPlugin.ts'
@@ -121,7 +122,7 @@ export const scenarios = [
       const refreshApi = ctx.api()
       const api = ctx.api(authPlugin({
         storage: { get: () => token, set: value => { token = value }, remove: () => { token = '' } },
-        async refreshToken() { refreshes++; ctx.log('401 → 正在刷新凭证'); const session = await refreshApi.post('/refresh'); return session.accessToken }
+        async refreshToken() { refreshes++; ctx.log(t('401 → 正在刷新凭证')); const session = await refreshApi.post('/refresh'); return session.accessToken }
       }))
       const results = await Promise.all([api.get('/auth'), api.get('/auth')])
       check(refreshes === 1 && results.every(value => value.authenticated), 'Expected one shared refresh')
@@ -129,7 +130,7 @@ export const scenarios = [
     } },
   { id: 'traffic', name: '并发与速率控制', tag: 'CONCURRENCY / RATE LIMIT', description: '观察真实 IP 限流，再通过独立 429 故障探针验证等待与恢复。继续展示并发排队、节流和本地 RATE_LIMIT 拒绝。',
     async run(ctx) {
-      ctx.log('阶段 1 / 预热连接后并发 12 次请求，服务器每 IP 每秒允许 5 次')
+      ctx.log(t('阶段 1 / 预热连接后并发 12 次请求，服务器每 IP 每秒允许 5 次'))
       const direct = ctx.api()
       await Promise.all(Array.from({ length: 6 }, () => direct.get('/user')))
       const burst = await Promise.allSettled(Array.from({ length: 12 }, () => direct.get('/traffic')))
@@ -137,11 +138,11 @@ export const scenarios = [
       if (unexpected) throw unexpected.reason
       const rejected = burst.filter(value => value.status === 'rejected' && value.reason.status === 429)
       ctx.log({ serverRejections: rejected.length, observedStatus: rejected.length ? 429 : 200 })
-      if (!rejected.length) ctx.log('本轮请求在服务器上未超过每秒 5 次，未触发 IP 限流。')
-      ctx.log('阶段 2 / 独立 429 故障探针：retryPlugin 遵从 Retry-After，等待 5 秒恢复')
+      if (!rejected.length) ctx.log(t('本轮请求在服务器上未超过每秒 5 次，未触发 IP 限流。'))
+      ctx.log(t('阶段 2 / 独立 429 故障探针：retryPlugin 遵从 Retry-After，等待 5 秒恢复'))
       const recovered = await ctx.api(retryPlugin({ retries: 1, onRetry: ({ delay }) => ctx.log({ retryDelay: delay }) })).get('/traffic-probe')
       check(recovered.accepted && recovered.probe, 'Expected 429 probe recovery')
-      ctx.log('阶段 3 / 最多 2 个并发、每秒 4 次，排队完成 8 个请求')
+      ctx.log(t('阶段 3 / 最多 2 个并发、每秒 4 次，排队完成 8 个请求'))
       const concurrency = concurrencyPlugin({ maxConcurrent: 2 })
       const rate = rateLimitPlugin({ maxRequests: 4, interval: 1100 })
       const bounded = ctx.api(concurrency, rate, retryPlugin({ retries: 1,
@@ -149,7 +150,7 @@ export const scenarios = [
       const requests = Array.from({ length: 8 }, () => bounded.get('/traffic'))
       ctx.log({ concurrency: concurrency.getState(location.origin), rate: rate.getState(location.origin) })
       check((await Promise.all(requests)).every(value => value.accepted), 'Bounded request failed')
-      ctx.log('阶段 4 / 禁用本地排队，超额请求以 RATE_LIMIT 拒绝')
+      ctx.log(t('阶段 4 / 禁用本地排队，超额请求以 RATE_LIMIT 拒绝'))
       // /user isolates this local guard demonstration from the server traffic window.
       const local = ctx.api(rateLimitPlugin({ maxRequests: 1, interval: 1000, maxQueue: 0 }))
       const results = await Promise.allSettled([local.get('/user'), local.get('/user')])
@@ -174,7 +175,7 @@ export function createScenarioContext({ signal, log, state, progress, network })
           network({ method, path: url.pathname, status: response.status, ms: performance.now() - start })
           return response
         } catch (error) {
-          network({ method, path: url.pathname, status: '中断/失败', ms: performance.now() - start }); throw error
+          network({ method, path: url.pathname, status: t('中断/失败'), ms: performance.now() - start }); throw error
         }
       }
     })
@@ -189,7 +190,7 @@ export function createScenarioContext({ signal, log, state, progress, network })
         const result = await client.post('/upload', { extensions: { upload } })
         network({ method: 'POST', path: '/api/upload', status: 200, ms: performance.now() - start }); return result
       } catch (error) {
-        network({ method: 'POST', path: '/api/upload', status: error.status ?? '中断/失败', ms: performance.now() - start }); throw error
+        network({ method: 'POST', path: '/api/upload', status: error.status ?? t('中断/失败'), ms: performance.now() - start }); throw error
       }
     }
   }
