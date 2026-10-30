@@ -329,7 +329,7 @@ h2 {
   display: flex;
   justify-content: space-between;
 }
-.sidebar-title span {
+.sidebar-title > span:last-child {
   font-family: monospace;
 }
 .scenario {
@@ -878,4 +878,24 @@ progress {
   .result-panel pre {
     height: 225px;
   }
+}
+
+.language-picker select {
+  font: inherit;
+  color: inherit;
+  background: transparent;
+  border: 1px solid #d9dde3;
+  border-radius: 6px;
+  padding: 6px;
+  max-width: 110px;
+}
+.language-picker select:focus-visible {
+  outline: 2px solid #3165f5;
+  outline-offset: 3px;
+}
+html[lang="en"] h1 { font-size: clamp(38px, 5vw, 68px); }
+@media (max-width: 600px) {
+  .nav { flex-wrap: wrap; gap: 12px; height: auto; min-height: 75px; padding-block: 16px; }
+  nav { flex-wrap: wrap; }
+  .run-actions { flex-wrap: wrap; }
 }

@@ -20,11 +20,11 @@ test('Pages serves the public site; unknown APIs and source paths never return t
   const health = await runtime.dispatchFetch('https://demo.test/api/health')
   assert.equal(health.status, 200); assert.equal((await health.json()).ready, true)
   const page = await request('/')
-  assert.equal(page.status, 200); assert.match(await page.text(), /代码的事，让请求说话/)
+  assert.equal(page.status, 200); assert.match(await page.text(), /See your requests in action/)
   for (const path of ['/api', '/api/missing', '/functions/api/user.js', '/wrangler.jsonc', '/state/worker.mjs']) {
     const response = await request(path)
     assert.equal(response.status, 404, path)
-    assert.doesNotMatch(await response.text(), /代码的事，让请求说话/)
+    assert.doesNotMatch(await response.text(), /See your requests in action/)
   }
 })
 

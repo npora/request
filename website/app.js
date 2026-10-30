@@ -1,3 +1,4 @@
+import { t, localizeCode, applyLanguage, setLanguage, getLanguage } from './i18n.js'
 import { scenarios, createScenarioContext } from './scenarios.js'
 
 const $ = id => document.getElementById(id)
@@ -11,7 +12,7 @@ for (const [index, scenario] of scenarios.entries()) {
   const button = document.createElement('button')
   button.type = 'button'; button.className = 'scenario'; button.dataset.scenario = scenario.id
   const number = document.createElement('span'); number.className = 'scenario-number'; number.textContent = String(index + 1).padStart(2, '0')
-  const name = document.createElement('span'); name.textContent = scenario.name
+  const name = document.createElement('span'); name.textContent = t(scenario.name)
   const indicator = document.createElement('span'); indicator.className = 'scenario-indicator'; indicator.setAttribute('aria-hidden', 'true')
   button.append(number, name, indicator)
   button.addEventListener('click', () => { selected = scenario; render() })
@@ -20,28 +21,29 @@ for (const [index, scenario] of scenarios.entries()) {
 
 function render() {
   const result = results.get(selected.id)
-  $('demo-tag').textContent = selected.tag; $('demo-title').textContent = selected.name
-  $('demo-description').textContent = selected.description; $('demo-code').textContent = selected.code
+  $('demo-tag').textContent = selected.tag; $('demo-title').textContent = t(selected.name)
+  $('demo-description').textContent = t(selected.description); $('demo-code').textContent = localizeCode(selected.code)
   for (const button of $('scenarios').children) {
+    button.children[1].textContent = t(scenarios.find(scenario => scenario.id === button.dataset.scenario).name)
     button.setAttribute('aria-pressed', String(button.dataset.scenario === selected.id))
     const outcome = results.get(button.dataset.scenario).outcome
     button.lastElementChild.textContent = { passed: '✓', failed: '!', running: '◌' }[outcome] ?? ''
   }
   $('outcome').dataset.outcome = result.outcome
-  $('outcome').textContent = { idle: '等待运行', running: '运行中', passed: '验证通过', failed: '运行失败', stopped: '已停止' }[result.outcome]
-  $('output').textContent = result.lines.join('\n') || '选择运行，观察真实响应。'
+  $('outcome').textContent = { idle: t('等待运行'), running: t('运行中'), passed: t('验证通过'), failed: t('运行失败'), stopped: t('已停止') }[result.outcome]
+  $('output').textContent = result.lines.map(line => line.message !== undefined ? t(line.message) : line.data).join('\n') || t('选择运行，观察真实响应。')
   $('stream-state').textContent = result.state
-  $('elapsed').textContent = result.elapsed ? `${(result.elapsed / 1000).toFixed(2)} s · ${result.requests.length} 次请求` : '准备就绪'
+  $('elapsed').textContent = result.elapsed ? `${(result.elapsed / 1000).toFixed(2)} s · ${result.requests.length} ${t('次请求')}` : t('准备就绪')
   $('request-count').textContent = String(result.requests.length)
   $('requests').replaceChildren()
   if (!result.requests.length) {
     const row = $('requests').insertRow(); row.className = 'empty-row'
-    const cell = row.insertCell(); cell.colSpan = 3; cell.textContent = '运行后，实际发出的每次请求会显示在这里。'
+    const cell = row.insertCell(); cell.colSpan = 3; cell.textContent = t('运行后，实际发出的每次请求会显示在这里。')
   }
   for (const request of result.requests) {
     const row = $('requests').insertRow()
     row.insertCell().textContent = `${request.method} ${request.path}`
-    const status = row.insertCell(); status.textContent = String(request.status)
+    const status = row.insertCell(); status.textContent = typeof request.status === 'string' ? t(request.status) : String(request.status)
     status.className = request.status >= 200 && request.status < 300 ? 'status-ok' : 'status-error'
     row.insertCell().textContent = `${Math.round(request.ms)} ms`
   }
@@ -50,7 +52,7 @@ function render() {
     const value = result.progress[type]
     if (!value || value.progress !== undefined) $(type + '-progress').value = value?.progress ?? 0
     else $(type + '-progress').removeAttribute('value')
-    $(type + '-label').textContent = value ? `${value.progress === undefined ? '传输中' : Math.round(value.progress * 100) + '%'} · ${(value.loaded / 1024).toFixed(0)} KiB` : '0%'
+    $(type + '-label').textContent = value ? `${value.progress === undefined ? t('传输中') : Math.round(value.progress * 100) + '%'} · ${(value.loaded / 1024).toFixed(0)} KiB` : '0%'
   }
   $('run').disabled = running || batch; $('run-all').disabled = running || batch
   $('stop').disabled = !running; $('clear').disabled = running || batch
@@ -65,7 +67,7 @@ async function run(scenario) {
   const update = () => { result.elapsed = performance.now() - start; if (selected.id === scenario.id) render() }
   const log = value => {
     // Bounded output keeps the console usable even if future scenarios emit more.
-    result.lines.push(typeof value === 'string' ? value : JSON.stringify(value, null, 2))
+    result.lines.push(typeof value === 'string' ? { message: value } : { data: JSON.stringify(value, null, 2) })
     if (result.lines.length > 100) result.lines.shift()
     update()
   }
@@ -77,7 +79,7 @@ async function run(scenario) {
       progress: (type, value) => { result.progress[type] = value; update() },
       network: value => { result.requests.push(value); update() }
     }))
-    result.outcome = 'passed'; log('✓ 已验证预期行为')
+    result.outcome = 'passed'; log(t('✓ 已验证预期行为'))
   } catch (error) {
     result.outcome = activeController.signal.aborted ? 'stopped' : 'failed'
     log({ code: error.code ?? 'DEMO_ERROR', status: error.status, message: error.message, data: error.data })
@@ -103,8 +105,13 @@ $('clear').addEventListener('click', () => {
   results.set(selected.id, { lines: [], requests: [], outcome: 'idle', elapsed: 0, state: 'READY', progress: {} }); render()
 })
 $('copy-install').addEventListener('click', async () => {
-  try { await navigator.clipboard.writeText('npm i @npora/request'); $('copy-status').textContent = '安装命令已复制' }
-  catch { $('copy-status').textContent = '请复制：npm i @npora/request' }
+  try { await navigator.clipboard.writeText('npm i @npora/request'); $('copy-status').textContent = t('安装命令已复制') }
+  catch { $('copy-status').textContent = t('请复制：npm i @npora/request') }
 })
+$('language').value = getLanguage()
+$('language').addEventListener('change', () => {
+  setLanguage($('language').value); applyLanguage(); $('copy-status').textContent = ''; render()
+})
+applyLanguage()
 window.addEventListener('pagehide', () => controller?.abort())
 render()

@@ -18,3 +18,22 @@ pnpm website:dev
 
 完整部署、绑定、接口与验证步骤见 [Cloudflare 官网部署指南](../docs/cloudflare-website.md)。
 官网开发不改变 npm 包版本，也不需要发布 npm。
+
+## Languages
+
+The homepage defaults to English. The navigation selector also offers Simplified
+Chinese (`zh-CN`). A manual selection is stored in `localStorage`; when storage
+is blocked, switching still works for the current page. Browser language does
+not override the English default.
+
+`translations.js` contains the English and Chinese copy; `i18n.js` applies it to
+the page, accessibility labels, title, description, scenario descriptions and
+code comments. Switching preserves running requests, results and progress.
+Raw API data, error codes, HTTP methods and stream state identifiers are not
+translated. Add both language values for new copy, and mark static text with
+`data-i18n` (or the corresponding attribute marker).
+
+Run `pnpm test:website:browser` from the repository root to cover both languages,
+persistence, blocked storage and switching while an SSE stream is running on
+desktop and mobile browsers. This website-only change does not require an npm
+package release.
