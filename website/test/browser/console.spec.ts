@@ -69,6 +69,42 @@ test('SSE renders before EOF, stops cleanly, and another scenario can run', asyn
   await expect(page.locator('#outcome')).toHaveAttribute('data-outcome', 'passed')
 })
 
+test('waiting for a response updates elapsed time without rebuilding unchanged console content', async ({ page }) => {
+  let release!: () => void
+  const pending = new Promise<void>(resolve => { release = resolve })
+  await page.route('**/api/user', async route => { await pending; await route.continue() })
+  await page.goto('/')
+  await page.locator('#run').click()
+  await expect(page.locator('#outcome')).toHaveAttribute('data-outcome', 'running')
+  await page.evaluate(() => {
+    const audit = { mutations: 0 }
+    ;(window as any).consoleAudit = audit
+    const observer = new MutationObserver(records => { audit.mutations += records.length })
+    for (const id of ['demo-code', 'output', 'requests', 'outcome', 'scenarios']) {
+      observer.observe(document.getElementById(id)!, { subtree: true, childList: true, characterData: true, attributes: true })
+    }
+  })
+  try {
+    await expect.poll(async () => parseFloat(await page.locator('#elapsed').innerText())).toBeGreaterThanOrEqual(0.6)
+    expect(await page.evaluate(() => (window as any).consoleAudit.mutations)).toBe(0)
+  } finally { release() }
+  await expect(page.locator('#outcome')).toHaveAttribute('data-outcome', 'passed')
+  await expect(page.locator('#requests tr')).toHaveCount(1)
+})
+
+test('leaving the page cancels the batch before the next scenario starts', async ({ page }) => {
+  const later: string[] = []
+  page.on('request', request => { if (request.url().includes('/api/ndjson')) later.push(request.url()) })
+  await page.goto('/')
+  await page.locator('#run-all').click()
+  await expect(page.locator('[data-scenario="sse"]')).toHaveAttribute('aria-pressed', 'true')
+  await expect(page.locator('#stream-state')).toHaveText('OPEN')
+  await page.evaluate(() => window.dispatchEvent(new Event('pagehide')))
+  await expect(page.locator('#outcome')).toHaveAttribute('data-outcome', 'stopped')
+  await expect(page.locator('#run-all')).toBeEnabled()
+  expect(later).toEqual([])
+})
+
 test('stopping the full sequence prevents later scenarios from starting', async ({ page }) => {
   const later: string[] = []
   page.on('request', request => { if (request.url().includes('/api/ndjson')) later.push(request.url()) })

@@ -10,6 +10,15 @@ const results = new Map(scenarios.map(value => [value.id, {
 }]))
 let selected = scenarios[0], controller, running = false, batch = false
 
+function setText(id, value) {
+  const element = $(id)
+  if (element.textContent !== value) element.textContent = value
+}
+
+function renderElapsed(result) {
+  setText('elapsed', result.elapsed ? `${(result.elapsed / 1000).toFixed(2)} s · ${result.requests.length} ${t('次请求')}` : t('准备就绪'))
+}
+
 for (const [index, scenario] of scenarios.entries()) {
   const button = document.createElement('button')
   button.type = 'button'; button.className = 'scenario'; button.dataset.scenario = scenario.id
@@ -32,10 +41,10 @@ function render() {
     button.lastElementChild.textContent = { passed: '✓', failed: '!', running: '◌' }[outcome] ?? ''
   }
   $('outcome').dataset.outcome = result.outcome
-  $('outcome').textContent = { idle: t('等待运行'), running: t('运行中'), passed: t('验证通过'), failed: t('运行失败'), stopped: t('已停止') }[result.outcome]
-  $('output').textContent = result.lines.map(line => line.message !== undefined ? t(line.message) : line.data).join('\n') || t('选择运行，观察真实响应。')
+  setText('outcome', { idle: t('等待运行'), running: t('运行中'), passed: t('验证通过'), failed: t('运行失败'), stopped: t('已停止') }[result.outcome])
+  setText('output', result.lines.map(line => line.message !== undefined ? t(line.message) : line.data).join('\n') || t('选择运行，观察真实响应。'))
   $('stream-state').textContent = result.state
-  $('elapsed').textContent = result.elapsed ? `${(result.elapsed / 1000).toFixed(2)} s · ${result.requests.length} ${t('次请求')}` : t('准备就绪')
+  renderElapsed(result)
   $('request-count').textContent = String(result.requests.length)
   $('requests').replaceChildren()
   if (!result.requests.length) {
@@ -73,7 +82,12 @@ async function run(scenario) {
     if (result.lines.length > 100) result.lines.shift()
     update()
   }
-  const ticker = setInterval(update, 100)
+  // Clock ticks do not change results. Keep code, live regions and request rows
+  // intact while waiting for actual network, stream or progress updates.
+  const ticker = setInterval(() => {
+    result.elapsed = performance.now() - start
+    if (selected.id === scenario.id) renderElapsed(result)
+  }, 100)
   render()
   try {
     await scenario.run(createScenarioContext({ signal: activeController.signal, log,
@@ -115,5 +129,5 @@ $('language').addEventListener('change', () => {
   setLanguage($('language').value); applyLanguage(); $('copy-status').textContent = ''; render(); recordingDemo.render()
 })
 applyLanguage()
-window.addEventListener('pagehide', () => { controller?.abort(); recordingDemo.dispose() })
+window.addEventListener('pagehide', () => { batch = false; controller?.abort(); recordingDemo.dispose() })
 render()

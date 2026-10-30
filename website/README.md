@@ -53,3 +53,14 @@ languages, fixture generation and responsive layout.
 
 The branded 404 uses the same English default, language preference and stylesheet.
 Its separate `not-found.js` bundle keeps missing pages independent of console setup.
+
+## Console updates and page lifecycle
+
+The elapsed clock updates every 100 ms without re-rendering the scenario code,
+live output or network table. Results render on network, stream and progress
+events; unchanged output text is preserved to avoid repeating live-region
+announcements. Changing languages or scenarios still renders the current result.
+
+Leaving the page cancels both the active request and the remaining batch queue.
+The browser suite covers this cancellation and verifies that waiting for a
+response advances the clock without changing the rest of the console DOM.
