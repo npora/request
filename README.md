@@ -80,6 +80,29 @@ implementations.
 
 ## Quick start
 
+To try a real response before connecting your own backend, save this as
+`first-request.mjs` in the project where you installed the package:
+
+```js
+import { createClient } from '@npora/request/core'
+
+const api = createClient({
+  baseURL: 'https://npora.pages.dev/api',
+  timeout: 5000
+})
+
+const user = await api.get('/user')
+console.log(user.name)
+```
+
+Run `node first-request.mjs` with Node.js 22 or newer. The public demo returns
+`Ada Lovelace`. For browser applications, use your own same-origin `/api` or a
+backend with CORS configured for your application origin. The public demo is
+for experimentation; connect your own backend for application traffic.
+
+For a TypeScript application, define the expected response type and configure
+your API base URL:
+
 ```ts
 import { createClient } from '@npora/request'
 
