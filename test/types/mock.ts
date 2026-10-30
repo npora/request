@@ -46,3 +46,20 @@ adapter.onDelete('/users/1').timeoutOnce()
 const history: readonly RequestConfig[] = adapter.history
 
 void history
+
+
+// Recording is explicit and remains available from the testing-only entrypoint.
+import { FetchAdapter } from '@npora/request/core'
+import type { MockRecordOptions, MockRecording, MockRecordingStats } from '@npora/request/testing'
+const recordingOptions: MockRecordOptions = {
+  adapter: new FetchAdapter(), maxEntries: 10, maxRecordSize: 65536,
+  transform(value) { return value.matcher.url === '/skip' ? undefined : value }
+}
+const recorder = new MockAdapter({ record: recordingOptions })
+const recordings: readonly MockRecording[] = recorder.recordings
+const stats: MockRecordingStats = recorder.recordingStats
+const script: string = recorder.exportMocks()
+recorder.clearRecordings()
+void [recordings, stats, script]
+// @ts-expect-error transforms are synchronous
+new MockAdapter({ record: { adapter: new FetchAdapter(), transform: async value => value } })

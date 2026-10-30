@@ -56,13 +56,13 @@
       "transitive": true
     },
     "dist/testing.js": {
-      "bytes": 8000,
-      "gzipBytes": 3650,
+      "bytes": 13100,
+      "gzipBytes": 5500,
       "transitive": true
     }
   },
   "package": {
-    "bytes": 136750,
+    "bytes": 137750,
     "unpackedBytes": 517100
   }
 }

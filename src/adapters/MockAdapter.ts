@@ -1,3 +1,5 @@
+import { MockRecorder, type MockRecordOptions, type MockRecording, type MockRecordingStats } from './MockRecorder'
+export type { MockRecordOptions, MockRecording, MockRecordingStats, MockRecordedData } from './MockRecorder'
 import { RequestError } from '../errors'
 import type {
   Adapter,
@@ -81,6 +83,9 @@ export interface MockRoute {
 }
 
 export interface MockAdapterOptions {
+  /** Explicitly forward and record unmatched requests. Disabled by default. */
+  record?: MockRecordOptions
+
   handlers?: Record<string, MockHandler>
 
   /**
@@ -108,10 +113,13 @@ export class MockAdapter implements Adapter {
 
   private readonly requests: RequestConfig[] = []
 
+  private readonly recorder?: MockRecorder
+
   private readonly delay: number
 
   constructor(options: MockAdapterOptions = {}) {
     this.delay = normalizeDelay(options.delay)
+    this.recorder = options.record === undefined ? undefined : new MockRecorder(options.record)
 
     Object.entries(options.handlers ?? {}).forEach(([key, handler]) => {
       this.handlers.set(key, handler)
@@ -120,6 +128,25 @@ export class MockAdapter implements Adapter {
 
   get history(): readonly RequestConfig[] {
     return [...this.requests]
+  }
+
+  /** Detached JSON snapshots, ordered by request invocation. */
+  get recordings(): readonly MockRecording[] {
+    return this.recorder?.recordings ?? []
+  }
+
+  get recordingStats(): MockRecordingStats {
+    return this.recorder?.stats ?? { recorded: 0, skipped: 0 }
+  }
+
+  /** Export replyOnce registrations for a variable named `mock`. */
+  exportMocks(): string {
+    return this.recorder?.exportMocks() ?? ''
+  }
+
+  clearRecordings(): this {
+    this.recorder?.clear()
+    return this
   }
 
   /**
@@ -201,7 +228,7 @@ export class MockAdapter implements Adapter {
   }
 
   reset(): this {
-    return this.resetHandlers().resetHistory()
+    return this.resetHandlers().resetHistory().clearRecordings()
   }
 
   async request<T = unknown>(config: RequestConfig): Promise<NporaResponse<T>> {
@@ -230,6 +257,7 @@ export class MockAdapter implements Adapter {
     const handler = this.handlers.get(String(config.url))
 
     if (!handler) {
+      if (this.recorder) return this.recorder.request<T>(config)
       throw new Error(
         `No mock handler found for ${config.url} (${method})`
       )

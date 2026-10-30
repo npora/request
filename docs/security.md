@@ -189,3 +189,18 @@ CI also performs CodeQL analysis, scheduled registry-install smoke tests,
 coverage checks, package manifest verification, and Dependabot update checks.
 
 See [SECURITY.md](../SECURITY.md) for private vulnerability reporting.
+
+## Mock response recording
+
+Recording is explicitly enabled through `MockAdapter`'s `record.adapter` option;
+unmatched requests then reach that adapter, including mutating methods. Use a
+test backend and the same access controls as ordinary requests. The library
+does not write or upload recorded fixtures automatically.
+
+Recordings omit request headers/bodies, omit common credential response
+headers, redact common secret JSON fields and skip credential/fragment URLs or
+known sensitive query keys. These are field-based reductions, not a guarantee
+that payloads or URLs contain no personal data. Configure synchronous
+`transform` filtering and review exports before committing or sharing them.
+Mock request `history` remains unredacted. Retention and per-record UTF-8 JSON
+limits are enforced independently of network response size limits.

@@ -600,7 +600,8 @@ first; equal priorities preserve registration order.
 
 ## Request testing
 
-`MockAdapter` supports method-aware routes, dynamic or one-time responses,
+`MockAdapter` supports opt-in response recording and replay scripts,
+method-aware routes, dynamic or one-time responses,
 query/header matching, delay, timeout and network-error simulation, and request
 history:
 
