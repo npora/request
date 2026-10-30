@@ -221,7 +221,7 @@ function snapshot(value: unknown, limit: number): MockRecordedData {
       charge(JSON.stringify(input)); return input
     }
     if (typeof input === 'number' && Number.isFinite(input) && !Object.is(input, -0)) { charge(String(input)); return input }
-    if (typeof input !== 'object' || input === null || seen.has(input)) throw new TypeError('Non-JSON recording')
+    if (typeof input !== 'object' || seen.has(input)) throw new TypeError('Non-JSON recording')
     const array = Array.isArray(input)
     if (!array && Object.getPrototypeOf(input) !== Object.prototype && Object.getPrototypeOf(input) !== null) {
       throw new TypeError('Non-JSON recording')
