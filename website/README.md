@@ -40,6 +40,11 @@ package release.
 
 ## Homepage and recording preview
 
+The `#quickstart` section provides a complete JavaScript example for Node.js 22+,
+including installation, the `.mjs` filename, the run command and a copy button.
+It uses the public demo API; browser integration notes explain the same-origin
+or CORS requirement. Keep this example aligned with the README quick start.
+
 The homepage uses a responsive light layout, a dark code console and a shared
 green accent. The original ten request scenarios remain available. The recording
 section runs one real `/api/user` request through the current source version of

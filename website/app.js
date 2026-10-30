@@ -124,9 +124,15 @@ $('copy-install').addEventListener('click', async () => {
   try { await navigator.clipboard.writeText('npm i @npora/request'); $('copy-status').textContent = t('安装命令已复制') }
   catch { $('copy-status').textContent = t('请复制：npm i @npora/request') }
 })
+$('copy-quickstart').addEventListener('click', async () => {
+  try {
+    await navigator.clipboard.writeText($('quickstart-code').textContent.trim())
+    $('quickstart-status').textContent = t('quickstart.copied')
+  } catch { $('quickstart-status').textContent = t('quickstart.fallback') }
+})
 $('language').value = getLanguage()
 $('language').addEventListener('change', () => {
-  setLanguage($('language').value); applyLanguage(); $('copy-status').textContent = ''; render(); recordingDemo.render()
+  setLanguage($('language').value); applyLanguage(); $('copy-status').textContent = ''; $('quickstart-status').textContent = ''; render(); recordingDemo.render()
 })
 applyLanguage()
 window.addEventListener('pagehide', () => { batch = false; controller?.abort(); recordingDemo.dispose() })
