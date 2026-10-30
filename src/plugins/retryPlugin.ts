@@ -11,6 +11,7 @@ import { waitForSignal } from '../utils/waitForSignal'
 import { MAX_TIMER_DELAY } from '../utils/maxTimerDelay'
 import { resolveExtensionConfig } from './resolveExtensionConfig'
 import { isReadableStream } from '../utils/isReadableStream'
+import { throwIfAborted } from '../utils/createAbortError'
 
 const DEFAULT_RETRY_METHODS: readonly HttpMethod[] = [
   'GET',
@@ -106,12 +107,14 @@ export function retryPlugin(
 
         if (isPromiseLike(shouldRetry)) {
           const decision = Promise.resolve(shouldRetry).then(result => {
+            throwIfAborted(requestContext.config)
             return result
               ? createRetryDecision(
                   retryOptions,
                   requestContext.error,
                   requestContext.startTime,
-                  attempt
+                  attempt,
+                  requestContext.config
                 )
               : undefined
           })
@@ -129,7 +132,8 @@ export function retryPlugin(
           retryOptions,
           requestContext.error,
           requestContext.startTime,
-          attempt
+          attempt,
+          requestContext.config
         )
 
         return requestContext.config.signal && isPromiseLike(decision)
@@ -194,11 +198,13 @@ function createRetryDecision(
   options: NormalizedRetryOptions,
   error: unknown,
   startTime: number,
-  attempt: number
+  attempt: number,
+  config: RequestConfig
 ): { retry: true; delay: number } | undefined | Promise<{
   retry: true
   delay: number
 } | undefined> {
+  throwIfAborted(config)
   const configuredDelay = options.delay(attempt, error)
 
   if (isPromiseLike(configuredDelay)) {
@@ -208,7 +214,8 @@ function createRetryDecision(
         error,
         startTime,
         attempt,
-        delay
+        delay,
+        config
       )
     })
   }
@@ -218,7 +225,8 @@ function createRetryDecision(
     error,
     startTime,
     attempt,
-    configuredDelay
+    configuredDelay,
+    config
   )
 }
 
@@ -227,11 +235,14 @@ function finalizeRetryDecision(
   error: unknown,
   startTime: number,
   attempt: number,
-  configuredDelay: number
+  configuredDelay: number,
+  config: RequestConfig
 ): { retry: true; delay: number } | undefined | Promise<{
   retry: true
   delay: number
 } | undefined> {
+  throwIfAborted(config)
+
   const serverDelay = options.respectRetryAfter
     ? parseServerRetryDelay(error)
     : undefined
@@ -268,19 +279,22 @@ function finalizeRetryDecision(
 
   if (isPromiseLike(jitteredDelay)) {
     return Promise.resolve(jitteredDelay).then(delay => {
-      return completeRetryDecision(options, pendingEvent, delay, startTime)
+      return completeRetryDecision(options, pendingEvent, delay, startTime, config)
     })
   }
 
-  return completeRetryDecision(options, pendingEvent, jitteredDelay, startTime)
+  return completeRetryDecision(options, pendingEvent, jitteredDelay, startTime, config)
 }
 
 function completeRetryDecision(
   options: NormalizedRetryOptions,
   pendingEvent: Readonly<RetryEvent>,
   jitteredDelay: number,
-  startTime: number
+  startTime: number,
+  config: RequestConfig
 ): { retry: true; delay: number } | undefined {
+  throwIfAborted(config)
+
   const delay = normalizeRetryDelay(jitteredDelay, options.maxDelay)
   const event = {
     ...pendingEvent,

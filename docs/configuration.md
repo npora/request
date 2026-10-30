@@ -465,6 +465,10 @@ timing header. Set `retryOnTimeout: false` when repeating a timed-out operation
 would be unsafe. A custom `shouldRetry` result of `true` or `false` overrides
 the built-in decision; return `undefined` to fall back to `statusCodes`,
 `retryOnTimeout`, and the network-error policy.
+Cancellation and `totalTimeout` also stop waiting for asynchronous `shouldRetry`,
+`delay`, or `jitter` callbacks. Those callbacks may finish their own work later,
+but their late results do not start another retry stage or emit `onRetry`.
+An already running callback is not forcibly interrupted.
 `Retry-After` takes precedence over `RateLimit-Reset`,
 `X-RateLimit-Retry-After`, `X-RateLimit-Reset`, and
 `X-Rate-Limit-Reset`. Reset values accept delay seconds or current-era Unix
