@@ -232,6 +232,28 @@ upload/download progress. A minified application bundle imported through the
 package exports also checks cache clearing, errors, and cancellation in all
 three browsers.
 
+The [cross-origin session suite](../browser/tests/session-cross-origin.spec.ts)
+bundles a consumer using public package exports and starts a separate, ephemeral
+HTTP API. It verifies an HttpOnly refresh cookie with `credentials: 'include'`,
+real CORS preflights, missing-cookie 401 responses, and rejection of an invalid
+CORS response. Two expired requests share one refresh; cancelling one waiter
+leaves the survivor active. Logout must disconnect both a pending request and
+the refresh transport, clear the application's access token, and leave another
+browser context's account and cached response intact.
+
+The refresh is held behind a server gate until both callers have joined. The
+suite uses bounded polling rather than timing sleeps and closes all servers
+and browser contexts. The account facade handles session disposal; the library
+does not implement login/logout or delete HttpOnly cookies. These tests use
+same-site localhost origins on different ports. They cover cross-origin Fetch,
+not third-party cookie policies or production TLS/SameSite deployment settings.
+They exercise the local build; the installed-package HTTP tests above verify
+published artifacts separately.
+
+```sh
+pnpm test:browser --grep 'cross-origin cookie|logout cancels a pending'
+```
+
 ## Performance checks
 
 ```sh
