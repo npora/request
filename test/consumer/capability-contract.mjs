@@ -1,7 +1,20 @@
 import assert from 'node:assert/strict'
 
 /** Shared by offline tarball and actual registry-installed ESM/CJS consumers. */
-export async function checkCapabilityContract({ createClient, TieredCacheStore, MemoryCacheStore, toFormErrors, concurrencyPlugin }, format) {
+export async function checkCapabilityContract({ createClient, TieredCacheStore, MemoryCacheStore, toFormErrors, concurrencyPlugin, MockAdapter, FetchAdapter }, format) {
+  const recorder = new MockAdapter({ record: { adapter: new FetchAdapter() } })
+  const recordingClient = createClient({ adapter: recorder,
+    fetch: async () => new Response(JSON.stringify({ id: 1, accessToken: 'private' }), {
+      headers: { 'content-type': 'application/json', 'set-cookie': 'secret=true' }
+    })
+  })
+  assert.deepEqual(await recordingClient.get('/recorded'), { id: 1, accessToken: 'private' })
+  assert.deepEqual(recorder.recordings[0].response.data, { id: 1, accessToken: '[REDACTED]' })
+  assert.equal(recorder.recordings[0].response.headers['set-cookie'], undefined)
+  const offline = new MockAdapter()
+  new Function('mock', recorder.exportMocks())(offline)
+  assert.deepEqual(await createClient({ adapter: offline }).get('/recorded'), { id: 1, accessToken: '[REDACTED]' })
+
   const releases = []
   let started
   const firstStarted = new Promise(resolve => { started = resolve })

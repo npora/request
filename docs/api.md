@@ -642,7 +642,8 @@ attempting to coerce them.
 
 # MockAdapter
 
-`MockAdapter` provides deterministic request tests without network I/O.
+`MockAdapter` provides deterministic request tests. It stays offline unless
+`record.adapter` explicitly enables forwarding for unmatched requests.
 Method-specific routes return the adapter after a reply is registered, so
 different routes can be chained:
 
@@ -721,8 +722,67 @@ adapter.onGet('/slow').reply(200, { ok: true }, {
 
 `adapter.history` contains matched and unmatched request configurations.
 `resetHistory()` clears only history, `resetHandlers()` clears legacy handlers
-and routes, and `reset()` clears both. The legacy `on(url, handler)` API remains
+and routes, and `reset()` clears both plus recordings. The legacy `on(url, handler)` API remains
 available for URL-only 200 responses.
+
+## Record real responses
+
+```ts
+import { createClient, FetchAdapter } from '@npora/request/core'
+import { MockAdapter } from '@npora/request/testing'
+
+const mock = new MockAdapter({
+  record: {
+    adapter: new FetchAdapter(),
+    maxEntries: 100,
+    maxRecordSize: 262144,
+    transform(recording) {
+      return recording.matcher.url.startsWith('/private') ? undefined : recording
+    }
+  }
+})
+const api = createClient({ baseURL: 'https://api.example.com', adapter: mock })
+await api.get('/users/1')
+console.log(mock.exportMocks())
+// mock.onMethod("GET", { url: "/users/1" }).replyOnce(...)
+```
+
+Existing method routes and legacy handlers take priority; only unmatched
+requests reach the supplied adapter. Forwarding preserves its response or
+error. Successful responses and `HTTP_ERROR` responses are eligible for
+recording. Other failures, live streams, binary bodies and non-JSON values are
+forwarded without a snapshot. Recording and transformation failures do not
+replace the real request result. Transformations must be synchronous.
+
+`recordings` returns detached snapshots with method, URL/query matcher, status,
+status text, headers and parsed data. The recorder keeps at most `maxEntries`
+responses (default 100), ordered by request invocation rather than completion.
+`maxRecordSize` bounds UTF-8 JSON bytes for the complete entry, including matcher
+and metadata (default 256 KiB); limits must be positive safe integers.
+`recordingStats` reports retained `recorded` entries and `skipped` attempts.
+Capacity eviction is not counted as a skipped attempt.
+
+`exportMocks()` returns JavaScript registrations for a `MockAdapter` variable
+named `mock`. Each uses `replyOnce()` so repeated routes replay in sequence.
+The generated script preserves object queries and ordered/duplicate
+`searchParams`, but does not match request bodies. Responses for different POST
+bodies on the same route therefore replay by invocation order. It records the
+adapter response before response hooks, schema validation or interceptors.
+No file, network export or persistence is performed automatically.
+
+`clearRecordings()` clears snapshots and statistics, invalidating captures
+already in flight. It preserves routes and history; `reset()` clears all three.
+`resetHistory()` and `resetHandlers()` leave recordings intact.
+
+Request headers and bodies are excluded from recordings. Credential URLs,
+fragment URLs, and known sensitive query keys are skipped. Common credential
+response headers are omitted, and common password/token/API-key fields in JSON
+are replaced with `[REDACTED]`. These field-based defaults do not identify all
+personal data or secrets inside free text, URL paths or custom fields. Use
+`transform` for application-specific filtering and review fixtures before
+sharing. Existing `history` still contains request configurations and is not
+redacted. Only JSON-compatible finite values and dense arrays are supported;
+cyclic values, negative zero, accessors, class instances and excessive depth are skipped.
 
 ---
 

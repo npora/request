@@ -345,3 +345,19 @@ Changesets Action v2. Run `pnpm test:release-workflow` after changing release
 automation; it verifies the CLI/config generation, action pin, token input,
 and v2 input names. Changes limited to verification or development tools do not
 require a published package version bump.
+
+## Record response fixtures
+
+Use the [MockAdapter recording API](api.md#record-real-responses) with an explicit
+`FetchAdapter` to forward unmatched requests and export one-time Mock replies.
+The recorder is bounded, skips streaming/non-JSON data, and redacts common
+credential fields. It does not record request bodies or replace backend access
+controls. Review generated fixtures and use the synchronous transform for
+application-specific redaction. `history` retains its existing unredacted request
+configurations.
+
+[Recording tests](../test/mock-recording.test.ts) exercise real loopback HTTP,
+HTTP failures, executable replay, redaction, prototype-safe data, unsupported
+values, bounded retention, concurrent completion order and clearing in-flight
+captures. The installed ESM/CommonJS capability contract also verifies the
+public testing entrypoint, redaction and generated replay script.
