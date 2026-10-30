@@ -165,7 +165,7 @@ function validateRecording(value: MockRecording): void {
   if (!value.response.headers || Object.values(value.response.headers).some(header => typeof header !== 'string')) {
     throw new TypeError('Invalid recorded headers')
   }
-  new Headers(value.response.headers)
+  new Response(null, value.response)
 }
 
 function positiveInteger(value: number | undefined, fallback: number): number {
@@ -223,6 +223,7 @@ function snapshot(value: unknown, limit: number): MockRecordedData {
     if (typeof input === 'number' && Number.isFinite(input) && !Object.is(input, -0)) { charge(String(input)); return input }
     if (typeof input !== 'object' || seen.has(input)) throw new TypeError('Non-JSON recording')
     const array = Array.isArray(input)
+    if (array && input.length > (remaining - 2) / 2) throw new TypeError('Recording too large')
     if (!array && Object.getPrototypeOf(input) !== Object.prototype && Object.getPrototypeOf(input) !== null) {
       throw new TypeError('Non-JSON recording')
     }

@@ -56,7 +56,7 @@
       "transitive": true
     },
     "dist/testing.js": {
-      "bytes": 13100,
+      "bytes": 13175,
       "gzipBytes": 5500,
       "transitive": true
     }
