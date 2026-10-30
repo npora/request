@@ -39,7 +39,7 @@ describe('MockAdapter recording', () => {
     const payload = JSON.parse('{"__proto__":{"polluted":true},"password":"secret","nested":{"access_token":"token"},"text":"\\\";globalThis.bad=true;//</script>"}')
     const source: Adapter = {
       async request<T>(config: RequestConfig) {
-        return { ...response(config, payload), headers: new Headers({ 'set-cookie': 'session=secret', authorization: 'secret', 'x-api-key': 'secret', 'x-public': 'yes' }) } as NporaResponse<T>
+        return { ...response(config, payload), headers: new Headers({ 'set-cookie': 'session=secret', authorization: 'secret', 'x-api-key': 'secret', 'x-public': 'yes', 'content-length': '999', 'content-encoding': 'gzip', 'transfer-encoding': 'chunked' }) } as NporaResponse<T>
       }
     }
     const mock = new MockAdapter({ record: { adapter: source } })
@@ -50,7 +50,7 @@ describe('MockAdapter recording', () => {
     payload.nested.access_token = 'changed'; config.query.role.push('c')
     const record = mock.recordings[0]!
     expect(record.matcher.query).toEqual({ role: ['a', 'b'] })
-    expect(record.response.headers).toEqual({ 'x-public': 'yes' })
+    expect(record.response.headers).toEqual({ 'x-public': 'yes', 'content-length': '999', 'content-encoding': 'gzip', 'transfer-encoding': 'chunked' })
     expect(record.response.data).toMatchObject({ password: '[REDACTED]', nested: { access_token: '[REDACTED]' } })
     record.response.headers['x-public'] = 'mutated'
     expect(mock.recordings[0]!.response.headers['x-public']).toBe('yes')

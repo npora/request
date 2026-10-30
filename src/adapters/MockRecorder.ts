@@ -124,7 +124,7 @@ export class MockRecorder {
   private record(capture: Capture, response: NporaResponse<unknown>): void {
     if (capture.generation !== this.generation) return
     try {
-      const headers = Object.fromEntries([...response.headers].filter(([key]) => !sensitive(key)))
+      const headers = Object.fromEntries([...response.headers].filter(([key]) => !sensitive(key) && !/^(content-length|content-encoding|transfer-encoding)$/i.test(key)))
       const recording: MockRecording = {
         method: capture.method, matcher: capture.matcher,
         response: { status: response.status, statusText: response.statusText, headers }

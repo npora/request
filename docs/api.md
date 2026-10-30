@@ -776,7 +776,8 @@ already in flight. It preserves routes and history; `reset()` clears all three.
 
 Request headers and bodies are excluded from recordings. Credential URLs,
 fragment URLs, and known sensitive query keys are skipped. Common credential
-response headers are omitted, and common password/token/API-key fields in JSON
+response headers and wire length/encoding headers are omitted (replayed bodies
+are re-encoded), and common password/token/API-key fields in JSON
 are replaced with `[REDACTED]`. These field-based defaults do not identify all
 personal data or secrets inside free text, URL paths or custom fields. Use
 `transform` for application-specific filtering and review fixtures before
