@@ -50,7 +50,7 @@ describe('MockAdapter recording', () => {
     payload.nested.access_token = 'changed'; config.query.role.push('c')
     const record = mock.recordings[0]!
     expect(record.matcher.query).toEqual({ role: ['a', 'b'] })
-    expect(record.response.headers).toEqual({ 'x-public': 'yes', 'content-length': '999', 'content-encoding': 'gzip', 'transfer-encoding': 'chunked' })
+    expect(record.response.headers).toEqual({ 'x-public': 'yes' })
     expect(record.response.data).toMatchObject({ password: '[REDACTED]', nested: { access_token: '[REDACTED]' } })
     record.response.headers['x-public'] = 'mutated'
     expect(mock.recordings[0]!.response.headers['x-public']).toBe('yes')
