@@ -184,6 +184,29 @@ describe('MockAdapter recording', () => {
     expect((await mock.request({ url: '/legacy' })).data).toBe('local')
   })
 
+  it('skips metadata that cannot be reconstructed by a native Response', async () => {
+    for (const statusText of ['错误', 'OK\r\nx-test: injected']) {
+      const source: Adapter = { async request<T>(config: RequestConfig) {
+        return { ...response(config, 'unchanged'), statusText } as NporaResponse<T>
+      } }
+      const mock = new MockAdapter({ record: { adapter: source } })
+      expect((await mock.request({ url: '/data' })).statusText).toBe(statusText)
+      expect(mock.recordingStats).toEqual({ recorded: 0, skipped: 1 })
+      expect(mock.exportMocks()).toBe('')
+    }
+  })
+
+  it('rejects an oversized array before enumerating its elements', async () => {
+    let enumerations = 0
+    const data = new Proxy(Array(10000).fill(0), {
+      ownKeys(target) { enumerations++; return Reflect.ownKeys(target) }
+    })
+    const mock = new MockAdapter({ record: { adapter: adapter(data), maxRecordSize: 256 } })
+    expect((await mock.request({ url: '/data' })).data).toBe(data)
+    expect(mock.recordingStats).toEqual({ recorded: 0, skipped: 1 })
+    expect(enumerations).toBe(0)
+  })
+
   it('validates opt-in recording configuration and keeps ordinary mocking offline', async () => {
     for (const value of [0, -1, Infinity, NaN, 0.5]) {
       expect(() => new MockAdapter({ record: { adapter: adapter(null), maxEntries: value } })).toThrow(TypeError)

@@ -784,6 +784,9 @@ personal data or secrets inside free text, URL paths or custom fields. Use
 sharing. Existing `history` still contains request configurations and is not
 redacted. Only JSON-compatible finite values and dense arrays are supported;
 cyclic values, negative zero, accessors, class instances and excessive depth are skipped.
+Recorded response metadata must be reconstructible with the native `Response`
+constructor. Arrays that already exceed the recording budget are skipped before
+their elements are enumerated.
 
 ---
 
