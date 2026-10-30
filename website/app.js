@@ -1,7 +1,9 @@
+import { setupRecordingDemo } from './recording.js'
 import { t, localizeCode, applyLanguage, setLanguage, getLanguage } from './i18n.js'
 import { scenarios, createScenarioContext } from './scenarios.js'
 
 const $ = id => document.getElementById(id)
+const recordingDemo = setupRecordingDemo()
 for (const element of document.querySelectorAll('[data-version]')) element.textContent = __VERSION__
 const results = new Map(scenarios.map(value => [value.id, {
   lines: [], requests: [], outcome: 'idle', elapsed: 0, state: 'READY', progress: {}
@@ -110,8 +112,8 @@ $('copy-install').addEventListener('click', async () => {
 })
 $('language').value = getLanguage()
 $('language').addEventListener('change', () => {
-  setLanguage($('language').value); applyLanguage(); $('copy-status').textContent = ''; render()
+  setLanguage($('language').value); applyLanguage(); $('copy-status').textContent = ''; render(); recordingDemo.render()
 })
 applyLanguage()
-window.addEventListener('pagehide', () => controller?.abort())
+window.addEventListener('pagehide', () => { controller?.abort(); recordingDemo.dispose() })
 render()

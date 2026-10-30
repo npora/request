@@ -37,3 +37,16 @@ Run `pnpm test:website:browser` from the repository root to cover both languages
 persistence, blocked storage and switching while an SSE stream is running on
 desktop and mobile browsers. This website-only change does not require an npm
 package release.
+
+## Homepage and recording preview
+
+The homepage uses a responsive light layout, a dark code console and a shared
+green accent. The original ten request scenarios remain available. The recording
+section runs one real `/api/user` request through the current source version of
+`MockAdapter` and displays `exportMocks()` output for copying. It does not evaluate
+the generated script, persist files, or load third-party resources. Its controller
+is aborted on page exit, and language changes preserve the generated fixture.
+
+`recording.js` owns this preview. `style.css` includes mobile layouts and a
+reduced-motion override. The browser suite exercises the ten scenarios, both
+languages, fixture generation and responsive layout.
