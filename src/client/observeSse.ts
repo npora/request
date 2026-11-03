@@ -1,6 +1,6 @@
 import { RequestError } from '../errors/RequestError'
 import type { SseState, SseStateObserver } from '../types/response'
-import { withEarlyIteratorCleanup } from '../utils/withEarlyIteratorCleanup'
+import { singleIterator, withEarlyIteratorCleanup } from '../utils/withEarlyIteratorCleanup'
 
 /** Observers report transport lifecycle; they never control stream delivery. */
 export function observeSse<T>(
@@ -40,6 +40,11 @@ export function observeSse<T>(
   }
 
   return Promise.resolve().then(() => connect(notify)).then(stream => {
+    stream = singleIterator(stream)
+    const close = () => {
+      notify('closed')
+      return stream[Symbol.asyncIterator]().return?.()
+    }
     return withEarlyIteratorCleanup(start => (async function* () {
       start()
       try {
@@ -50,10 +55,7 @@ export function observeSse<T>(
       } finally {
         notify('closed')
       }
-    })(), () => {
-      notify('closed')
-      return stream[Symbol.asyncIterator]().return?.()
-    })
+    })(), close, close)
   }, error => {
     notify(signal?.aborted ? 'closed' : 'errored')
     throw error

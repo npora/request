@@ -11,7 +11,7 @@ import { waitForRetry } from '../core/lifecycleTiming'
 import { throwIfAborted } from '../utils/createAbortError'
 import { MAX_TIMER_DELAY } from '../utils/maxTimerDelay'
 import { withSseControl } from '../utils/sseControl'
-import { withEarlyIteratorCleanup } from '../utils/withEarlyIteratorCleanup'
+import { singleIterator, withEarlyIteratorCleanup } from '../utils/withEarlyIteratorCleanup'
 
 type SseStreamResponse = NporaResponse<AsyncIterable<ServerSentEvent>>
 
@@ -40,11 +40,19 @@ export function createReconnectingSse(
     return Promise.reject(error)
   }
 
+  const cancellation = new AbortController()
+  config = {
+    ...config,
+    signal: config.signal
+      ? AbortSignal.any([config.signal, cancellation.signal])
+      : cancellation.signal
+  }
+  initialConfig.signal = config.signal
   const state: ReconnectState = {}
 
   const open = (response: SseStreamResponse) => {
     notify?.(response.status === 204 ? 'closed' : 'open')
-    return response
+    return response.data ? { ...response, data: singleIterator(response.data) } : response
   }
   return connect(withSseControl(config, observerFor(state))).then(open).then(first => reconnectSse(
     first,
@@ -55,7 +63,8 @@ export function createReconnectingSse(
       reconnectConfig(config, state.lastEventId),
       observerFor(state)
     )).then(open),
-    notify
+    notify,
+    () => cancellation.abort()
   ))
 }
 
@@ -89,58 +98,73 @@ export function reconnectSse(
   options: SseReconnectOptions,
   state: ReconnectState,
   connect: () => Promise<SseStreamResponse>,
-  notify?: SseStateObserver
+  notify?: SseStateObserver,
+  interrupt?: () => void
 ): AsyncIterable<ServerSentEvent> {
+  let current: SseStreamResponse | undefined = first
+  let closed = false
+  let closing: unknown
+  const close = () => {
+    if (!closed) {
+      closed = true
+      interrupt?.()
+      closing = current?.data?.[Symbol.asyncIterator]().return?.()
+    }
+    return closing
+  }
   return withEarlyIteratorCleanup(start => (async function* () {
     start()
-    let current: SseStreamResponse | undefined = first
     let lastError: unknown
     let attempts = 0
 
-    while (true) {
-      if (current) {
-        if (current.status === 204) return
+    try {
+      while (true) {
+        if (current) {
+          if (current.status === 204) return
+
+          try {
+            if (current.data) yield* current.data
+            lastError = undefined
+          } catch (error) {
+            if (!isRetryableDisconnect(error)) {
+              throw error
+            }
+            lastError = error
+          }
+          current = undefined
+        }
+
+        throwIfAborted(config)
+
+        if (attempts >= options.maxAttempts) {
+          if (lastError) throw lastError
+          return
+        }
+
+        notify?.('reconnecting')
+        const delay = Math.min(
+          state.serverDelay ?? options.delay ?? 1000,
+          options.maxDelay ?? MAX_TIMER_DELAY
+        )
+        const wait = waitForRetry(delay, config)
+
+        if (wait) await wait
+        throwIfAborted(config)
+        attempts += 1
 
         try {
-          if (current.data) yield* current.data
-          lastError = undefined
+          current = await connect()
         } catch (error) {
           if (!isRetryableDisconnect(error)) {
             throw error
           }
           lastError = error
         }
-        current = undefined
       }
-
-      throwIfAborted(config)
-
-      if (attempts >= options.maxAttempts) {
-        if (lastError) throw lastError
-        return
-      }
-
-      notify?.('reconnecting')
-      const delay = Math.min(
-        state.serverDelay ?? options.delay ?? 1000,
-        options.maxDelay ?? MAX_TIMER_DELAY
-      )
-      const wait = waitForRetry(delay, config)
-
-      if (wait) await wait
-      throwIfAborted(config)
-      attempts += 1
-
-      try {
-        current = await connect()
-      } catch (error) {
-        if (!isRetryableDisconnect(error)) {
-          throw error
-        }
-        lastError = error
-      }
+    } catch (error) {
+      if (!closed) throw error
     }
-  })(), () => first.data?.[Symbol.asyncIterator]().return?.())
+  })(), close, close)
 }
 
 function isRetryableDisconnect(error: unknown): boolean {

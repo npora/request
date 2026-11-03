@@ -20,6 +20,8 @@ interface StreamingParserContext {
   response: Response
   signal?: AbortSignal | null
   schemaConfig?: RequestConfig
+  closed?: boolean
+  interrupt?: () => void
   start(): void
 }
 
@@ -32,12 +34,11 @@ export function parseServerSentEvents<T = ServerSentEvent>(
   observer?: SseControlObserver,
   signal = config.signal
 ): AsyncIterable<T> {
-  return withEarlyIteratorCleanup(start => decodeServerSentEvents<T>(response.body, {
-    config,
-    response,
-    signal,
-    start
-  }, observer), () => response.body?.cancel())
+  const context: StreamingParserContext = { config, response, signal, start() {} }
+  return withEarlyIteratorCleanup(start => {
+    context.start = start
+    return decodeServerSentEvents<T>(response.body, context, observer)
+  }, () => response.body?.cancel(), () => context.interrupt?.())
 }
 
 /**
@@ -49,12 +50,11 @@ export function parseNdjson<T>(
   config: RequestConfig,
   signal = config.signal
 ): AsyncIterable<T> {
-  return withEarlyIteratorCleanup(start => decodeNdjson<T>(response.body, {
-    config,
-    response,
-    signal,
-    start
-  }), () => response.body?.cancel())
+  const context: StreamingParserContext = { config, response, signal, start() {} }
+  return withEarlyIteratorCleanup(start => {
+    context.start = start
+    return decodeNdjson<T>(response.body, context)
+  }, () => response.body?.cancel(), () => context.interrupt?.())
 }
 
 async function* decodeServerSentEvents<T>(
@@ -79,11 +79,19 @@ async function* decodeServerSentEvents<T>(
           ...(retry === undefined ? {} : { retry })
         }
 
-        yield await validateStreamingItem<T>(item, context, {
-          itemIndex,
-          event: item.event,
-          eventId: item.id
-        }, 'SSE')
+        let value: T
+        try {
+          value = await validateStreamingItem<T>(item, context, {
+            itemIndex,
+            event: item.event,
+            eventId: item.id
+          }, 'SSE')
+        } catch (error) {
+          if (context.closed) return
+          throw error
+        }
+        if (context.closed) return
+        yield value
         itemIndex += 1
       }
 
@@ -152,12 +160,15 @@ async function* decodeNdjson<T>(
     try {
       const item = JSON.parse(line) as unknown
 
-      yield await validateStreamingItem<T>(item, context, {
+      const value = await validateStreamingItem<T>(item, context, {
         itemIndex,
         lineNumber
       }, 'NDJSON')
+      if (context.closed) return
+      yield value
       itemIndex += 1
     } catch (error) {
+      if (context.closed) return
       if (isRequestError(error)) {
         throw error
       }
@@ -238,6 +249,11 @@ async function* decodeLines(
       signal: signals.length === 1 ? failure.signal : AbortSignal.any(signals)
     }
   }
+  context.interrupt = () => {
+    context.closed = true
+    failure?.abort()
+    void reader.cancel().catch(() => {})
+  }
   void reader.closed.catch(error => {
     streamError = error
     failure?.abort(isRequestError(error)
@@ -260,8 +276,10 @@ async function* decodeLines(
 
   try {
     while (true) {
+      if (context.closed) return
       check()
       const result = await reader.read()
+      if (context.closed) return
       check()
       completed = result.done
       const chunk = completed
@@ -322,6 +340,7 @@ async function* decodeLines(
       error
     )
   } finally {
+    context.interrupt = undefined
     try {
       if (!completed) {
         // A source's cancellation hook may never settle. Release ownership
