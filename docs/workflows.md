@@ -230,6 +230,9 @@ reads finish with `done: true`; `return(value)` preserves its value and `throw(e
 rejects with that error. Closing releases readers and request timers without
 aborting the caller's signal. Already running validator callbacks may finish their
 own work later, but cannot deliver another item after closure.
+Interruption and normal iterator cleanup share a terminal close operation, so a
+custom adapter's iterator is not closed twice. Nonterminal returns from a generator
+that yields in `finally` can still advance to terminal closure.
 
 The retry plugin handles failures within the request pipeline. It does not
 restart an iterator after consumption has begun. For SSE streams that should

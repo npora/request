@@ -32,22 +32,24 @@ size report.
 ## Stream iterator cancellation
 
 Compared with released 1.22.2 (`c79219b`), interrupting pending iterator reads,
-validation and SSE reconnects adds the following cost to the same consumer entries:
+validation and SSE reconnects, with shared terminal cleanup for custom iterators,
+adds the following cost to the same consumer entries:
 
 | Application | Before gzip bytes | After gzip bytes |
 | --- | ---: | ---: |
-| Root: basic | 14,470 | 14,707 |
-| Core: basic | 14,464 | 14,700 |
-| Core + retry | 15,848 | 16,089 |
-| Core + full cache | 20,970 | 21,201 |
-| Core + memory cache | 15,682 | 15,919 |
-| Root + retry + cache | 22,327 | 22,565 |
-| Core + retry + cache | 22,376 | 22,619 |
+| Root: basic | 14,470 | 14,795 |
+| Core: basic | 14,464 | 14,786 |
+| Core + retry | 15,848 | 16,178 |
+| Core + full cache | 20,970 | 21,286 |
+| Core + memory cache | 15,682 | 16,005 |
+| Root + retry + cache | 22,327 | 22,651 |
+| Core + retry + cache | 22,376 | 22,704 |
 
 The existing consumer measurement command reproduces these browser bundles.
-The seven affected consumer ceilings increase by 275 gzip bytes each for this
+The seven affected consumer ceilings increase by 375 gzip bytes each for this
 reliability fix. The schema-error helper remains 268 bytes with the same ceiling;
-all transitive package, declaration and tarball ceilings stay unchanged. No public
+all transitive entrypoint and declaration ceilings stay unchanged. The tarball
+ceiling increases by 200 bytes, from 137,750 to 137,950 (measured: 137,868). No public
 API or dependency is added. This is a resource-lifecycle fix, not a size reduction.
 
 ## Configuration merger reduction
