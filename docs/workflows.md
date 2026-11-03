@@ -224,6 +224,13 @@ it explicitly with `await records[Symbol.asyncIterator]().return?.()`. This also
 releases an unopened reconnecting SSE response and its timeout resources.
 Closing an iterator does not read an item or start another connection.
 
+Calling `return()` or `throw()` also interrupts an outstanding `next()`, including
+waiting for bytes, item validation, or an SSE reconnect delay/connection. Pending
+reads finish with `done: true`; `return(value)` preserves its value and `throw(error)`
+rejects with that error. Closing releases readers and request timers without
+aborting the caller's signal. Already running validator callbacks may finish their
+own work later, but cannot deliver another item after closure.
+
 The retry plugin handles failures within the request pipeline. It does not
 restart an iterator after consumption has begun. For SSE streams that should
 resume after EOF or a transient disconnect, opt in to bounded reconnection:

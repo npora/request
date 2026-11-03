@@ -39,7 +39,9 @@ test('injected Undici dispatcher reuses a connection and cleans up aborts and st
     const stream = await client.sse('/stream')
     const iterator = stream[Symbol.asyncIterator]()
     assert.equal((await iterator.next()).value.data, 'first')
+    const reading = iterator.next()
     await iterator.return()
+    assert.deepEqual(await reading, { value: undefined, done: true })
     assert.deepEqual(await client.get('/json'), { ok: true }, 'Released stream must not starve a one-connection pool')
   } finally {
     await dispatcher.destroy()
