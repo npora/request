@@ -1,7 +1,26 @@
 /** Use the same owned iterator for consumption and cancellation. */
 export function singleIterator<T>(source: AsyncIterable<T>): AsyncIterable<T> {
   let iterator: AsyncIterator<T> | undefined
-  return { [Symbol.asyncIterator]() { return iterator ??= source[Symbol.asyncIterator]() } }
+  return { [Symbol.asyncIterator]() {
+    if (iterator) return iterator
+    const owned = source[Symbol.asyncIterator]()
+    let closing: Promise<IteratorResult<T>> | undefined
+    const close = (value: unknown): Promise<IteratorResult<T>> =>
+      Promise.resolve().then(() => owned.return?.(value) ?? { done: true, value })
+    iterator = {
+      next: owned.next.bind(owned),
+      return(value) {
+        // Interruption and native yield* cleanup can both request closure.
+        // A generator may yield from finally; advance nonterminal returns.
+        closing = closing
+          ? closing.then(result => result.done ? { done: true, value } : close(value))
+          : close(value)
+        return closing
+      },
+      ...(owned.throw ? { throw: owned.throw.bind(owned) } : {})
+    }
+    return iterator
+  } }
 }
 
 /** Close early generators and interrupt work that would otherwise block return/throw. */

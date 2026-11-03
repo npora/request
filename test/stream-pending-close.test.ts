@@ -4,16 +4,38 @@ import { createClient } from '../src/core-entry'
 afterEach(() => vi.useRealTimers())
 
 describe('closing a streaming iterator with a pending read', () => {
-  it.each(['ndjson', 'sse', 'observed sse', 'reconnecting sse'])(
-    'closes the owned custom-adapter iterator for %s', async format => {
+  it('finishes a custom generator that yields during cleanup without delivering that item', async () => {
+    const cleanup = vi.fn()
+    const data = { async *[Symbol.asyncIterator]() {
+      try { yield 1 } finally { cleanup(); yield 2 }
+    } }
+    const api = createClient({ adapter: { async request<T>(config) {
+      return { config, data: data as T, status: 200, statusText: 'OK', headers: new Headers(), raw: new Response() }
+    } } })
+    const iterator = (await api.ndjson('/stream', { totalTimeout: 1000 }))[Symbol.asyncIterator]()
+    await expect(iterator.next()).resolves.toEqual({ done: false, value: 1 })
+    await expect(iterator.return!('finished')).resolves.toEqual({ done: true, value: 'finished' })
+    await expect(iterator.next()).resolves.toMatchObject({ done: true })
+    expect(cleanup).toHaveBeenCalledTimes(1)
+  })
+
+  it.each(['ndjson', 'sse', 'observed sse', 'reconnecting sse'].flatMap(format =>
+    [false, true].map(pending => ({ format, pending }))
+  ))(
+    'closes the owned custom-adapter iterator once for $format (pending=$pending)', async ({ format, pending }) => {
       let entered!: () => void
       const waiting = new Promise<void>(resolve => { entered = resolve })
       const iterators: AsyncIterator<unknown>[] = []
+      const closed = vi.fn()
       const data = { [Symbol.asyncIterator]() {
         let finish: ((value: IteratorResult<unknown>) => void) | undefined
+        let sent = false
         const iterator: AsyncIterator<unknown> = {
-          next() { return new Promise(resolve => { finish = resolve; entered() }) },
-          async return(value) { finish?.({ done: true, value: undefined }); return { done: true, value } }
+          next() {
+            if (!pending && !sent) { sent = true; return Promise.resolve({ done: false, value: { id: 1 } }) }
+            return new Promise(resolve => { finish = resolve; entered() })
+          },
+          async return(value) { closed(); finish?.({ done: true, value: undefined }); return { done: true, value } }
         }
         iterators.push(iterator)
         return iterator
@@ -28,7 +50,8 @@ describe('closing a streaming iterator with a pending read', () => {
             ...(format === 'reconnecting sse' ? { reconnect: { maxAttempts: 3 } } : {}) })
       const iterator = stream[Symbol.asyncIterator]()
       const reading = iterator.next().catch(error => ({ error }))
-      await waiting
+      if (pending) await waiting
+      else await expect(reading).resolves.toMatchObject({ done: false })
       const closing = iterator.return!('finished')
       let timer: ReturnType<typeof setTimeout> | undefined
       try {
@@ -36,8 +59,9 @@ describe('closing a streaming iterator with a pending read', () => {
           timer = setTimeout(() => resolve('pending'), 50)
         })])
         expect(result).toEqual({ done: true, value: 'finished' })
-        await expect(reading).resolves.toMatchObject({ done: true })
+        if (pending) await expect(reading).resolves.toMatchObject({ done: true })
         expect(iterators).toHaveLength(1)
+        expect(closed).toHaveBeenCalledTimes(1)
       } finally {
         clearTimeout(timer)
         await Promise.allSettled(iterators.map(source => source.return?.()))
