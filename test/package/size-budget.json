@@ -2,12 +2,12 @@
   "files": {
     "dist/index.js": {
       "bytes": 154075,
-      "gzipBytes": 51000,
+      "gzipBytes": 51250,
       "transitive": true
     },
     "dist/index.cjs": {
       "bytes": 158575,
-      "gzipBytes": 52050,
+      "gzipBytes": 52300,
       "transitive": true
     },
     "dist/index.d.ts": {
@@ -62,7 +62,7 @@
     }
   },
   "package": {
-    "bytes": 137950,
+    "bytes": 138550,
     "unpackedBytes": 517100
   }
 }

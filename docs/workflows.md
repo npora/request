@@ -379,11 +379,24 @@ access token when the refresh endpoint returns 401; transient network failures
 leave credentials intact.
 
 Overlapping 401 handling shares one in-flight refresh within a plugin instance.
-Each request can refresh once, then retry with the new token. Cancelling one
+After a completed refresh, a delayed 401 from an older request first resolves
+the current credential through the usual request-token, plugin-token and storage
+priority. If it differs from the failed request's authorization, the request
+replays with it instead of refreshing again. No refreshed token is retained by
+the plugin; applications using this optimization must expose the new credential
+through their provider or storage. A request sent with the current credential
+can still initiate a new refresh when it receives a 401.
+Each request can perform one authentication replay. Cancelling one
 waiter rejects that caller with `ABORT_ERROR` while other waiters continue.
 If refresh fails, callers retain their original request error and a later
 request can try refreshing again. This authentication retry does not require
 installing `retryPlugin`.
+
+When an authentication replay changes authorization, cookies or Fetch credentials,
+the cache skips persisting that response under the original credential's key and
+does not restore an old-identity stale response. The next request with the new
+credential can populate its own cache entry. This also applies to explicit cache
+keys; keep clearing session caches and aborting outstanding requests on logout.
 
 Create a client and storage per user session on the server; the in-memory
 storage above must not be shared across unrelated SSR requests. Browser

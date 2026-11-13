@@ -61,6 +61,9 @@ pnpm test:edge
 pnpm test:browser
 ```
 
-The isolated fixture pins Undici 7.30.1 and overrides sharp to 0.35.5 to address
-advisories in Miniflare's pinned dependencies. The fixture is audited and tested
+The isolated fixture pins Undici 7.30.2 and overrides sharp to 0.35.5 to address
+advisories in Miniflare's pinned dependencies. A separate `undici-next` alias pins
+Undici 8.12.4 and runs the same real-HTTP dispatcher contracts on both versions;
+it does not replace Miniflare's 7.x transport. Undici 8 requires Node.js 22.19.0
+or newer. The fixture is audited and tested
 in CI; none of its dependencies enter the published package.

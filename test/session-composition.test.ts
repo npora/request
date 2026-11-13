@@ -56,7 +56,7 @@ describe.each(['auth-first', 'cache-first'] as const)('%s session composition', 
     await expect(leader).resolves.toEqual({ owner: 'A' })
     expect(refreshToken).toHaveBeenCalledOnce()
     expect(headers).toEqual(['Bearer expired', 'Bearer fresh', 'Bearer fresh'])
-    // Cache identity is captured before refresh; warm the new credential's key.
+    // Credential-changing retries skip persistence; warm the new identity's key.
     await expect(client.get('/catalog', readOptions)).resolves.toEqual({ owner: 'A' })
     await expect(client.get('/catalog', readOptions)).resolves.toEqual({ owner: 'A' })
     expect(fetch).toHaveBeenCalledTimes(4)

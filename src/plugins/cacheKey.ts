@@ -3,6 +3,15 @@ import { isURLSearchParams } from '../utils/isURLSearchParams'
 
 const EMPTY_QUERY: ReadonlyArray<[string, string]> = []
 
+/** Credentials must not change underneath an acquired cache generation. */
+export function cacheCredentialIdentity(config: RequestConfig): string {
+  const headers = new Headers(config.headers)
+  return JSON.stringify([
+    headers.get('authorization'), headers.get('cookie'),
+    config.fetchOptions?.credentials ?? 'same-origin'
+  ])
+}
+
 export function createCacheKey(
   config: RequestConfig,
   cache: CacheOptions,

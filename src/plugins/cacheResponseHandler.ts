@@ -16,6 +16,7 @@ import {
 } from './cacheValidation'
 import { resolveResponseCachePolicy } from './cachePolicy'
 import type { CacheState } from './cacheState'
+import { cacheCredentialIdentity } from './cacheKey'
 
 export function createCacheResponseHandler(state: CacheState) {
   const {
@@ -67,6 +68,12 @@ export function createCacheResponseHandler(state: CacheState) {
     }
 
     const revalidation = revalidations.get(requestContext)
+
+    if (state.requestIdentities.get(requestContext) !==
+      cacheCredentialIdentity(requestContext.config)) {
+      uncacheableLeaders.add(requestContext)
+      return
+    }
 
     if (
       requestContext.response.raw.type === 'opaque' ||
