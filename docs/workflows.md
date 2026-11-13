@@ -553,3 +553,13 @@ try {
 
 Cancellation rejects with `ABORT_ERROR`. For transport configuration on
 Node.js, see the [Undici integration guide](undici.md).
+
+Already-started asynchronous retry and circuit-breaker policies remain observed
+when cancellation wins during abort-listener setup. A late policy rejection must
+not become an unhandled rejection. Circuit-breaker settlement preserves the
+original request error when its failure-counting policy is cancelled.
+
+CI also runs `pnpm stress -- --operations 100000 --concurrency 64 --warmup 200`
+to exercise composed plugins and cancellation beyond individual assertions.
+Its report is included in the benchmark artifact; this is a correctness check,
+not a cross-library throughput comparison.

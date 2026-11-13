@@ -182,6 +182,9 @@ jobs:
       - name: Run performance benchmarks
         run: pnpm benchmark -- --operations 50000 --warmup 2000 --samples 4096 --output .artifacts/benchmarks/request.json
 
+      - name: Verify composed lifecycle stress
+        run: pnpm stress -- --operations 100000 --concurrency 64 --warmup 200 --output .artifacts/benchmarks/stress.json
+
       - name: Run million-item streaming schema benchmark
         run: pnpm benchmark:streaming -- --operations 1000000 --warmup 1000 --output .artifacts/benchmarks/streaming-schema.json
 

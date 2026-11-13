@@ -6,7 +6,7 @@ import type {
 } from '../types'
 import type { Plugin } from './Plugin'
 import { isPromiseLike } from '../utils/isPromiseLike'
-import { waitForSignal } from '../utils/waitForSignal'
+import { waitForPending } from '../utils/waitForSignal'
 import { resolveRequestOrigin } from '../utils/resolveRequestOrigin'
 import { resolveExtensionConfig } from './resolveExtensionConfig'
 
@@ -253,8 +253,8 @@ export function circuitBreakerPlugin(
             requestContext.config.signal &&
             isPromiseLike(counted)
           ) {
-            counted = waitForSignal(
-              () => counted,
+            counted = waitForPending(
+              counted,
               requestContext.config
             )
           }

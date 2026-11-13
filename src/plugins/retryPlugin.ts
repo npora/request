@@ -7,7 +7,7 @@ import type {
 } from '../types'
 import type { Plugin } from './Plugin'
 import { isPromiseLike } from '../utils/isPromiseLike'
-import { waitForSignal } from '../utils/waitForSignal'
+import { waitForPending } from '../utils/waitForSignal'
 import { MAX_TIMER_DELAY } from '../utils/maxTimerDelay'
 import { resolveExtensionConfig } from './resolveExtensionConfig'
 import { isReadableStream } from '../utils/isReadableStream'
@@ -120,7 +120,7 @@ export function retryPlugin(
           })
 
           return requestContext.config.signal
-            ? waitForSignal(() => decision, requestContext.config)
+            ? waitForPending(decision, requestContext.config)
             : decision
         }
 
@@ -137,7 +137,7 @@ export function retryPlugin(
         )
 
         return requestContext.config.signal && isPromiseLike(decision)
-          ? waitForSignal(() => decision, requestContext.config)
+          ? waitForPending(decision, requestContext.config)
           : decision
       })
     }
