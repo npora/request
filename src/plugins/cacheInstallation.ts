@@ -12,6 +12,7 @@ import { releaseCacheGeneration } from './cacheShared'
 import { ignoreCacheEventError } from './cacheEvents'
 import type { CachePlugin } from './cacheTypes'
 import type { CacheState } from './cacheState'
+import { cacheCredentialIdentity } from './cacheKey'
 
 /** One installation owns only its leaders and refresh leases. */
 export function createCacheInstallation() {
@@ -31,6 +32,8 @@ export function createCacheErrorHandler(state: CacheState) {
 
     if (
       !record ||
+      state.requestIdentities.get(requestContext) !==
+        cacheCredentialIdentity(requestContext.config) ||
       !isEligibleStaleIfError(requestContext.error)
     ) {
       return
@@ -73,6 +76,7 @@ export function createCacheSettledHandler(
     noStoreRequests.delete(requestContext)
     staleFallbacks.delete(requestContext)
     cacheFallbacks.delete(requestContext)
+    state.requestIdentities.delete(requestContext)
 
     const requestGeneration = requestGenerations.get(requestContext)
     const invalidateAfterSuccess = () => {

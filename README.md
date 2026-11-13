@@ -472,6 +472,13 @@ const user = await request.get<User>('/users/1', {
 cache.clear()
 ```
 
+Authentication shares in-flight refreshes and reuses the current credential for
+delayed 401 responses after a completed refresh. Expose the updated token through
+your provider or storage. Credential-changing retries skip cache persistence;
+the next request can populate the new credential's entry. See the
+[authentication workflow](https://github.com/npora/request/blob/main/docs/workflows.md#refresh-authentication-tokens)
+for cancellation and session cleanup.
+
 See [cache workflows](https://github.com/npora/request/blob/main/docs/cache.md) for request sharing, cache updates, tag
 invalidation, HTTP revalidation, stale recovery, persistent stores, and
 coordination across browser tabs.

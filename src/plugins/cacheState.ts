@@ -35,6 +35,7 @@ export function createCacheState(options: CachePluginOptions) {
   const cacheHits = new WeakSet<object>()
   const leaders = new WeakMap<object, InFlightRequest>()
   const requestGenerations = new WeakMap<object, CacheGeneration>()
+  const requestIdentities = new WeakMap<object, string>()
   const automaticInvalidations = new WeakMap<object, readonly string[]>()
   const completedRecords = new WeakMap<object, CacheEntry>()
   const revalidations = new WeakMap<object, CacheEntry>()
@@ -71,6 +72,7 @@ export function createCacheState(options: CachePluginOptions) {
     cacheHits,
     leaders,
     requestGenerations,
+    requestIdentities,
     automaticInvalidations,
     completedRecords,
     revalidations,

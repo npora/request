@@ -72,6 +72,8 @@ export function authPlugin(options: AuthPluginOptions = {}): Plugin {
   } | undefined
 
   const refreshedContexts = new WeakSet<object>()
+  const requestGenerations = new WeakMap<object, number>()
+  let refreshGeneration = 0
 
   return {
     name: 'auth',
@@ -81,12 +83,27 @@ export function authPlugin(options: AuthPluginOptions = {}): Plugin {
       const installation = {}
 
       context.interceptors.request.use(config => {
-        return config.signal
+        const generation = refreshGeneration
+        const applied = config.signal
           ? waitForSignal(
               () => applyAuthorization(config, options),
               config
             )
           : applyAuthorization(config, options)
+        const remember = (authorized: RequestConfig) => {
+          requestGenerations.set(authorized, generation)
+          return authorized
+        }
+        return isPromiseLike(applied)
+          ? Promise.resolve(applied).then(remember)
+          : remember(applied)
+      })
+
+      context.hooks.onRequest(requestContext => {
+        requestGenerations.set(
+          requestContext,
+          requestGenerations.get(requestContext.config) ?? refreshGeneration
+        )
       })
 
       context.hooks.onRetry(requestContext => {
@@ -132,6 +149,24 @@ export function authPlugin(options: AuthPluginOptions = {}): Plugin {
         refreshedContexts.add(requestContext)
 
         try {
+          // A delayed 401 may belong to a credential that another request has
+          // already replaced. Resolve through the normal per-request priority;
+          // never retain a refreshed token outside the application's storage.
+          if (requestGenerations.get(requestContext) !== refreshGeneration) {
+            const current = await waitForSignal(
+              () => resolveAuthorization(requestContext.config, options),
+              requestContext.config
+            )
+            if (!active || !current.token) return undefined
+            if (new Headers(requestContext.config.headers).get('authorization') !==
+              `${current.scheme ?? 'Bearer'} ${current.token}`) {
+              requestContext.config = setAuthorizationHeader(
+                requestContext.config, current.token, current.scheme
+              )
+              return { retry: true, delay: 0 }
+            }
+          }
+
           const refreshedToken = await waitForSignal(
             () => refreshAccessToken(refreshToken, installation),
             requestContext.config
@@ -217,6 +252,10 @@ export function authPlugin(options: AuthPluginOptions = {}): Plugin {
               return Promise.resolve(write).then(() => token)
             }
 
+            return token
+          })
+          .then(token => {
+            if (refresh.installations.size > 0) refreshGeneration++
             return token
           })
           .finally(() => {

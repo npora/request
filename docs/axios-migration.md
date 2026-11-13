@@ -182,7 +182,7 @@ including array encoding, multipart values, credentials, and error handling.
 ## Compare real HTTP requests
 
 The [migration contract suite](../benchmark/competitors/axios-migration.test.mjs)
-compares the built package with pinned Axios 1.21.0 using both its Node HTTP
+compares the built package with pinned Axios 1.21.1 using both its Node HTTP
 and Fetch adapters against the same loopback HTTP server:
 
 ```sh
@@ -227,4 +227,6 @@ OpenTelemetry Metrics plugin and select its documented request/attempt/stream
 measurements; their timing boundaries are not automatically equivalent to
 Axios's duration. The historical 1.20.0 comparison reports remain archived;
 use the [reliability patch comparison](measurements/fetch-capability/README.md)
-for the 1.21.0 fixture. See [Axios's release notes](https://github.com/axios/axios/releases/tag/v1.21.0).
+for the historical 1.21.0 fixture. The current fixture uses 1.21.1, which fixes
+its response timer's Next.js prerendering compatibility and raises the minimum
+redirect dependency version. See [Axios's release notes](https://github.com/axios/axios/releases/tag/v1.21.1).

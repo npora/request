@@ -29,6 +29,20 @@ exports and combine shared chunks. The consumer report is checked against
 `benchmark/consumer-size-budget.json` in CI and recorded alongside the package
 size report.
 
+## Authentication and cache identity
+
+Compared with 1.22.3, credential-identity guards add 80 gzip bytes to the
+core + cache consumer (21,286 to 21,366), 75 to root + retry + cache
+(22,651 to 22,726), and 77 to core + retry + cache (22,704 to 22,781).
+Those three consumer ceilings increase by 100 bytes; basic core, retry,
+memory-cache and schema-error consumers are unchanged.
+
+The root transitive closure, including auth, measures 51,133 ESM / 52,174 CJS
+gzip bytes, up from 50,898 / 51,942. Their ceilings increase by 250 bytes.
+The tarball measures 138,437 bytes; its ceiling increases by 600 bytes to
+138,550. Declaration, core and other plugin ceilings remain unchanged.
+No public API or runtime dependency is added.
+
 ## Stream iterator cancellation
 
 Compared with released 1.22.2 (`c79219b`), interrupting pending iterator reads,

@@ -3,8 +3,8 @@
   "root: basic": 14870,
   "core: basic": 14865,
   "core + retry": 16225,
-  "core + cache": 21375,
+  "core + cache": 21475,
   "core + memory cache": 16075,
-  "root: retry + cache": 22715,
-  "core + retry + cache": 22760
+  "root: retry + cache": 22815,
+  "core + retry + cache": 22860
 }

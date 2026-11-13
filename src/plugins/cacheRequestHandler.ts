@@ -6,7 +6,7 @@ import type { PluginContext } from './Plugin'
 import { resolveExtensionConfig } from './resolveExtensionConfig'
 import { resolveRequestCachePolicy } from './cachePolicy'
 import { isCacheableRequest } from './cacheLifecycle'
-import { createCacheKey } from './cacheKey'
+import { cacheCredentialIdentity, createCacheKey } from './cacheKey'
 import {
   acquireCacheGeneration,
   isCurrentCacheGeneration,
@@ -125,6 +125,9 @@ export function createCacheRequestHandler(
     )
 
     requestGenerations.set(requestContext, requestGeneration)
+    state.requestIdentities.set(
+      requestContext, cacheCredentialIdentity(requestContext.config)
+    )
 
     const read = () => {
       const stored = readStore(store, key)
