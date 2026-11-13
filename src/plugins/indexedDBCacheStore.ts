@@ -21,6 +21,7 @@ import {
   normalizeCompactionMaxRemovals, normalizeIndexedDBSchemaVersion
 } from './indexedDBCacheValidation'
 import { pruneOlderSchemaRecords } from './indexedDBCacheMaintenance'
+import { CacheInvalidation, type CacheOperationToken } from './cacheOperationQueue'
 
 export type {
   IndexedDBCacheStoreOptions, IndexedDBCacheUsage,
@@ -49,6 +50,8 @@ export class IndexedDBCacheStore implements CacheStore {
   private readonly schemaVersion: number
 
   private database?: Promise<IDBDatabase>
+
+  private readonly writes = new CacheInvalidation()
 
   constructor(
     factory: IDBFactory,
@@ -125,12 +128,23 @@ export class IndexedDBCacheStore implements CacheStore {
   }
 
   async set(key: string, entry: CacheEntry): Promise<void> {
+    this.writes.invalidate(key)
+    const token = this.writes.capture(key, entry.tags)
+    try {
+      await this.setEntry(key, entry, token)
+    } finally {
+      this.writes.release(token)
+    }
+  }
+
+  private async setEntry(key: string, entry: CacheEntry, token: CacheOperationToken): Promise<void> {
     if (this.maxEntries === 0 || this.maxBytes === 0) {
       await this.delete(key)
       return
     }
 
     const database = await this.getDatabase()
+    if (!token.valid) return
     const record: IndexedDBCacheRecord = {
       ...toPortableCacheEntry(entry),
       key: this.createKey(key),
@@ -155,6 +169,8 @@ export class IndexedDBCacheStore implements CacheStore {
       ? await this.shouldPersist(toPortableCacheEntry(record), record.size)
       : true
 
+    if (!token.valid) return
+
     if (typeof admission !== 'boolean') {
       throw new RequestError(
         'IndexedDB cache shouldPersist must return a boolean',
@@ -176,6 +192,7 @@ export class IndexedDBCacheStore implements CacheStore {
     try {
       await this.writeRecord(database, record)
     } catch (error) {
+      if (!token.valid) return
       if (
         !this.quotaRecovery ||
         !isQuotaExceededError(error) ||
@@ -184,11 +201,12 @@ export class IndexedDBCacheStore implements CacheStore {
         throw error
       }
 
-      await this.writeRecord(database, record)
+      if (token.valid) await this.writeRecord(database, record)
     }
   }
 
   async delete(key: string): Promise<void> {
+    this.writes.invalidate(key)
     const database = await this.getDatabase()
     const transaction = database.transaction(STORE_NAME, 'readwrite')
     const done = waitForTransaction(transaction)
@@ -205,6 +223,7 @@ export class IndexedDBCacheStore implements CacheStore {
   }
 
   async invalidateTags(tags: readonly string[]): Promise<number> {
+    this.writes.invalidateTags(tags)
     const expected = new Set(tags)
     let deleted = 0
 
@@ -221,6 +240,7 @@ export class IndexedDBCacheStore implements CacheStore {
   }
 
   async clear(): Promise<void> {
+    this.writes.invalidate()
     await this.visitNamespace(() => true)
   }
 

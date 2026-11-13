@@ -5,6 +5,21 @@ in client defaults before using these workflows. For option defaults and
 cache eligibility, see the [configuration reference](configuration.md#extensionscache).
 For the smaller TTL-only alternative, see [memory caching](configuration.md#extensionsmemorycache).
 
+Persistence defaults to HTTP 200–299 except partial-content 206, even when
+`throwHttpErrors: false` accepts other statuses. Use
+`cachePlugin({ statusCodes: [200, 404] })` to replace that policy explicitly;
+an empty list disables response persistence. HTTP `no-store` and other cache
+admission rules still apply. Equivalent in-flight requests may share a response
+that is not persisted.
+
+`cache.clear()` invalidates older request generations immediately. Await its
+result for asynchronous stores: it waits for already-started writes before
+clearing, and new requests wait for that clear to settle before reading.
+Explicit key/tag mutations also coordinate with pending network writes.
+IndexedDB abandons an older asynchronous admission after a matching local
+key/tag invalidation or clear; tiered stores discard invalidated pending reads
+instead of promoting their old values into memory.
+
 ## Shared requests and statistics
 
 Equivalent concurrent cache-enabled requests share one network operation by

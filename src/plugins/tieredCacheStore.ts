@@ -1,5 +1,6 @@
 import { RequestError } from '../errors'
 import { isPromiseLike } from '../utils/isPromiseLike'
+import { CacheInvalidation, CacheOperationQueue, type CacheOperationToken } from './cacheOperationQueue'
 import type {
   CacheEntry,
   CacheRefreshLease,
@@ -65,6 +66,10 @@ export class TieredCacheStore implements CacheStore {
 
   private trackedKeyCount = 0
 
+  private readonly reads = new CacheInvalidation()
+
+  private readonly operations = new CacheOperationQueue()
+
   constructor(options: TieredCacheStoreOptions) {
     if (
       !options ||
@@ -123,29 +128,49 @@ export class TieredCacheStore implements CacheStore {
   }
 
   get(key: string): MaybePromise<CacheEntry | undefined> {
+    const token = this.reads.capture(key)
+    let result: MaybePromise<CacheEntry | undefined>
+    try { result = this.readPrimary(key, token) } catch (error) {
+      this.reads.release(token)
+      throw error
+    }
+    if (isPromiseLike(result)) {
+      return Promise.resolve(result).then(entry => token.valid ? entry : undefined)
+        .finally(() => this.reads.release(token))
+    }
+    this.reads.release(token)
+    return token.valid ? result : undefined
+  }
+
+  private readPrimary(key: string, token: CacheOperationToken): MaybePromise<CacheEntry | undefined> {
     let primary: MaybePromise<CacheEntry | undefined>
 
     try {
       primary = this.primary.get(key)
     } catch {
-      return this.readSecondary(key)
+      return this.readSecondary(key, token)
     }
 
     if (isPromiseLike(primary)) {
       return Promise.resolve(primary).then(
         entry => entry
           ? this.remember(key, entry)
-          : this.readSecondary(key),
-        () => this.readSecondary(key)
+          : this.readSecondary(key, token),
+        () => this.readSecondary(key, token)
       )
     }
 
     return primary
       ? this.remember(key, primary)
-      : this.readSecondary(key)
+      : this.readSecondary(key, token)
   }
 
   set(key: string, entry: CacheEntry): MaybePromise<void> {
+    this.reads.invalidate(key)
+    return this.operations.run(key, () => this.writeEntry(key, entry))
+  }
+
+  private writeEntry(key: string, entry: CacheEntry): MaybePromise<void> {
     const writePrimary = () => {
       let result: MaybePromise<void>
 
@@ -176,7 +201,8 @@ export class TieredCacheStore implements CacheStore {
   }
 
   delete(key: string): MaybePromise<void> {
-    return this.afterSettled(
+    this.reads.invalidate(key)
+    return this.operations.run(key, () => this.afterSettled(
       () => combineStoreOperations([
         () => this.primary.delete(key),
         () => this.secondary.delete(key)
@@ -185,7 +211,7 @@ export class TieredCacheStore implements CacheStore {
         this.untrackKey(key)
         this.broadcastKey(key)
       }
-    )
+    ))
   }
 
   invalidateTags(tags: readonly string[]): MaybePromise<number> {
@@ -199,23 +225,25 @@ export class TieredCacheStore implements CacheStore {
       )
     }
 
-    return this.afterSettled(
+    this.reads.invalidate()
+    return this.operations.clear(() => this.afterSettled(
       () => combineStoreOperations([
         () => primary.call(this.primary, tags),
         () => secondary.call(this.secondary, tags)
       ], results => Math.max(...results)),
       () => this.broadcastClear()
-    )
+    ))
   }
 
   clear(): MaybePromise<void> {
-    return this.afterSettled(
+    this.reads.invalidate()
+    return this.operations.clear(() => this.afterSettled(
       () => combineStoreOperations([
         () => this.primary.clear(),
         () => this.secondary.clear()
       ], () => undefined),
       () => this.broadcastClear()
-    )
+    ))
   }
 
   private async acquireCoordinatedLease(
@@ -244,6 +272,7 @@ export class TieredCacheStore implements CacheStore {
 
   /** Stop listening for cross-context invalidation messages. */
   dispose(): void {
+    this.reads.invalidate()
     this.channel?.removeEventListener('message', this.handleMessage)
 
     for (const release of this.leaseReleases) {
@@ -312,22 +341,23 @@ export class TieredCacheStore implements CacheStore {
   }
 
   private readSecondary(
-    key: string
+    key: string,
+    token: CacheOperationToken
   ): MaybePromise<CacheEntry | undefined> {
     const promote = (
       entry: CacheEntry | undefined
     ): MaybePromise<CacheEntry | undefined> => {
-      if (!entry) {
+      if (!entry || !token.valid) {
         return undefined
       }
 
       try {
-        const result = this.primary.set(key, entry)
+        const result = this.operations.run(key, () => token.valid ? this.primary.set(key, entry) : undefined)
 
         if (isPromiseLike(result)) {
           return Promise.resolve(result).then(
-            () => this.remember(key, entry),
-            () => this.remember(key, entry)
+            () => token.valid ? this.remember(key, entry) : undefined,
+            () => token.valid ? this.remember(key, entry) : undefined
           )
         }
       } catch {
@@ -453,14 +483,16 @@ export class TieredCacheStore implements CacheStore {
     this.trackedKeyCount -= keys.size
 
     for (const key of keys) {
-      ignoreStoreResult(() => this.primary.delete(key))
+      this.reads.invalidate(key)
+      ignoreStoreResult(() => this.operations.run(key, () => this.primary.delete(key)))
     }
   }
 
   private clearPrimary(): void {
+    this.reads.invalidate()
     this.trackedKeys.clear()
     this.trackedKeyCount = 0
-    ignoreStoreResult(() => this.primary.clear())
+    ignoreStoreResult(() => this.operations.clear(() => this.primary.clear()))
   }
 
   private recoverPrimaryWrite(key: string): void {

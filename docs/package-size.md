@@ -29,6 +29,33 @@ exports and combine shared chunks. The consumer report is checked against
 `benchmark/consumer-size-budget.json` in CI and recorded alongside the package
 size report.
 
+## Composed lifecycle contracts
+
+Against 1.22.4, the same consumer entries measure the following gzip cost for
+cache mutation ordering, conditional-auth replay and the explicit status policy:
+
+| Consumer | 1.22.4 bytes | Candidate bytes |
+| --- | ---: | ---: |
+| Root: basic | 14,795 | 14,803 |
+| Core: basic | 14,786 | 14,804 |
+| Core + retry | 16,178 | 16,184 |
+| Core + cache | 21,366 | 21,917 |
+| Core + memory cache | 16,005 | 16,014 |
+| Root + retry + cache | 22,726 | 23,266 |
+| Core + retry + cache | 22,781 | 23,274 |
+
+Only the three full-cache consumer ceilings increase, by 600 bytes each. Basic,
+retry, memory-cache and schema-error ceilings are unchanged. Sharing the pure
+URL joiner changes chunk boundaries: core's transitive gzip closure measures
+17,983 bytes even though the basic application grows only 18 gzip bytes.
+Its closure ceiling increases by 350 bytes. Root ESM/CJS closures measure
+52,444 / 53,528 bytes; their ceilings increase by 1,400 bytes. Tracing measures
+4,584 raw / 2,286 gzip bytes (ceilings +150 / +250), and metrics measures 3,039
+gzip bytes (ceiling +300). The tarball measures 141,129 bytes, with its ceiling
+increased by 3,000 to 141,550. Declaration and unpacked-package ceilings remain
+unchanged. No runtime dependency is added; `cachePlugin.statusCodes` is a new
+optional public setting. These are explicit reliability costs, not speed claims.
+
 ## Authentication and cache identity
 
 Compared with 1.22.3, credential-identity guards add 80 gzip bytes to the

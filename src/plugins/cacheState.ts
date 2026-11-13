@@ -14,6 +14,8 @@ import type {
 } from './cacheShared'
 import type { CachePluginOptions } from './cacheTypes'
 import { createCacheStats, createCacheEventRecorder } from './cacheEvents'
+import { CacheOperationQueue } from './cacheOperationQueue'
+import { RequestError } from '../errors'
 
 const DEFAULT_CACHE_METHODS: readonly HttpMethod[] = [
   'GET',
@@ -29,6 +31,11 @@ const DEFAULT_VARY_HEADERS = [
 
 /** State is shared by a plugin's mutations and installed lifecycle hooks. */
 export function createCacheState(options: CachePluginOptions) {
+  if (options.statusCodes !== undefined && (!Array.isArray(options.statusCodes) ||
+    options.statusCodes.some(status => !Number.isInteger(status) || status < 200 || status > 599))) {
+    throw new RequestError('Cache statusCodes must contain HTTP statuses from 200 to 599', { code: 'CONFIG_ERROR' })
+  }
+  const statusCodes = options.statusCodes === undefined ? undefined : new Set(options.statusCodes)
   const store: CacheStore = options.store ?? new MemoryCacheStore({
     maxEntries: options.maxEntries
   })
@@ -39,6 +46,7 @@ export function createCacheState(options: CachePluginOptions) {
   const automaticInvalidations = new WeakMap<object, readonly string[]>()
   const completedRecords = new WeakMap<object, CacheEntry>()
   const revalidations = new WeakMap<object, CacheEntry>()
+  const revalidationRestorers = new WeakMap<object, (config: import('../types').RequestConfig) => void>()
   const forcedRevalidations = new WeakSet<object>()
   const noStoreRequests = new WeakSet<object>()
   const staleFallbacks = new WeakMap<object, CacheEntry>()
@@ -50,7 +58,8 @@ export function createCacheState(options: CachePluginOptions) {
   const rawLeaders = new WeakSet<object>()
   const backgroundRefreshes = new Map<string, AbortController>()
   const keyGenerations = new Map<string, KeyGeneration>()
-  const keyOperations = new Map<string, Promise<void>>()
+  const operations = new CacheOperationQueue()
+  const keyOperations = operations.pending
   const tagInvalidations = new Map<string, Promise<void>>()
   const stats = createCacheStats()
   const recordEvent = createCacheEventRecorder(stats, options.onEvent)
@@ -69,6 +78,7 @@ export function createCacheState(options: CachePluginOptions) {
 
   return {
     store,
+    statusCodes,
     cacheHits,
     leaders,
     requestGenerations,
@@ -76,6 +86,7 @@ export function createCacheState(options: CachePluginOptions) {
     automaticInvalidations,
     completedRecords,
     revalidations,
+    revalidationRestorers,
     forcedRevalidations,
     noStoreRequests,
     staleFallbacks,
@@ -88,6 +99,7 @@ export function createCacheState(options: CachePluginOptions) {
     backgroundRefreshes,
     keyGenerations,
     keyOperations,
+    operations,
     tagInvalidations,
     stats,
     recordEvent,

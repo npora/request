@@ -233,6 +233,9 @@ own work later, but cannot deliver another item after closure.
 Interruption and normal iterator cleanup share a terminal close operation, so a
 custom adapter's iterator is not closed twice. Nonterminal returns from a generator
 that yields in `finally` can still advance to terminal closure.
+These close semantics also apply with OpenTelemetry stream metrics enabled;
+closing an unopened or pending iterator releases the source and balances the
+active-stream measurement exactly once.
 
 The retry plugin handles failures within the request pipeline. It does not
 restart an iterator after consumption has begun. For SSE streams that should
@@ -397,6 +400,9 @@ the cache skips persisting that response under the original credential's key and
 does not restore an old-identity stale response. The next request with the new
 credential can populate its own cache entry. This also applies to explicit cache
 keys; keep clearing session caches and aborting outstanding requests on logout.
+When a credential changes during conditional revalidation, the cache removes
+only its own injected validators and restores the original status policy before
+replay. Application-provided conditional headers remain under application control.
 
 Create a client and storage per user session on the server; the in-memory
 storage above must not be shared across unrelated SSR requests. Browser

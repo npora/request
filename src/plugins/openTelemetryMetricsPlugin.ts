@@ -8,6 +8,7 @@ import type { RequestContext } from '../core/RequestContext'
 import { isReadableStream } from '../utils/isReadableStream'
 import type { Plugin } from './Plugin'
 import { resolveExtensionConfig } from './resolveExtensionConfig'
+import { singleIterator, withEarlyIteratorCleanup } from '../utils/withEarlyIteratorCleanup'
 
 export type OpenTelemetryMetricAttributes = Readonly<Record<
   string,
@@ -377,7 +378,13 @@ function measureAsyncIterable<T>(
   iterable: AsyncIterable<T>,
   finish: (outcome: StreamOutcome) => void
 ): AsyncIterable<T> {
-  return (async function* () {
+  iterable = singleIterator(iterable)
+  const close = () => {
+    finish('cancelled')
+    return iterable[Symbol.asyncIterator]().return?.()
+  }
+  return withEarlyIteratorCleanup(start => (async function* () {
+    start()
     let outcome: StreamOutcome | undefined
 
     try {
@@ -389,7 +396,7 @@ function measureAsyncIterable<T>(
     } finally {
       finish(outcome ?? 'cancelled')
     }
-  })()
+  })(), close, close)
 }
 
 function measureReadableStream(

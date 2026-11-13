@@ -48,7 +48,7 @@ export function createCacheMutations(state: CacheState): CacheMutations {
       rawInFlight.clear()
       keyGenerations.clear()
       abortBackgroundRefreshes(backgroundRefreshes)
-      return store.clear()
+      return state.operations.clear(() => store.clear(), tagInvalidations.values())
     },
 
     delete(config) {

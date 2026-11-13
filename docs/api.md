@@ -1362,6 +1362,8 @@ Stable HTTP semantic-convention attributes include `http.request.method`,
 to the low-cardinality HTTP method. The default `url.full` removes credentials,
 query, and fragment; use `sanitizeUrl` to enforce an application policy or
 return `undefined` to omit it.
+URL paths use the same base-path concatenation as the transport, including
+relative requests against a `baseURL` containing an API prefix.
 
 HTTP and transport failures mark the span as error. Intentional cancellation
 keeps status unset and records only `npora.request.cancelled`. Exception events
@@ -1438,6 +1440,10 @@ Set `measureStreamConsumption: false` globally or per request to avoid wrapping
 returned streams. Meter/exporter failures are isolated. Use
 `shouldRecord(config)` or `extensions.openTelemetryMetrics.enabled` for
 filtering.
+
+Stream metrics preserve early `return()` and `throw()`, including while a read
+or item validator is pending. Closing releases the owned source and balances
+the active-stream counter once, even before consumption starts.
 
 Official references: [OpenTelemetry JavaScript propagation](https://opentelemetry.io/docs/languages/js/propagation/),
 [HTTP metric semantic conventions](https://opentelemetry.io/docs/specs/semconv/http/http-metrics/),
@@ -1599,6 +1605,10 @@ may still be conditionally revalidated. Configure the built-in store with
 `maxEntries`; `0` disables storage and `Infinity` explicitly removes the
 capacity bound. A custom `store` owns and enforces its own capacity, so
 `maxEntries` is ignored when one is provided.
+Response persistence defaults to HTTP 200–299 except 206. Plugin-level
+`statusCodes` replaces this policy, for example `[200, 404]`, while `[]` disables
+response persistence. Accepted error statuses are not automatically cacheable;
+HTTP cache directives and all other eligibility rules still apply.
 Only `GET` and `HEAD` are cached. The generated cache key includes every
 explicitly configured request header and guarantees variation by
 `authorization`, `cookie`, `accept` and `accept-language`. This conservatively
@@ -1948,6 +1958,10 @@ and stale asynchronous reads or older responses cannot repopulate, overwrite or
 delete entries in the new generation. Requests already sharing an older leader
 still settle normally. Await `cache.clear()` when using an asynchronous store
 before relying on the underlying store having finished its own clear operation.
+Clears wait for already-started asynchronous writes; later requests and explicit
+mutations wait for the clear barrier. Matching key/tag invalidations are ordered
+after network writes too. IndexedDB invalidates pending local admission checks,
+and tiered caches discard invalidated secondary reads before promoting them.
 Use `cache.delete(config)` when only one entry should be invalidated.
 
 The generated default key incorporates values from `varyHeaders`, including

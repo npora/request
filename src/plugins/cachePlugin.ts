@@ -3,6 +3,7 @@ import { createCacheState } from './cacheState'
 import { createCacheMutations } from './cacheMutations'
 import { createCacheResponseHandler } from './cacheResponseHandler'
 import { createCacheRequestHandler } from './cacheRequestHandler'
+import { cacheCredentialIdentity } from './cacheKey'
 import {
   createCacheInstallation,
   createCacheErrorHandler,
@@ -64,6 +65,15 @@ export function cachePlugin(
         createCacheResponseHandler(state),
         { requiresRawResponse: false }
       )
+      context.hooks.onTransport(requestContext => {
+        const restore = state.revalidationRestorers.get(requestContext)
+        if (restore && state.requestIdentities.get(requestContext) !==
+          cacheCredentialIdentity(requestContext.config)) {
+          restore(requestContext.config)
+          state.revalidationRestorers.delete(requestContext)
+          state.revalidations.delete(requestContext)
+        }
+      }, { priority: Number.MAX_SAFE_INTEGER })
       context.hooks.onError(createCacheErrorHandler(state))
       context.hooks.onSettled(
         createCacheSettledHandler(state, installation, plugin)

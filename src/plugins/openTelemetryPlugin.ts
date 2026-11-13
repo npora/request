@@ -7,6 +7,7 @@ import type {
 import type { RequestContext } from '../core/RequestContext'
 import type { Plugin } from './Plugin'
 import { resolveExtensionConfig } from './resolveExtensionConfig'
+import { joinURL } from '../utils/joinURL'
 
 const SPAN_KIND_CLIENT = 2
 const SPAN_STATUS_UNSET = 0
@@ -394,9 +395,7 @@ function shouldTrace(
 
 function resolveURL(config: RequestConfig): URL | undefined {
   try {
-    return config.baseURL
-      ? new URL(String(config.url), config.baseURL)
-      : new URL(String(config.url))
+    return new URL(joinURL(config.baseURL, String(config.url)))
   } catch {
     return undefined
   }

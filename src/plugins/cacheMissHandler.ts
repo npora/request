@@ -171,14 +171,12 @@ export function createCacheMissHandler(
     }
 
     // Sharing and conditional revalidation are independent cache policies.
-    if (
-      staleRecord &&
-      prepareConditionalRevalidation(
-        requestContext.config,
-        staleRecord
-      )
-    ) {
-      revalidations.set(requestContext, staleRecord)
+    if (staleRecord) {
+      const restore = prepareConditionalRevalidation(requestContext.config, staleRecord)
+      if (restore) {
+        revalidations.set(requestContext, staleRecord)
+        state.revalidationRestorers.set(requestContext, restore)
+      }
     }
   }
 

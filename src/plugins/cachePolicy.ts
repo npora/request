@@ -52,8 +52,11 @@ export function resolveResponseCachePolicy(
   response: NporaResponse,
   configuredTtl: number,
   configuredStaleIfError?: number,
-  configuredStaleWhileRevalidate?: number
+  configuredStaleWhileRevalidate?: number,
+  statusCodes?: ReadonlySet<number>
 ): ResponseCachePolicy {
+  if (statusCodes ? !statusCodes.has(response.status) :
+    response.status < 200 || response.status >= 300 || response.status === 206) return NO_CACHE_POLICY
   const cacheControl = response.headers.get('cache-control')
   let maxAgeSeconds: number | undefined
   let requiresRevalidation = false

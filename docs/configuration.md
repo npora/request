@@ -228,6 +228,10 @@ interceptors. It cannot reproduce every Fetch option:
 
 Use the Fetch download transport when those options are required. Upload
 progress currently requires a browser environment with `XMLHttpRequest`.
+XHR rejects `ReadableStream` bodies, including bodies inherited from a native
+`Request`, with `CONFIG_ERROR` before sending or consuming the body. Native
+non-GET/HEAD Requests whose runtime hides the body stream are rejected too. Use Fetch
+for those inputs, or supply a replayable `body`, `json` or `formData` explicitly.
 
 ## Request body
 
@@ -538,6 +542,12 @@ headers may shorten the configured TTL. `no-store`, ambiguous `max-age`, and
 `no-cache` is not persisted. A `304` response refreshes cached metadata and the
 configured lifetime. Equivalent concurrent requests may still share their
 network operation.
+
+The plugin persists HTTP 200–299 except 206 by default. Accepting an HTTP error
+with `throwHttpErrors: false` or `validateStatus` does not make it cacheable.
+The plugin-level `statusCodes` option replaces this persistence policy, for
+example `cachePlugin({ statusCodes: [200, 404] })`; `[]` disables persistence.
+Entries still obey HTTP cache directives, TTL and request eligibility rules.
 
 Installing `cachePlugin()` alone does not cache requests. Enable it on an
 individual request or in client defaults for an API whose responses are safe
