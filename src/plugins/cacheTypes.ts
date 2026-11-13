@@ -10,6 +10,9 @@ export interface CachePluginOptions {
    */
   methods?: readonly HttpMethod[]
 
+  /** HTTP statuses eligible for persistence. @default 200–299 except 206 */
+  statusCodes?: readonly number[]
+
   /**
    * Additional request headers included in the default cache key.
    * All explicitly configured request headers are included automatically.

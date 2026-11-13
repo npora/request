@@ -466,6 +466,7 @@ void tieredCoordinationOptions
 void cacheRefreshLease
 
 const cacheOptions: CachePluginOptions = {
+  statusCodes: [200, 404] as const,
   onEvent(event) {
     const cacheEvent: CacheEvent = event
 

@@ -192,12 +192,14 @@ export function xhrRequest<T>(
         return
       }
 
-      const body = request.init.body
+      const body = request.input?.body ?? request.init.body
 
-      if (isReadableStream(body)) {
+      if (isReadableStream(body) || (request.input &&
+        request.input.body === undefined &&
+        request.input.method !== 'GET' && request.input.method !== 'HEAD')) {
         abortWith(
           new RequestError(
-            'XMLHttpRequest cannot send a ReadableStream body',
+            'XMLHttpRequest cannot send a streaming or opaque native Request body',
             {
               code: 'CONFIG_ERROR',
               config

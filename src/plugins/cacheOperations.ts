@@ -45,6 +45,7 @@ export function createCacheOperations(state: CacheState) {
     failure?: CacheEventType
   ): MaybePromise<T> {
     const pending = new Set(waits)
+    if (state.operations.clearing) pending.add(state.operations.clearing)
     const previous = keyOperations.get(key)
 
     if (previous) {

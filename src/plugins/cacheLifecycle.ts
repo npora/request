@@ -195,13 +195,13 @@ export function canRevalidateCacheEntry(
 export function prepareConditionalRevalidation(
   config: RequestConfig,
   record: CacheEntry
-): boolean {
+): ((config: RequestConfig) => void) | undefined {
   const storedHeaders = new Headers(record.headers)
   const etag = storedHeaders.get('etag')
   const lastModified = storedHeaders.get('last-modified')
 
   if (!etag && !lastModified) {
-    return false
+    return undefined
   }
 
   const headers = new Headers(config.headers)
@@ -219,7 +219,7 @@ export function prepareConditionalRevalidation(
 
   config.headers = headers
   config.throwHttpErrors = undefined
-  config.validateStatus = status => {
+  const revalidateStatus = (status: number) => {
     return status === 304 || (
       validateStatus
         ? validateStatus(status)
@@ -228,7 +228,17 @@ export function prepareConditionalRevalidation(
         )
     )
   }
-  return true
+  config.validateStatus = revalidateStatus
+  return target => {
+    const headers = new Headers(target.headers)
+    if (etag && headers.get('if-none-match') === etag) headers.delete('if-none-match')
+    if (lastModified && headers.get('if-modified-since') === lastModified) headers.delete('if-modified-since')
+    target.headers = headers
+    if (target.validateStatus === revalidateStatus) {
+      target.validateStatus = validateStatus
+      target.throwHttpErrors = throwHttpErrors
+    }
+  }
 }
 
 function hasResponseValidator(headers: Headers): boolean {

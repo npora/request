@@ -479,6 +479,11 @@ the next request can populate the new credential's entry. See the
 [authentication workflow](https://github.com/npora/request/blob/main/docs/workflows.md#refresh-authentication-tokens)
 for cancellation and session cleanup.
 
+Cache persistence defaults to HTTP 200–299 except 206. To cache selected error
+statuses explicitly, use `cachePlugin({ statusCodes: [200, 404] })` and an
+appropriate HTTP acceptance policy. Await asynchronous `cache.clear()` calls
+to coordinate pending store writes before the next cache read.
+
 See [cache workflows](https://github.com/npora/request/blob/main/docs/cache.md) for request sharing, cache updates, tag
 invalidation, HTTP revalidation, stale recovery, persistent stores, and
 coordination across browser tabs.

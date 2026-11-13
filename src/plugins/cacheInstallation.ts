@@ -77,6 +77,7 @@ export function createCacheSettledHandler(
     staleFallbacks.delete(requestContext)
     cacheFallbacks.delete(requestContext)
     state.requestIdentities.delete(requestContext)
+    state.revalidationRestorers.delete(requestContext)
 
     const requestGeneration = requestGenerations.get(requestContext)
     const invalidateAfterSuccess = () => {

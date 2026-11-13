@@ -2,12 +2,12 @@
   "files": {
     "dist/index.js": {
       "bytes": 154075,
-      "gzipBytes": 51250,
+      "gzipBytes": 52650,
       "transitive": true
     },
     "dist/index.cjs": {
       "bytes": 158575,
-      "gzipBytes": 52300,
+      "gzipBytes": 53700,
       "transitive": true
     },
     "dist/index.d.ts": {
@@ -22,7 +22,7 @@
     },
     "dist/core.js": {
       "bytes": 54925,
-      "gzipBytes": 17800,
+      "gzipBytes": 18150,
       "transitive": true
     },
     "dist/plugins/retry.js": {
@@ -46,13 +46,13 @@
       "transitive": true
     },
     "dist/plugins/opentelemetry.js": {
-      "bytes": 4550,
-      "gzipBytes": 2100,
+      "bytes": 4700,
+      "gzipBytes": 2350,
       "transitive": true
     },
     "dist/plugins/opentelemetry-metrics.js": {
       "bytes": 6550,
-      "gzipBytes": 2800,
+      "gzipBytes": 3100,
       "transitive": true
     },
     "dist/testing.js": {
@@ -62,7 +62,7 @@
     }
   },
   "package": {
-    "bytes": 138550,
+    "bytes": 141550,
     "unpackedBytes": 517100
   }
 }

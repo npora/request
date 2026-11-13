@@ -109,6 +109,11 @@ export function createCacheResponseHandler(state: CacheState) {
       state.generation,
       keyGenerations
     )
+    const mutate = (operation: () => void | Promise<void>) => state.operations.run(
+      key,
+      () => isCurrentCacheGeneration(generation, state.generation, keyGenerations)
+        ? operation() : undefined
+    )
     const generationTags = generation.token.tags
     const entryTags = generationTags && generationTags.size > 0
       ? [...generationTags]
@@ -121,7 +126,7 @@ export function createCacheResponseHandler(state: CacheState) {
         return
       }
 
-      const deletion = deleteStore(store, key)
+      const deletion = mutate(() => deleteStore(store, key))
 
       if (isPromiseLike(deletion)) {
         return requestContext.config.signal
@@ -148,13 +153,14 @@ export function createCacheResponseHandler(state: CacheState) {
       requestContext.response,
       configuredTtl,
       configuredStaleIfError,
-      configuredStaleWhileRevalidate
+      configuredStaleWhileRevalidate,
+      state.statusCodes
     )
     const ttl = policy.ttl
 
     if (!policy.persist) {
       const deletion = currentGeneration
-        ? deleteStore(store, key)
+        ? mutate(() => deleteStore(store, key))
         : undefined
       const waitsForDeletion = isPromiseLike(deletion)
       const pending = leader
@@ -204,7 +210,7 @@ export function createCacheResponseHandler(state: CacheState) {
       return
     }
 
-    const write = writeStore(store, key, record)
+    const write = mutate(() => writeStore(store, key, record))
 
     if (isPromiseLike(write)) {
       return requestContext.config.signal

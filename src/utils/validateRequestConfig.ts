@@ -4,7 +4,7 @@ import { isURLSearchParams } from './isURLSearchParams'
 import { isFormData } from './isFormData'
 import { MAX_TIMER_DELAY } from './maxTimerDelay'
 import { hasOwnProperty } from './hasOwnProperty'
-import { isAbsoluteURL } from './buildRequest'
+import { isAbsoluteURL } from './joinURL'
 import { normalizeURL } from './normalizeURL'
 
 const BODY_FIELDS = [

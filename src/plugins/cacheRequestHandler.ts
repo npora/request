@@ -165,6 +165,7 @@ export function createCacheRequestHandler(
       )
     }
     const pendingInvalidations = new Set<Promise<void>>()
+    if (state.operations.clearing) pendingInvalidations.add(state.operations.clearing)
     const keyInvalidation = keyOperations.get(key)
 
     if (keyInvalidation) {
