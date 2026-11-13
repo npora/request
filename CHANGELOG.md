@@ -1,5 +1,11 @@
 # @npora/request
 
+## 1.23.1
+
+### Patch Changes
+
+- c7a42f0: Observe already-started asynchronous retry and circuit-breaker policy promises when cancellation wins during abort-listener setup, preventing late policy failures from becoming unhandled rejections.
+
 ## 1.23.0
 
 ### Minor Changes
