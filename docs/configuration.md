@@ -797,6 +797,13 @@ since the previous event. After at least 250 milliseconds, `rate` reports the
 average bytes per second. `estimated` reports remaining seconds only when both
 the total size and rate are available.
 
+When both upload and download progress are enabled, install both plugins and
+use download transport `auto` or `xhr`. They share a single XHR and report each
+direction independently. Upload progress cannot be combined with explicit
+download transport `fetch` or download output `stream`; these combinations
+reject with `CONFIG_ERROR` before network I/O. Upload progress measures bytes
+sent, not completion of server-side processing.
+
 ### `extensions.download`
 
 Requires `downloadPlugin()`.
@@ -812,8 +819,10 @@ Fetch response stream and falls back to XHR; `transport: 'fetch'` and
 `transport: 'xhr'` select explicitly. The current Blob result is assembled in
 memory, so set `maxResponseSize` for untrusted or potentially large downloads.
 If `Content-Length` is unavailable, `total` and `progress` are omitted.
-`estimated` is also omitted without a known total. An empty Fetch-stream
-download reports one event with `loaded`, `total`, and `bytes` all set to zero.
+For Fetch responses with a non-identity `Content-Encoding`, decoded `loaded`
+bytes cannot be compared with the encoded length, so `total`, `progress` and
+`estimated` are omitted. An empty Fetch-stream download reports zero `loaded`
+and `bytes`; `total` is zero only when its length is known to be zero.
 Throwing from the progress callback cancels or aborts the transfer.
 
 Set `output: 'stream'` for downloads that should not be buffered in memory.
@@ -823,6 +832,11 @@ fail with `CONFIG_ERROR` before network I/O. Progress advances as the consumer
 reads. Cancelling the returned stream cancels the underlying response reader.
 Response-size violations and progress callback failures reject stream reads
 because the request promise has already returned the stream.
+
+Buffered progress downloads snapshot each chunk before invoking its progress
+callback. Custom producers can reuse consumed buffers after that callback;
+they must not mutate data still queued upstream, including prefetched chunks.
+Use stream output to avoid assembling a large Blob.
 
 ## Merge and validation rules
 

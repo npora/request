@@ -53,6 +53,7 @@ export function uploadPlugin(): Plugin {
           requestContext.config,
           {
             onUploadProgress: upload.onProgress,
+            onDownloadProgress: resolveExtensionConfig(requestContext.config, 'download')?.onProgress,
             preserveRaw: requestContext.preserveRaw
           }
         )

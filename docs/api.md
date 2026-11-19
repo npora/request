@@ -932,6 +932,20 @@ optional `total` and `progress`, per-event `bytes`, average bytes-per-second
 `rate`, and remaining-seconds `estimated`. Rate estimates begin after a
 250-millisecond sample; fields that cannot be determined are omitted.
 
+With both plugins installed, simultaneous upload and download progress uses
+one XHR in `auto` or `xhr` mode, in either plugin installation order. Upload
+progress combined with explicit Fetch download transport or `output: 'stream'`
+rejects with `CONFIG_ERROR` before sending. Native XHR buffers the response, so
+it cannot provide a backpressure-aware streaming download. Upload completion
+also does not mean the server has finished processing the request.
+
+Fetch download progress counts decoded bytes. When `Content-Encoding` indicates
+compression, `Content-Length` describes encoded bytes; `total`, `progress` and
+`estimated` are therefore omitted. Buffered progress downloads snapshot each
+chunk before its progress callback, allowing producers to reuse consumed
+buffers. Producers remain responsible for keeping queued and prefetched chunks
+stable until consumption.
+
 Return a stream for large downloads that should retain backpressure instead of
 being assembled into an in-memory Blob:
 

@@ -7,9 +7,8 @@ import type {
 import type { Plugin } from './Plugin'
 import { isBodylessResponse } from '../utils/parseResponse'
 import { resolveExtensionConfig } from './resolveExtensionConfig'
-import { xhrRequest } from './xhrTransport'
+import { isXHRResponse, xhrRequest } from './xhrTransport'
 import { createTransferProgressTracker } from './transferProgress'
-import { isArrayBuffer } from '../utils/isBinaryBody'
 import { isReadableStream } from '../utils/isReadableStream'
 
 export type DownloadTransport = 'auto' | 'fetch' | 'xhr'
@@ -29,8 +28,6 @@ export interface DownloadPluginOptions {
 export function downloadPlugin(
   options: DownloadPluginOptions = {}
 ): Plugin {
-  const xhrContexts = new WeakSet<object>()
-
   return {
     name: 'download',
 
@@ -50,6 +47,13 @@ export function downloadPlugin(
           config
         )
 
+        const uploadProgress = resolveExtensionConfig(config, 'upload')?.onProgress
+        if (uploadProgress && (options.transport === 'fetch' || output === 'stream')) {
+          throw new RequestError('Upload progress requires XHR and cannot use Fetch or stream downloads', {
+            code: 'CONFIG_ERROR', config
+          })
+        }
+
         if (output === 'stream') {
           validateStreamOutput(options.transport, config)
 
@@ -61,7 +65,7 @@ export function downloadPlugin(
 
         const responseType =
           download.onProgress &&
-          !shouldUseXHR(options.transport)
+          !shouldUseXHR(options.transport, Boolean(uploadProgress))
             ? 'stream'
             : config.responseType ?? 'blob'
 
@@ -81,11 +85,12 @@ export function downloadPlugin(
           'download'
         )
         const onProgress = download?.onProgress
+        const uploadProgress = resolveExtensionConfig(requestContext.config, 'upload')?.onProgress
 
         if (
           download?.output === 'stream' ||
           !onProgress ||
-          !shouldUseXHR(options.transport)
+          !shouldUseXHR(options.transport, Boolean(uploadProgress))
         ) {
           return
         }
@@ -104,20 +109,16 @@ export function downloadPlugin(
           requestContext.config,
           {
             onDownloadProgress: onProgress,
+            onUploadProgress: uploadProgress,
             preserveRaw: requestContext.preserveRaw
           }
         )
-        xhrContexts.add(requestContext)
       }, { priority: -3000 })
 
       context.hooks.onResponse(async requestContext => {
-        if (xhrContexts.has(requestContext)) {
-          return
-        }
-
         const response = requestContext.response
 
-        if (!response) {
+        if (!response || isXHRResponse(response)) {
           return
         }
 
@@ -238,7 +239,8 @@ function validateStreamOutput(
 }
 
 function shouldUseXHR(
-  transport: DownloadTransport = 'auto'
+  transport: DownloadTransport = 'auto',
+  uploadProgress = false
 ): boolean {
   if (transport === 'xhr') {
     return true
@@ -249,8 +251,10 @@ function shouldUseXHR(
   }
 
   return (
-    !supportsFetchResponseStream() &&
-    typeof XMLHttpRequest !== 'undefined'
+    uploadProgress || (
+      !supportsFetchResponseStream() &&
+      typeof XMLHttpRequest !== 'undefined'
+    )
   )
 }
 
@@ -269,9 +273,7 @@ async function consumeDownloadStream(
 ): Promise<Blob> {
   const reader = stream.getReader()
   const chunks: ArrayBuffer[] = []
-  const total = parseContentLength(
-    response.headers.get('content-length')
-  )
+  const total = resolveDownloadTotal(response.headers)
   const trackProgress = createTransferProgressTracker()
   let loaded = 0
   let reported = false
@@ -318,9 +320,7 @@ function monitorDownloadStream(
   onProgress: (progress: DownloadProgress) => void
 ): ReadableStream<Uint8Array<ArrayBufferLike>> {
   const reader = stream.getReader()
-  const total = parseContentLength(
-    response.headers.get('content-length')
-  )
+  const total = resolveDownloadTotal(response.headers)
   const trackProgress = createTransferProgressTracker()
   let loaded = 0
   let reported = false
@@ -377,26 +377,11 @@ function monitorDownloadStream(
 }
 
 /**
- * Reuses complete ArrayBuffer chunks and copies only sliced or
- * SharedArrayBuffer-backed views before passing them to Blob.
+ * Snapshot each chunk before the producer can reuse its backing buffer.
  */
 function toDownloadBuffer(
   chunk: Uint8Array<ArrayBufferLike>
 ): ArrayBuffer {
-  if (isArrayBuffer(chunk.buffer)) {
-    if (
-      chunk.byteOffset === 0 &&
-      chunk.byteLength === chunk.buffer.byteLength
-    ) {
-      return chunk.buffer
-    }
-
-    return chunk.buffer.slice(
-      chunk.byteOffset,
-      chunk.byteOffset + chunk.byteLength
-    )
-  }
-
   const copy = new Uint8Array(chunk.byteLength)
 
   copy.set(chunk)
@@ -404,9 +389,11 @@ function toDownloadBuffer(
   return copy.buffer
 }
 
-function parseContentLength(
-  value: string | null
-): number | undefined {
+function resolveDownloadTotal(headers: Headers): number | undefined {
+  const encoding = headers.get('content-encoding')?.trim().toLowerCase()
+  // Fetch exposes decoded chunks, while Content-Length describes encoded bytes.
+  if (encoding && encoding !== 'identity') return undefined
+  const value = headers.get('content-length')
   if (!value) {
     return undefined
   }

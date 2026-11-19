@@ -1,5 +1,6 @@
 import { readFile } from 'node:fs/promises'
 import { createServer } from 'node:http'
+import { gzipSync } from 'node:zlib'
 import {
   extname,
   join,
@@ -130,6 +131,17 @@ const server = createServer(
           ok: true
         })
 
+        return
+      }
+
+      if (url.pathname === '/api/compressed-download') {
+        const body = gzipSync(downloadFixture)
+        response.writeHead(200, {
+          'content-type': 'application/octet-stream',
+          'content-encoding': 'gzip',
+          'content-length': body.length
+        })
+        response.end(body)
         return
       }
 
