@@ -18,7 +18,8 @@ concurrency:
 jobs:
   website:
     name: Cloudflare website
-    runs-on: ubuntu-latest
+    # Keep browser system dependencies stable when ubuntu-latest changes images.
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     env:
       WRANGLER_SEND_METRICS: 'false'
