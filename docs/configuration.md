@@ -833,9 +833,10 @@ reads. Cancelling the returned stream cancels the underlying response reader.
 Response-size violations and progress callback failures reject stream reads
 because the request promise has already returned the stream.
 
-Buffered progress downloads snapshot each chunk before reading the next one,
-so custom stream producers can reuse their backing buffers without corrupting
-the resulting Blob. Use stream output to avoid assembling a large Blob.
+Buffered progress downloads snapshot each chunk before invoking its progress
+callback. Custom producers can reuse consumed buffers after that callback;
+they must not mutate data still queued upstream, including prefetched chunks.
+Use stream output to avoid assembling a large Blob.
 
 ## Merge and validation rules
 

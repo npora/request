@@ -74,15 +74,19 @@ it.each([
 it('snapshots reusable producer buffers before assembling a download Blob', async () => {
   const buffer = new Uint8Array(2)
   let index = 0
+  let consumed!: () => void
+  let acknowledged = new Promise<void>(resolve => { consumed = resolve })
   const source = new ReadableStream({
-    pull(controller) {
+    async pull(controller) {
       if (index === 2) { controller.close(); return }
+      if (index > 0) await acknowledged
+      acknowledged = new Promise<void>(resolve => { consumed = resolve })
       buffer.fill(index++ === 0 ? 65 : 66)
       controller.enqueue(buffer)
     }
   }, { highWaterMark: 0 })
   const client = createClient({ fetch: async () => new Response(source) }).use(downloadPlugin())
-  const blob = await client.get<Blob>('/download', { extensions: { download: { onProgress() {} } } })
+  const blob = await client.get<Blob>('/download', { extensions: { download: { onProgress() { consumed() } } } })
   expect(await blob.text()).toBe('AABB')
 })
 

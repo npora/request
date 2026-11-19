@@ -942,7 +942,9 @@ also does not mean the server has finished processing the request.
 Fetch download progress counts decoded bytes. When `Content-Encoding` indicates
 compression, `Content-Length` describes encoded bytes; `total`, `progress` and
 `estimated` are therefore omitted. Buffered progress downloads snapshot each
-chunk so custom producers that reuse buffers cannot overwrite earlier data.
+chunk before its progress callback, allowing producers to reuse consumed
+buffers. Producers remain responsible for keeping queued and prefetched chunks
+stable until consumption.
 
 Return a stream for large downloads that should retain backpressure instead of
 being assembled into an in-memory Blob:
