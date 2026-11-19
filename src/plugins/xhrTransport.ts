@@ -27,6 +27,13 @@ import {
 
 type TransferProgress = TransferProgressSnapshot
 
+const xhrResponses = new WeakSet<object>()
+
+/** Internal transport ownership, without retaining completed responses. */
+export function isXHRResponse(response: NporaResponse): boolean {
+  return xhrResponses.has(response)
+}
+
 export interface XHRTransportOptions {
   onDownloadProgress?: (progress: TransferProgress) => void
   onUploadProgress?: (progress: TransferProgress) => void
@@ -304,6 +311,7 @@ async function processResponse<T>(
       )
     }
 
+    xhrResponses.add(response)
     return response
   } catch (error) {
     if (isRequestError(error)) {

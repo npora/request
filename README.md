@@ -503,6 +503,11 @@ Built-in plugins:
 - `uploadPlugin()`
 - `downloadPlugin()`
 
+Upload and download progress can share one XHR in download `auto` or `xhr`
+mode. Upload progress is incompatible with Fetch-only or streaming downloads
+and fails early with `CONFIG_ERROR`. See the [transfer documentation](docs/api.md#download-progress-transport)
+for decoded-byte progress and large-file streaming behavior.
+
 Plugin-owned request options belong under `extensions`. Third-party plugins can
 augment `RequestExtensions` through TypeScript module augmentation.
 
