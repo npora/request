@@ -763,3 +763,6 @@ Internal modules outside those public entrypoints are not public API.
 ## License
 
 MIT © Npora Team
+
+See the [dated stable-client comparison](docs/measurements/1.23.3-comparison/README.md)
+for reproducible Axios, Ky and ofetch measurements, feature differences and limits.

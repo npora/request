@@ -1,4 +1,15 @@
 export const messages = {
+  "comparison.eyebrow": {"en": "MEASURED, NOT ASSUMED", "zh-CN": "以实测为依据"},
+  "comparison.title": {"en": "Choose the right client.", "zh-CN": "选择适合你的请求库。"},
+  "comparison.description": {"en": "A transparent snapshot against current stable clients, measured on November 20, 2026.", "zh-CN": "与当前稳定版请求库的透明对比，测量日期为 2026 年 11 月 20 日。"},
+  "comparison.client": {"en": "Client / version", "zh-CN": "客户端 / 版本"},
+  "comparison.get": {"en": "GET JSON · req/s", "zh-CN": "GET JSON · 次/秒"},
+  "comparison.large": {"en": "64 KiB JSON · req/s", "zh-CN": "64 KiB JSON · 次/秒"},
+  "comparison.bundle": {"en": "Browser gzip", "zh-CN": "浏览器 gzip"},
+  "comparison.method": {"en": "Npora 1.23.3 · Node 24.18.0 · Apple M3 · loopback HTTP · concurrency 32 · six rotated rounds. Retries and configurable timeouts disabled. Browser bundles: esbuild 0.28.2, ES2020, gzip level 9. These results do not rank production or browser network performance.", "zh-CN": "Npora 1.23.3 · Node 24.18.0 · Apple M3 · 本机回环 HTTP · 并发 32 · 六轮轮换顺序。关闭重试和可配置超时。浏览器包使用 esbuild 0.28.2、ES2020、gzip 级别 9。结果不代表生产或浏览器网络性能排名。"},
+  "comparison.position": {"en": "Ky also supports Standard Schema, QUERY and transfer progress. Npora focuses on incremental SSE/NDJSON validation and composed request lifecycles. Got and Undici target Node transport needs; SuperAgent offers mature forms and transfers. They were reviewed, not benchmarked here.", "zh-CN": "Ky 同样支持 Standard Schema、QUERY 和传输进度。Npora 专注于 SSE/NDJSON 增量校验和请求生命周期组合。Got、Undici 面向 Node 传输需求，SuperAgent 提供成熟的表单与传输能力；本次审阅了其能力，未纳入性能测试。"},
+  "comparison.docs": {"en": "Methodology and raw results ↗", "zh-CN": "测试方法与原始结果 ↗"},
+
   "quickstart.nav": {"en": "Get started", "zh-CN": "快速开始"},
   "quickstart.eyebrow": {"en": "YOUR FIRST REQUEST", "zh-CN": "你的第一个请求"},
   "quickstart.title": {"en": "Install. Run. Meet your response.", "zh-CN": "安装，运行，拿到响应。"},

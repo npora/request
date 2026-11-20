@@ -2,6 +2,20 @@ import { test, expect } from '@playwright/test'
 import { readFileSync } from 'node:fs'
 const { version } = JSON.parse(readFileSync(new URL('../../../package.json', import.meta.url), 'utf8'))
 
+test('comparison snapshot is accessible, dated and bilingual', async ({ page }, testInfo) => {
+  await page.goto('/')
+  const section = page.locator('#comparison')
+  await expect(section.getByRole('heading')).toHaveText('Choose the right client.')
+  await expect(section.getByRole('table')).toContainText('Axios 1.21.1')
+  await expect(section).toContainText('Npora 1.23.3')
+  await expect(section).toContainText('do not rank production')
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+  await section.screenshot({ path: testInfo.outputPath('comparison.png') })
+  await page.locator('#language').selectOption('zh-CN')
+  await expect(section.getByRole('heading')).toHaveText('选择适合你的请求库。')
+  await expect(section).toContainText('不代表生产或浏览器网络性能排名')
+})
+
 test('all ten real scenarios complete and report actual network activity', async ({ page }, testInfo) => {
   const errors: string[] = []
   const retryUrls: string[] = []

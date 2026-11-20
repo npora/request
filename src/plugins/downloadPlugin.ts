@@ -10,6 +10,7 @@ import { resolveExtensionConfig } from './resolveExtensionConfig'
 import { isXHRResponse, xhrRequest } from './xhrTransport'
 import { createTransferProgressTracker } from './transferProgress'
 import { isReadableStream } from '../utils/isReadableStream'
+import { decodedContentLength } from '../utils/decodedContentLength'
 
 export type DownloadTransport = 'auto' | 'fetch' | 'xhr'
 
@@ -273,7 +274,7 @@ async function consumeDownloadStream(
 ): Promise<Blob> {
   const reader = stream.getReader()
   const chunks: ArrayBuffer[] = []
-  const total = resolveDownloadTotal(response.headers)
+  const total = decodedContentLength(response.headers)
   const trackProgress = createTransferProgressTracker()
   let loaded = 0
   let reported = false
@@ -321,7 +322,7 @@ function monitorDownloadStream(
   onProgress: (progress: DownloadProgress) => void
 ): ReadableStream<Uint8Array<ArrayBufferLike>> {
   const reader = stream.getReader()
-  const total = resolveDownloadTotal(response.headers)
+  const total = decodedContentLength(response.headers)
   const trackProgress = createTransferProgressTracker()
   let loaded = 0
   let reported = false
@@ -389,22 +390,4 @@ function toDownloadBuffer(
   copy.set(chunk)
 
   return copy.buffer
-}
-
-function resolveDownloadTotal(headers: Headers): number | undefined {
-  const encoding = headers.get('content-encoding')?.trim().toLowerCase()
-  // Fetch exposes decoded chunks, while Content-Length describes encoded bytes.
-  if (encoding && encoding !== 'identity') return undefined
-  const value = headers.get('content-length')
-  if (!value) {
-    return undefined
-  }
-
-  const total = Number(value)
-
-  if (!Number.isFinite(total) || total < 0) {
-    return undefined
-  }
-
-  return total
 }

@@ -63,7 +63,17 @@ pnpm test:browser
 
 The isolated fixture pins Undici 7.30.2 and overrides sharp to 0.35.5 to address
 advisories in Miniflare's pinned dependencies. A separate `undici-next` alias pins
-Undici 8.12.4 and runs the same real-HTTP dispatcher contracts on both versions;
+Undici 8.13.0 and runs the same real-HTTP dispatcher contracts on both versions;
 it does not replace Miniflare's 7.x transport. Undici 8 requires Node.js 22.19.0
 or newer. The fixture is audited and tested
 in CI; none of its dependencies enter the published package.
+
+## Local HTTPS contracts
+
+`test/edge/https.test.mjs` verifies both injected Undici versions with real TLS
+sockets, trusted ephemeral certificates, certificate rejection, CONNECT proxy
+tunnels, slow uploads, compressed downloads, decoded limits, cancellation,
+timeouts and interrupted bodies. Certificates are generated in a temporary
+directory using OpenSSL and removed after the suite; no private keys are stored
+in the repository. These local tests do not reproduce public Internet latency,
+enterprise proxy authentication or production certificate rotation.

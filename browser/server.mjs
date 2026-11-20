@@ -147,6 +147,16 @@ const server = createServer(
         return
       }
 
+      if (url.pathname === '/api/compressed-json') {
+        const body = gzipSync(Buffer.from('{"ok":true}'))
+        response.writeHead(url.searchParams.has('error') ? 400 : 200, {
+          'content-type': 'application/json', 'content-encoding': 'gzip',
+          'content-length': body.length
+        })
+        response.end(body)
+        return
+      }
+
       if (url.pathname === '/api/download') {
         sendBinary(
           response,

@@ -6,6 +6,7 @@ import {
 } from './parseStreamingResponse'
 import { isArrayBuffer } from './isBinaryBody'
 import { getSseControl } from './sseControl'
+import { decodedContentLength } from './decodedContentLength'
 
 const TEXT_DECODER = new TextDecoder()
 
@@ -175,9 +176,7 @@ function rejectOversizedContentLength(
   maxSize: number,
   config: RequestConfig
 ): void {
-  const contentLength = Number(response.headers.get('content-length'))
-
-  if (!Number.isFinite(contentLength) || contentLength <= maxSize) {
+  if ((decodedContentLength(response.headers) ?? 0) <= maxSize) {
     return
   }
 

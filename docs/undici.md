@@ -18,10 +18,28 @@ import { createClient } from '@npora/request'
 function fetchWith(
   dispatcher: Dispatcher
 ): typeof globalThis.fetch {
-  return ((input, init) => undiciFetch(input, {
-    ...init,
-    dispatcher
-  })) as typeof globalThis.fetch
+  return ((input, init) => {
+    // Standalone Undici and Node's built-in Fetch use different Request brands.
+    if (input instanceof Request) {
+      init = {
+        method: input.method,
+        headers: input.headers,
+        body: input.body,
+        signal: input.signal,
+        cache: input.cache,
+        credentials: input.credentials,
+        integrity: input.integrity,
+        keepalive: input.keepalive,
+        mode: input.mode,
+        redirect: input.redirect,
+        referrer: input.referrer,
+        referrerPolicy: input.referrerPolicy,
+        ...init
+      }
+      input = input.url
+    }
+    return undiciFetch(input, { ...init, duplex: 'half', dispatcher })
+  }) as typeof globalThis.fetch
 }
 ```
 
@@ -134,3 +152,10 @@ Prefer one long-lived dispatcher per policy boundary instead of constructing
 an agent per request. For process-wide policy, Undici also supports
 `setGlobalDispatcher`, but per-client Fetch injection keeps proxy, certificate,
 and DNS behavior isolated and explicit.
+
+A custom streaming upload producer must also observe the caller's AbortSignal
+and stop its own timers or asynchronous work. Fetch implementations may abort
+the network request without invoking the source's cancellation hook promptly.
+Cancellation of the HTTP request is not proof that arbitrary producer work has
+stopped. The local HTTPS suite covers a signal-aware producer and subsequent
+connection-pool reuse.
