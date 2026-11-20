@@ -1,5 +1,6 @@
 import { readFile } from 'node:fs/promises'
 import { createServer } from 'node:http'
+import { createHash } from 'node:crypto'
 import { gzipSync } from 'node:zlib'
 import {
   extname,
@@ -42,6 +43,7 @@ const contentTypes = {
 }
 
 const requestCounts = new Map()
+const transferRecords = new Map()
 const downloadFixture = Buffer.alloc(
   64 * 1024,
   0x6e
@@ -212,6 +214,33 @@ const server = createServer(
         await delay(10)
         response.destroy(new Error('Intentional stream interruption'))
 
+        return
+      }
+
+      if (url.pathname === '/api/transfer-refresh') {
+        sendJson(response, 200, { token: 'fresh' })
+        return
+      }
+
+      if (url.pathname === '/api/transfer-replay') {
+        const body = await readRequestBuffer(request)
+        const form = await new Request('http://fixture/upload', {
+          method: 'POST', headers: { 'content-type': request.headers['content-type'] ?? '' }, body
+        }).formData()
+        const file = form.get('file')
+        if (!(file instanceof Blob)) { sendJson(response, 400, { error: 'Missing file' }); return }
+        const key = url.searchParams.get('run')
+        const records = transferRecords.get(key) ?? []
+        const authorization = request.headers.authorization ?? ''
+        const status = authorization !== 'Bearer fresh' ? 401 : records.length === 1 ? 503 : 200
+        records.push({ status, authorization, name: file.name, size: file.size,
+          hash: createHash('sha256').update(Buffer.from(await file.arrayBuffer())).digest('hex'),
+          labels: form.getAll('label') })
+        transferRecords.set(key, records)
+        const wait = Number(url.searchParams.get('wait') ?? 0)
+        if (Number.isFinite(wait) && wait > 0) await delay(Math.min(wait, 1000))
+        sendJson(response, status, { records })
+        if (status === 200) transferRecords.delete(key)
         return
       }
 

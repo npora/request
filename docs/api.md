@@ -970,6 +970,12 @@ cancellation propagates to the response body, and `maxResponseSize` remains
 enforced during consumption. Body-read and progress-callback errors surface
 from the stream reader or `pipeTo()` after the request promise has resolved.
 
+Progress callback failures release owned readers and settle with the original
+error without waiting for the source's cancellation promise. Late cleanup
+rejections remain observed. Once a download stream has been returned, body-read
+failures are not automatically retried or refreshed: the consumer must decide
+how to restart a partially consumed download.
+
 Plugins must not replace client methods.
 
 Plugins should extend the request lifecycle through supported extension points.
