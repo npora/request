@@ -1,5 +1,24 @@
 import { expect, test } from '@playwright/test'
 
+test('compressed decoded limits accept overhead and retain HTTP error data', async ({ page }) => {
+  await page.goto('/')
+  const result = await page.evaluate(async () => {
+    const { createClient } = await import(`${location.origin}/dist/index.js`)
+    const api = createClient({ baseURL: '/api' })
+    const data = await api.get('/compressed-json', { maxResponseSize: 11 })
+    const response = await api.getResponse('/compressed-json', { maxResponseSize: 11 })
+    const stream = await api.get('/compressed-json', { maxResponseSize: 11, responseType: 'stream' })
+    let tooLarge, errorData
+    try { await api.get('/compressed-json', { maxResponseSize: 10 }) }
+    catch (error) { tooLarge = error.code }
+    try { await api.get('/compressed-json?error', { maxErrorResponseSize: 11 }) }
+    catch (error) { errorData = { code: error.code, data: error.response.data } }
+    return { data, response: response.data, stream: await new Response(stream).json(), tooLarge, errorData }
+  })
+  expect(result).toEqual({ data: { ok: true }, response: { ok: true }, stream: { ok: true },
+    tooLarge: 'RESPONSE_TOO_LARGE', errorData: { code: 'HTTP_ERROR', data: { ok: true } } })
+})
+
 for (const transport of ['auto', 'xhr'] as const) {
   for (const reverse of [false, true]) {
     test(`shares real upload/download progress (${transport}, reverse=${reverse})`, async ({ page }) => {

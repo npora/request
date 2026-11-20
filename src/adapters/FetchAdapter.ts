@@ -1,4 +1,5 @@
 import { isRequestError, RequestError } from '../errors'
+import { decodedContentLength } from '../utils/decodedContentLength'
 import type { Adapter, NporaResponse, RequestConfig } from '../types'
 import {
   type BuiltRequest,
@@ -108,7 +109,7 @@ export class FetchAdapter implements Adapter {
       )
       const knownErrorBodyTooLarge =
         errorResponseSizeLimit !== undefined &&
-        exceedsContentLength(response, errorResponseSizeLimit)
+        (decodedContentLength(response.headers) ?? 0) > errorResponseSizeLimit
       const parseTarget =
         bodyless ||
         knownErrorBodyTooLarge ||
@@ -244,12 +245,6 @@ function resolveFetch(config: RequestConfig): NonNullable<RequestConfig['fetch']
     })
   }
   return fetch
-}
-
-function exceedsContentLength(response: Response, limit: number): boolean {
-  const contentLength = Number(response.headers.get('content-length'))
-
-  return Number.isFinite(contentLength) && contentLength > limit
 }
 
 function cancelResponseBody(response: Response): void {

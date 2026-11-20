@@ -859,3 +859,13 @@ code `CONFIG_ERROR` before transport I/O.
 
 See the [API reference](api.md) for client methods, plugin constructor options,
 errors, adapters, and extension authoring.
+
+### Compressed response limits
+
+Fetch exposes decoded response bytes. For responses with a visible non-identity
+Content-Encoding, maxResponseSize and maxErrorResponseSize count the actual
+decoded bytes read, rather than the encoded Content-Length. This accepts small
+responses with compression overhead while still rejecting decoded expansion
+beyond the configured cap. Plain and identity responses retain early length
+checks. A cross-origin server must expose Content-Encoding through CORS for
+the client to distinguish those units from response headers.

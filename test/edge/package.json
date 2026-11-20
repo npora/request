@@ -5,7 +5,7 @@
   "dependencies": {
     "miniflare": "4.20260730.0",
     "undici": "7.30.2",
-    "undici-next": "npm:undici@8.12.4"
+    "undici-next": "npm:undici@8.13.0"
   },
   "overrides": {
     "undici": "$undici",

@@ -267,3 +267,16 @@ progress { display: block; width: 100%; height: 5px; margin-top: 7px; accent-col
 .not-found h1 { max-width: 780px; }
 .not-found > p { font-size: 15px; color: var(--muted); line-height: 1.9; max-width: 540px; margin-bottom: 30px; }
 .not-found .language-picker { margin-left: 10px; }
+
+.comparison-section { padding-block: 70px; }
+.comparison-scroll { overflow-x: auto; border: 1px solid var(--line, #d5dfd2); border-radius: 14px; margin-block: 24px; }
+.comparison-table { width: 100%; border-collapse: collapse; min-width: 540px; text-align: left; font-size: 13px; }
+.comparison-table th, .comparison-table td { padding: 18px 20px; border-bottom: 1px solid var(--line, #d5dfd2); width: auto; white-space: nowrap; }
+.comparison-table th { position: static; background: transparent; }
+.comparison-table th:first-child { width: 40%; }
+.comparison-table thead { background: #edf3e4; }
+.comparison-table tbody tr:first-child { background: #f5f8f0; }
+.comparison-table tr:last-child > * { border-bottom: 0; }
+.comparison-table td { font-family: var(--mono); white-space: nowrap; }
+.comparison-note { color: var(--muted); line-height: 1.8; font-size: 13px; margin-block: 16px; }
+@media (max-width: 600px) { .comparison-section { padding-block: 40px; } }
