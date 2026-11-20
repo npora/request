@@ -21,7 +21,7 @@ jobs:
     runs-on: ubuntu-24.04
     container:
       # Match the locked Playwright version; browsers and OS dependencies are bundled.
-      image: mcr.microsoft.com/playwright:v1.64.1-noble@sha256:2f05f8a734509a7b3f26a912639488ee08f58a7b292d14d62271bcff9038768f
+      image: mcr.microsoft.com/playwright:v1.65.0-noble@sha256:9beb546099e11f52d62e505537914870e01a67e0e6b00ae41da4775324e73dbe
       options: --ipc=host --init
     timeout-minutes: 15
     env:
@@ -47,7 +47,7 @@ jobs:
       - name: Verify interfaces in workerd
         run: pnpm test:website
       - name: Verify bundled browser version
-        run: node -e "require('node:assert/strict').equal(require('@playwright/test/package.json').version, '1.64.1', 'Update the pinned Playwright image when upgrading Playwright')"
+        run: node -e "require('node:assert/strict').equal(require('@playwright/test/package.json').version, '1.65.0', 'Update the pinned Playwright image when upgrading Playwright')"
       - name: Match browser home ownership
         # GitHub mounts a home directory owned by the host runner user.
         # Firefox requires the existing directory to belong to its launch user.

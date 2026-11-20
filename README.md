@@ -6,7 +6,7 @@
 [![runtime dependencies](https://img.shields.io/badge/runtime_dependencies-0-success)](package.json)
 [![license](https://img.shields.io/npm/l/@npora/request.svg)](LICENSE)
 
-[Website & live playground](https://npora.pages.dev) ·
+[Website & live playground](https://www.npora.live/) ·
 [API reference](https://github.com/npora/request/blob/main/docs/api.md) ·
 [Changelog](https://github.com/npora/request/blob/main/CHANGELOG.md)
 
@@ -20,7 +20,7 @@ has zero runtime dependencies.
 | Goal | Documentation |
 | --- | --- |
 | Send the first request | [Quick start](#quick-start) |
-| Try real requests in the browser | [Live playground](https://npora.pages.dev/#playground) |
+| Try real requests in the browser | [Live playground](https://www.npora.live/#playground) |
 | Develop or deploy the website | [Cloudflare Pages guide](https://github.com/npora/request/blob/main/docs/cloudflare-website.md) |
 | Move an existing Axios client | [Axios migration guide](https://github.com/npora/request/blob/main/docs/axios-migration.md) |
 | Consume SSE or NDJSON | [Streaming responses](#streaming-responses) |
@@ -35,7 +35,7 @@ has zero runtime dependencies.
 
 ## Live playground
 
-Try the library at **[npora.pages.dev](https://npora.pages.dev/#playground)**.
+Try the library at **[www.npora.live](https://www.npora.live/#playground)**.
 The console uses the request client built from this repository and makes real
 same-origin requests to Cloudflare Pages Functions. Its displayed version comes
 from the package manifest.
@@ -87,7 +87,7 @@ To try a real response before connecting your own backend, save this as
 import { createClient } from '@npora/request/core'
 
 const api = createClient({
-  baseURL: 'https://npora.pages.dev/api',
+  baseURL: 'https://www.npora.live/api',
   timeout: 5000
 })
 
@@ -706,7 +706,7 @@ allowlist, and size budgets.
 
 ## Documentation
 
-- [Live playground](https://npora.pages.dev/#playground)
+- [Live playground](https://www.npora.live/#playground)
 - [Website development and Cloudflare deployment](https://github.com/npora/request/blob/main/docs/cloudflare-website.md)
 - [Configuration reference](https://github.com/npora/request/blob/main/docs/configuration.md)
 - [API reference](https://github.com/npora/request/blob/main/docs/api.md)

@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
 import { getNpmPackManifest } from './npm-pack-result.mjs'
+import { collectDependencies } from './dependency-closure.mjs'
 import {
-  existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -12,7 +12,6 @@ import {
 import { tmpdir } from 'node:os'
 import {
   dirname,
-  extname,
   join,
   resolve
 } from 'node:path'
@@ -87,50 +86,6 @@ function inspectFiles() {
       }
     )
   )
-}
-
-function collectDependencies(entry) {
-  const pending = [entry]
-  const visited = new Set()
-
-  while (pending.length > 0) {
-    const file = pending.pop()
-
-    if (!file || visited.has(file)) {
-      continue
-    }
-
-    visited.add(file)
-
-    const source = readFileSync(file, 'utf8')
-    const imports = [
-      ...source.matchAll(/\bfrom\s*["']([^"']+)["']/g),
-      ...source.matchAll(/\bimport\s*["']([^"']+)["']/g),
-      ...source.matchAll(/\brequire\(\s*["']([^"']+)["']\s*\)/g)
-    ]
-
-    for (const match of imports) {
-      const specifier = match[1]
-
-      if (!specifier?.startsWith('.')) {
-        continue
-      }
-
-      let dependency = resolve(dirname(file), specifier)
-
-      if (!existsSync(dependency) && file.endsWith('.d.ts')) {
-        dependency = dependency.replace(/\.js$/, '.d.ts')
-      } else if (!existsSync(dependency) && file.endsWith('.d.cts')) {
-        dependency = dependency.replace(/\.cjs$/, '.d.cts')
-      }
-
-      if (extname(dependency) && existsSync(dependency)) {
-        pending.push(dependency)
-      }
-    }
-  }
-
-  return [...visited]
 }
 
 function inspectPackage() {
