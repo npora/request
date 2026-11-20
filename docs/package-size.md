@@ -4,6 +4,22 @@ Package size is a release constraint, separate from runtime performance.
 The check covers the transitive file closures loaded by the root and selected
 subpath entrypoints, their gzip sizes, declaration files, and the npm tarball.
 
+Declaration closures follow TypeScript extension substitution: `.js`, `.mjs`
+and `.cjs` references resolve to `.d.ts`, `.d.mts` and `.d.cts` before checking
+for matching runtime files. Runtime closures continue to follow JavaScript,
+including relative dynamic imports. Shared chunks and cycles are counted once;
+missing internal dependencies fail the check instead of disappearing from it.
+
+The tsdown 0.23.2 → 0.23.7 maintenance update leaves the ESM declaration closure
+at 69,043 raw / 21,214 gzip bytes. With the same source and 19 declaration files,
+the CommonJS declaration layout changes from 69,089 / 21,219 to
+71,445 / 21,505 bytes: +2,356 raw and +286 gzip. The old checker incorrectly
+followed colliding runtime filenames and reported 167,214 raw bytes. Only the
+CommonJS declaration ceilings change, from 69,100 / 21,250 to 71,600 / 21,600;
+all JavaScript, consumer-bundle, tarball and other declaration budgets stay
+unchanged. Public API and installed-consumer checks still apply. This is a
+measured tooling layout cost, not a runtime feature or a reason to publish alone.
+
 Build and verify the current package:
 
 ```sh
