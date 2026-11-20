@@ -825,6 +825,10 @@ bytes cannot be compared with the encoded length, so `total`, `progress` and
 and `bytes`; `total` is zero only when its length is known to be zero.
 Throwing from the progress callback cancels or aborts the transfer.
 
+For Fetch downloads, a progress callback failure rejects promptly with the
+original error even when source cancellation is slow or never finishes. Reader
+locks are released, and late cleanup rejections do not replace the callback error.
+
 Set `output: 'stream'` for downloads that should not be buffered in memory.
 Stream output requires Fetch response-stream support and is incompatible with
 `downloadPlugin({ transport: 'xhr' })`; invalid or unavailable combinations

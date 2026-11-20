@@ -417,6 +417,29 @@ service or credentials:
 pnpm example:auth-refresh
 ```
 
+## Upload with authentication and retries
+
+Install `authPlugin`, `retryPlugin`, `uploadPlugin` and `downloadPlugin` to
+combine multipart replay with upload and download progress. With download
+transport `auto` or `xhr`, both progress directions use one XHR per attempt.
+For a `401 → token refresh → 503 → retry → 200` sequence, configure `retries: 2`:
+authentication replay increments the shared attempt count. Retrying `POST` must
+be enabled explicitly in `methods`; use application-level idempotency protection
+when repeating a write could duplicate a business operation.
+
+Progress starts again for each attempt; it does not represent server-side
+processing completion. Cancelling an active transfer, refresh wait or retry
+delay rejects that caller and prevents its next attempt. Progress callback
+failures retain the original error and do not wait indefinitely for source
+cleanup. The transfer lifecycle tests verify multipart bytes, filenames,
+repeated fields, request counts and reader/timer cleanup across these paths.
+
+For large downloads, use Fetch `output: 'stream'` with consumer-driven reads.
+It cannot be combined with XHR upload progress. A timeout, size violation or
+callback error after stream handoff fails reads instead of replaying a partially
+consumed body. Use `maxResponseSize` and a per-attempt or idle timeout as needed;
+the consumer owns closing or cancelling its returned reader.
+
 ## Bound a batch of reads
 
 Run the [batch example](../examples/batch.ts) without a network service:

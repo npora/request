@@ -299,7 +299,8 @@ async function consumeDownloadStream(
     }
   } catch (error) {
     try {
-      await reader.cancel(error)
+      // Source cleanup must not delay delivery of the original failure.
+      void reader.cancel(error).catch(() => {})
     } catch {
       // Preserve the original stream/progress failure.
     }
@@ -354,7 +355,8 @@ function monitorDownloadStream(
         controller.enqueue(result.value)
       } catch (error) {
         try {
-          await reader.cancel(error)
+          // Source cleanup must not delay delivery of the original failure.
+          void reader.cancel(error).catch(() => {})
         } catch {
           // Preserve the original stream/progress failure.
         }
