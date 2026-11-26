@@ -1,13 +1,16 @@
 # Cloudflare Pages 官网与实时测试控制台
 
-官网目标地址为 **https://npora.pages.dev**，对应现有 Pages 项目 `npora`。
+请求库展示站的正式地址为 **https://request.npora.live**，对应 Pages 项目 `npora`。
+[线上站点仓库](https://github.com/npora/online/tree/main/request) 管理固定提交、候选构建和发布入口。
+旧 `www.npora.live/#playground` 由总官网转接，`www.npora.live/api` 与 `/api/*`
+由总官网透传到新域名，兼容已有请求方法、请求体、响应状态和流式响应。
 官网打包当前仓库源码，版本标记自动读取根 `package.json`，不从 CDN 加载另一个版本。
 官网、Mock 接口和测试独立于库的 npm 发布流程。
 
-## 按现有 Pages 项目部署
+## 构建环境
 
-Cloudflare 控制台截图使用的是 Pages。保留 GitHub 仓库 `npora/request`、生产分支 `main`，
-到 Pages 项目的 Settings → Builds & deployments 设置：
+生产部署遵循线上站点仓库的发布流程。下表记录 Pages 构建源检出所需的配置，
+也适用于仍使用 Git 集成的隔离预览项目。
 
 | 配置项 | 值 |
 | --- | --- |

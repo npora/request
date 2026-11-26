@@ -20,7 +20,7 @@
     "circuit-breaker",
     "web-worker"
   ],
-  "homepage": "https://www.npora.live/",
+  "homepage": "https://request.npora.live/",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/npora/request.git"

@@ -1,6 +1,8 @@
 # Npora Request website
 
-官网：https://npora.pages.dev
+官网：https://request.npora.live
+
+旧 `www.npora.live/#playground` 和 `www.npora.live/api` 由 Npora 总官网提供兼容入口。
 
 源码主页是 `index.html`，前端场景在 `scenarios.js`，交互在 `app.js`，
 Mock API 在 `functions/api/user.js`。这是 **Cloudflare Pages + Functions** 项目。
