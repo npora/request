@@ -3,8 +3,9 @@
 ## Keep the working tree tidy
 
 Coverage, browser reports and CI benchmark/size reports live under the ignored
-`.artifacts/` directory. `dist/` remains the package's build output;
-`website/dist/` is the Cloudflare Pages site's public build output.
+`.artifacts/` directory. `dist/` remains the package's build output. The
+[request playground](https://github.com/npora/online/tree/main/request)
+builds and tests the site from a pinned library revision.
 
 ```sh
 pnpm clean:dry-run
