@@ -5,11 +5,9 @@ repeats critical contracts against the built and published package.
 
 ## Local checks
 
-The [Cloudflare Pages website](cloudflare-website.md) has isolated tooling in
-`website/`. After `npm ci --prefix website --ignore-scripts`, run
-`pnpm test:website` for workerd interface contracts and
-`pnpm test:website:browser` for its real Pages console in desktop and mobile
-browsers. These tests do not publish npm or deploy Cloudflare resources.
+The [request playground](cloudflare-website.md) is verified separately in
+[npora/online](https://github.com/npora/online/tree/main/request) against its
+pinned library revision.
 
 ```sh
 pnpm typecheck

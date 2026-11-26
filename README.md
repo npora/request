@@ -21,7 +21,7 @@ has zero runtime dependencies.
 | --- | --- |
 | Send the first request | [Quick start](#quick-start) |
 | Try real requests in the browser | [Live playground](https://request.npora.live/#playground) |
-| Develop or deploy the website | [Cloudflare Pages guide](https://github.com/npora/request/blob/main/docs/cloudflare-website.md) |
+| Develop or deploy the website | [Online site and Cloudflare guide](https://github.com/npora/online/tree/main/request) |
 | Move an existing Axios client | [Axios migration guide](https://github.com/npora/request/blob/main/docs/axios-migration.md) |
 | Consume SSE or NDJSON | [Streaming responses](#streaming-responses) |
 | Run a complete session workflow | [Session example](https://github.com/npora/request/blob/main/docs/workflows.md#build-a-session-client) |
@@ -36,9 +36,9 @@ has zero runtime dependencies.
 ## Live playground
 
 Try the library at **[request.npora.live](https://request.npora.live/#playground)**.
-The console uses the request client built from this repository and makes real
-same-origin requests to Cloudflare Pages Functions. Its displayed version comes
-from the package manifest. Existing examples using `https://www.npora.live/api`
+The console builds the request client from a pinned commit in this repository
+and makes real same-origin requests to Cloudflare Pages Functions. Its displayed
+version comes from the package manifest. Existing examples using `https://www.npora.live/api`
 remain supported through the Npora site's compatibility endpoint. Use
 `https://request.npora.live/api` for new examples.
 
@@ -61,10 +61,13 @@ use server arrival times; a separate, clearly labelled probe makes
 `Retry-After` recovery observable even when a slow connection never exceeds
 the real limit. Mock users and tokens are demonstration data.
 
-The website and its build tools are separate from the npm package. Installing
-`@npora/request` adds no runtime dependencies or website server code. See the
-[Cloudflare deployment guide](https://github.com/npora/request/blob/main/docs/cloudflare-website.md)
-for local setup, API routes and bindings.
+The website, Cloudflare Pages Functions, state Worker, deployment configuration,
+and website tests are maintained in [npora/online](https://github.com/npora/online/tree/main/request).
+This repository contains the reusable request library, its API documentation,
+package tests, and release workflow. Installing `@npora/request` adds no
+runtime dependencies or website server code. See the
+[website operations guide](https://github.com/npora/online/tree/main/request)
+for local setup, API routes, bindings, preview, and deployment.
 
 ## Install
 
@@ -709,7 +712,7 @@ allowlist, and size budgets.
 ## Documentation
 
 - [Live playground](https://request.npora.live/#playground)
-- [Website development and Cloudflare deployment](https://github.com/npora/request/blob/main/docs/cloudflare-website.md)
+- [Website development and Cloudflare deployment](https://github.com/npora/online/tree/main/request)
 - [Configuration reference](https://github.com/npora/request/blob/main/docs/configuration.md)
 - [API reference](https://github.com/npora/request/blob/main/docs/api.md)
 - [Architecture](https://github.com/npora/request/blob/main/docs/architecture.md)
@@ -741,17 +744,8 @@ See the
 [testing and release gates](https://github.com/npora/request/blob/main/docs/testing.md)
 for the complete matrix.
 
-To run the website locally, install its isolated tools and build its public assets:
-
-```sh
-npm ci --prefix website --ignore-scripts
-pnpm website:build
-pnpm website:dev
-```
-
-Open `http://127.0.0.1:8787`. The development command starts Pages and its local
-state Worker. Website checks are `pnpm test:website` and
-`pnpm test:website:browser`; they do not deploy or publish anything.
+For the website's local setup, API and browser regression checks, see the
+[request playground and deployment files in npora/online](https://github.com/npora/online/tree/main/request).
 
 ## Versioning
 
